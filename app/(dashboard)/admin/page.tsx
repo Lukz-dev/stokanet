@@ -1,12 +1,14 @@
 import { getAdminUsers, setUserApproval } from '@/lib/admin'
 
+type AdminUser = Awaited<ReturnType<typeof getAdminUsers>>[number]
+
 const formatDate = new Intl.DateTimeFormat('pt-BR', {
   dateStyle: 'short',
   timeStyle: 'short',
 })
 
 export default async function AdminPage() {
-  const users = await getAdminUsers()
+  const users: AdminUser[] = await getAdminUsers()
 
   return (
     <div className="space-y-8">
@@ -25,11 +27,11 @@ export default async function AdminPage() {
         </div>
         <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
           <p className="text-xs uppercase tracking-wider text-muted-foreground">Aprovadas</p>
-          <p className="mt-2 text-3xl font-bold">{users.filter((user) => user.isApproved).length}</p>
+          <p className="mt-2 text-3xl font-bold">{users.filter((user: AdminUser) => user.isApproved).length}</p>
         </div>
         <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
           <p className="text-xs uppercase tracking-wider text-muted-foreground">Pendentes</p>
-          <p className="mt-2 text-3xl font-bold">{users.filter((user) => !user.isApproved && !user.isSystemAdmin).length}</p>
+          <p className="mt-2 text-3xl font-bold">{users.filter((user: AdminUser) => !user.isApproved && !user.isSystemAdmin).length}</p>
         </div>
       </div>
 
@@ -39,7 +41,7 @@ export default async function AdminPage() {
         </div>
 
         <div className="divide-y divide-border">
-          {users.map((user) => {
+          {users.map((user: AdminUser) => {
             const statusLabel = user.isSystemAdmin ? 'Administrador do sistema' : user.isApproved ? 'Aprovado' : 'Pendente'
             const statusClass = user.isSystemAdmin
               ? 'bg-primary/10 text-primary border-primary/20'

@@ -45,25 +45,35 @@ export const authOptions: NextAuthOptions = {
     signIn: '/login',
   },
   callbacks: {
-    async jwt({ token, user }) {
+    async jwt({ token, user, trigger, session }) {
       if (user) {
-        token.id = user.id
+        token.id = (user as any).id
         token.role = (user as any).role
         token.isApproved = (user as any).isApproved
         token.isSystemAdmin = (user as any).isSystemAdmin
         token.companyId = (user as any).companyId
         token.companyName = (user as any).companyName
+        ;(token as any).avatarVersion = Date.now()
       }
+
+      if (trigger === 'update' && session) {
+        if (typeof (session as any).name === 'string') token.name = (session as any).name
+        if (typeof (session as any).email === 'string') token.email = (session as any).email
+        if (typeof (session as any).companyName === 'string') (token as any).companyName = (session as any).companyName
+        if (typeof (session as any).avatarVersion === 'number') (token as any).avatarVersion = (session as any).avatarVersion
+      }
+
       return token
     },
     async session({ session, token }) {
       if (session.user) {
-        ;(session.user as any).id = token.id
-        ;(session.user as any).role = token.role
-        ;(session.user as any).isApproved = token.isApproved
-        ;(session.user as any).isSystemAdmin = token.isSystemAdmin
-        ;(session.user as any).companyId = token.companyId
-        ;(session.user as any).companyName = token.companyName
+        ;(session.user as any).id = (token as any).id
+        ;(session.user as any).role = (token as any).role
+        ;(session.user as any).isApproved = (token as any).isApproved
+        ;(session.user as any).isSystemAdmin = (token as any).isSystemAdmin
+        ;(session.user as any).companyId = (token as any).companyId
+        ;(session.user as any).companyName = (token as any).companyName
+        ;(session.user as any).avatarVersion = (token as any).avatarVersion ?? null
       }
       return session
     },

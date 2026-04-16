@@ -4,6 +4,7 @@ import { useState, useTransition } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
+import { useSession } from 'next-auth/react'
 import { Building2, Clock3, KeyRound, Mail, Shield, Store, UserRound, ArrowRight, LockKeyhole, Camera, Trash2 } from 'lucide-react'
 import { changePassword, updateAccountProfile } from '@/lib/actions'
 
@@ -31,6 +32,7 @@ interface Props {
 
 export function PerfilClient({ user, company }: Props) {
   const router = useRouter()
+  const { update: updateSession } = useSession()
   const [profilePending, startProfileTransition] = useTransition()
   const [passwordPending, startPasswordTransition] = useTransition()
   const [avatarPending, startAvatarTransition] = useTransition()
@@ -58,6 +60,11 @@ export function PerfilClient({ user, company }: Props) {
     startProfileTransition(async () => {
       try {
         await updateAccountProfile(profileForm)
+        await updateSession({
+          name: profileForm.name,
+          email: profileForm.email,
+          companyName: profileForm.companyName,
+        })
         setProfileSuccess('Perfil atualizado. Faça login novamente se o e-mail foi alterado.')
         router.refresh()
       } catch (error: any) {
@@ -102,6 +109,12 @@ export function PerfilClient({ user, company }: Props) {
           avatarUrl,
         })
         setProfileForm((current) => ({ ...current, avatarUrl: avatarUrl ?? '' }))
+        await updateSession({
+          name: profileForm.name,
+          email: profileForm.email,
+          companyName: profileForm.companyName,
+          avatarVersion: Date.now(),
+        })
         setProfileSuccess(successMessage)
         router.refresh()
       } catch (error: any) {

@@ -1,6 +1,8 @@
 'use client'
 
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import { useSession, signOut } from 'next-auth/react'
 import { Package, LayoutDashboard, ArrowRightLeft, Box, Building2, UserRound, Settings, ScanLine, Truck, ClipboardList, Warehouse, Boxes, BarChart3, ShieldCheck, LogOut } from 'lucide-react'
@@ -30,7 +32,33 @@ export function Sidebar() {
   const isSystemAdmin = (session?.user as any)?.isSystemAdmin === true
   const userName = session?.user?.name ?? 'Usuário'
   const userEmail = session?.user?.email ?? ''
+  const userId = (session?.user as any)?.id as string | undefined
+  const avatarVersion = (session?.user as any)?.avatarVersion as number | null | undefined
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
   const initials = userName.split(' ').map((name) => name[0]).slice(0, 2).join('').toUpperCase()
+
+  useEffect(() => {
+    if (!userId) {
+      setAvatarUrl(null)
+      return
+    }
+
+    const loadAvatar = async () => {
+      try {
+        const response = await fetch('/api/me/avatar', { cache: 'no-store' })
+        if (!response.ok) {
+          setAvatarUrl(null)
+          return
+        }
+        const payload = (await response.json()) as { avatarUrl: string | null }
+        setAvatarUrl(payload.avatarUrl)
+      } catch {
+        setAvatarUrl(null)
+      }
+    }
+
+    void loadAvatar()
+  }, [userId, avatarVersion])
 
   return (
     <aside className="w-64 border-r border-border bg-card/80 backdrop-blur-md flex flex-col h-screen fixed top-0 left-0 z-20">
@@ -88,8 +116,19 @@ export function Sidebar() {
       {/* Usuário + Logout */}
       <div className="p-3 border-t border-border space-y-2 shrink-0">
         <div className="flex items-center gap-3 px-3 py-2 rounded-lg bg-muted/40">
-          <div className="w-8 h-8 rounded-full bg-primary/20 border border-primary/30 flex items-center justify-center text-primary font-bold text-xs shrink-0">
-            {initials}
+          <div className="w-8 h-8 rounded-full bg-primary/20 border border-primary/30 flex items-center justify-center text-primary font-bold text-xs shrink-0 overflow-hidden">
+            {avatarUrl ? (
+              <Image
+                src={avatarUrl}
+                alt="Foto de perfil"
+                width={32}
+                height={32}
+                unoptimized
+                className="h-full w-full object-cover"
+              />
+            ) : (
+              initials
+            )}
           </div>
           <div className="min-w-0">
             <p className="text-sm font-medium truncate">{userName}</p>

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { useSession, signOut } from 'next-auth/react'
 import { Bell, ChevronDown, LogOut, Search, Settings, UserRound } from 'lucide-react'
 
@@ -47,6 +48,9 @@ export function Header() {
   const userName = session?.user?.name ?? 'Usuário'
   const initials = userName.split(' ').map((name) => name[0]).slice(0, 2).join('').toUpperCase()
   const companyName = (session?.user as any)?.companyName ?? ''
+  const userId = (session?.user as any)?.id as string | undefined
+  const avatarVersion = (session?.user as any)?.avatarVersion as number | null | undefined
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
 
   const loadNotifications = async () => {
     try {
@@ -63,6 +67,30 @@ export function Header() {
       setNotificationsLoading(false)
     }
   }
+
+  const loadAvatar = async () => {
+    if (!userId) {
+      setAvatarUrl(null)
+      return
+    }
+
+    try {
+      const response = await fetch('/api/me/avatar', { cache: 'no-store' })
+      if (!response.ok) {
+        setAvatarUrl(null)
+        return
+      }
+
+      const payload = (await response.json()) as { avatarUrl: string | null }
+      setAvatarUrl(payload.avatarUrl)
+    } catch {
+      setAvatarUrl(null)
+    }
+  }
+
+  useEffect(() => {
+    void loadAvatar()
+  }, [userId, avatarVersion])
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -184,8 +212,19 @@ export function Header() {
               <p className="text-sm font-medium leading-none">{userName}</p>
               {companyName && <p className="text-xs text-muted-foreground mt-0.5">{companyName}</p>}
             </div>
-            <div className="w-9 h-9 rounded-full bg-primary/20 border-2 border-primary/30 flex items-center justify-center text-primary font-bold text-sm cursor-pointer hover:bg-primary/30 transition-colors">
-              {initials}
+            <div className="w-9 h-9 rounded-full bg-primary/20 border-2 border-primary/30 flex items-center justify-center text-primary font-bold text-sm cursor-pointer hover:bg-primary/30 transition-colors overflow-hidden">
+              {avatarUrl ? (
+                <Image
+                  src={avatarUrl}
+                  alt="Foto de perfil"
+                  width={36}
+                  height={36}
+                  unoptimized
+                  className="h-full w-full object-cover"
+                />
+              ) : (
+                initials
+              )}
             </div>
             <ChevronDown className="hidden sm:block w-4 h-4 text-muted-foreground" />
           </button>

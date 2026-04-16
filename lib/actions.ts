@@ -73,6 +73,619 @@ async function sendExternalAlertIfConfigured(companyId: string, payload: { title
   }
 }
 
+function toMonthKey(year: number, month: number) {
+  return `${year}-${String(month).padStart(2, '0')}`
+}
+
+function parseMonthParams(params?: { year?: number; month?: number }) {
+  const now = new Date()
+  const year = params?.year ?? now.getUTCFullYear()
+  const month = params?.month ?? now.getUTCMonth() + 1
+
+  if (!Number.isInteger(year) || year < 2000 || year > 2100) {
+    throw new Error('Ano invalido para fechamento.')
+  }
+  if (!Number.isInteger(month) || month < 1 || month > 12) {
+    throw new Error('Mes invalido para fechamento.')
+  }
+
+  return { year, month, monthKey: toMonthKey(year, month) }
+}
+
+function getMonthBoundsUtc(year: number, month: number) {
+  const start = new Date(Date.UTC(year, month - 1, 1, 0, 0, 0, 0))
+  const end = new Date(Date.UTC(year, month, 1, 0, 0, 0, 0))
+  return { start, end }
+}
+
+function parseIsoDay(day: string) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) {
+    throw new Error('Data invalida. Use o formato YYYY-MM-DD.')
+  }
+
+  const date = new Date(`${day}T00:00:00.000Z`)
+  if (Number.isNaN(date.getTime())) {
+    throw new Error('Data invalida para fechamento diario.')
+  }
+
+  return date
+}
+
+function getDayBoundsUtc(isoDay: string) {
+  const start = parseIsoDay(isoDay)
+  const end = new Date(start)
+  end.setUTCDate(end.getUTCDate() + 1)
+  return { start, end }
+}
+
+function toIsoDay(date: Date) {
+  return date.toISOString().slice(0, 10)
+}
+
+export async function getMonthlyClosureCalendar(params?: { year?: number; month?: number }) {
+  await requireRole(['ADMIN', 'MANAGER', 'OPERATOR'])
+  const companyId = await getCompanyId()
+  const { year, month, monthKey } = parseMonthParams(params)
+  const { start, end } = getMonthBoundsUtc(year, month)
+
+  const [monthClosure, dayClosures] = await Promise.all([
+    prisma.monthlyClosure.findUnique({
+      where: {
+        companyId_year_month: { companyId, year, month },
+      },
+      select: {
+        id: true,
+        status: true,
+        notes: true,
+        daysClosed: true,
+        salesTotal: true,
+        purchaseTotal: true,
+        cashExpected: true,
+        closedAt: true,
+      },
+    }),
+    prisma.dailyClosure.findMany({
+      where: {
+        companyId,
+        day: { gte: start, lt: end },
+      },
+      select: {
+        id: true,
+        day: true,
+        status: true,
+        notes: true,
+        salesCount: true,
+        salesTotal: true,
+        purchaseOrdersCount: true,
+        purchaseTotal: true,
+        stockEntriesQty: true,
+        stockOutputsQty: true,
+        stockAdjustmentsQty: true,
+        stockBalanceQty: true,
+        cashExpected: true,
+        stockValue: true,
+        closedAt: true,
+      },
+      orderBy: { day: 'asc' },
+    }),
+  ])
+
+  const closureByDay = new Map(dayClosures.map((item) => [toIsoDay(item.day), item]))
+  const daysInMonth = new Date(Date.UTC(year, month, 0)).getUTCDate()
+  const days = Array.from({ length: daysInMonth }, (_, index) => {
+    const current = new Date(Date.UTC(year, month - 1, index + 1, 0, 0, 0, 0))
+    const iso = toIsoDay(current)
+    const closure = closureByDay.get(iso)
+
+    return {
+      date: iso,
+      day: index + 1,
+      weekDay: current.getUTCDay(),
+      status: closure?.status ?? 'OPEN',
+      notes: closure?.notes ?? null,
+      salesCount: closure?.salesCount ?? 0,
+      salesTotal: closure?.salesTotal ?? 0,
+      purchaseOrdersCount: closure?.purchaseOrdersCount ?? 0,
+      purchaseTotal: closure?.purchaseTotal ?? 0,
+      stockEntriesQty: closure?.stockEntriesQty ?? 0,
+      stockOutputsQty: closure?.stockOutputsQty ?? 0,
+      stockAdjustmentsQty: closure?.stockAdjustmentsQty ?? 0,
+      stockBalanceQty: closure?.stockBalanceQty ?? 0,
+      cashExpected: closure?.cashExpected ?? 0,
+      stockValue: closure?.stockValue ?? 0,
+      closedAt: closure?.closedAt?.toISOString() ?? null,
+    }
+  })
+
+  const closedDays = days.filter((item) => item.status === 'CLOSED')
+  const summary = {
+    daysInMonth,
+    closedDays: closedDays.length,
+    openDays: daysInMonth - closedDays.length,
+    salesTotal: Number(closedDays.reduce((acc, item) => acc + item.salesTotal, 0).toFixed(2)),
+    purchaseTotal: Number(closedDays.reduce((acc, item) => acc + item.purchaseTotal, 0).toFixed(2)),
+    cashExpected: Number(closedDays.reduce((acc, item) => acc + item.cashExpected, 0).toFixed(2)),
+  }
+
+  const prevMonthDate = new Date(Date.UTC(year, month - 2, 1))
+  const nextMonthDate = new Date(Date.UTC(year, month, 1))
+
+  return {
+    month: {
+      year,
+      month,
+      monthKey,
+      status: monthClosure?.status ?? 'OPEN',
+      notes: monthClosure?.notes ?? null,
+      closedAt: monthClosure?.closedAt?.toISOString() ?? null,
+    },
+    summary,
+    days,
+    prev: {
+      year: prevMonthDate.getUTCFullYear(),
+      month: prevMonthDate.getUTCMonth() + 1,
+    },
+    next: {
+      year: nextMonthDate.getUTCFullYear(),
+      month: nextMonthDate.getUTCMonth() + 1,
+    },
+  }
+}
+
+export async function closeDailyClosure(input: { day: string; notes?: string }) {
+  const user = await requireRole(['ADMIN', 'MANAGER', 'OPERATOR'])
+  const companyId = await getCompanyId()
+  const { start, end } = getDayBoundsUtc(input.day)
+  const year = start.getUTCFullYear()
+  const month = start.getUTCMonth() + 1
+  const monthKey = toMonthKey(year, month)
+  const normalizedNotes = input.notes?.trim() || null
+
+  const existingMonth = await prisma.monthlyClosure.findUnique({
+    where: { companyId_year_month: { companyId, year, month } },
+    select: { id: true, status: true },
+  })
+
+  if (existingMonth?.status === 'CLOSED') {
+    throw new Error('Este mes ja foi fechado. Reabra o mes antes de editar dias.')
+  }
+
+  const existing = await prisma.dailyClosure.findUnique({
+    where: {
+      companyId_day: {
+        companyId,
+        day: start,
+      },
+    },
+  })
+
+  if (existing?.status === 'CLOSED') {
+    return { ok: true, alreadyClosed: true, id: existing.id }
+  }
+
+  const [salesAggregate, salesCount, purchaseAggregate, purchaseCount, movementGroups, products] = await Promise.all([
+    prisma.sale.aggregate({
+      _sum: { total: true },
+      where: {
+        companyId,
+        createdAt: { gte: start, lt: end },
+      },
+    }),
+    prisma.sale.count({
+      where: {
+        companyId,
+        createdAt: { gte: start, lt: end },
+      },
+    }),
+    prisma.purchaseOrder.aggregate({
+      _sum: { subtotal: true },
+      where: {
+        companyId,
+        status: 'RECEBIDO',
+        updatedAt: { gte: start, lt: end },
+      },
+    }),
+    prisma.purchaseOrder.count({
+      where: {
+        companyId,
+        status: 'RECEBIDO',
+        updatedAt: { gte: start, lt: end },
+      },
+    }),
+    prisma.movement.groupBy({
+      by: ['type'],
+      where: {
+        companyId,
+        createdAt: { gte: start, lt: end },
+      },
+      _sum: { quantity: true },
+    }),
+    prisma.product.findMany({
+      where: { companyId },
+      select: { price: true, stockQty: true },
+    }),
+  ])
+
+  const movementMap = new Map(movementGroups.map((group) => [group.type, group._sum.quantity ?? 0]))
+  const stockEntriesQty = movementMap.get('ENTRADA') ?? 0
+  const stockOutputsQty = movementMap.get('SAIDA') ?? 0
+  const stockAdjustmentsQty = movementMap.get('AJUSTE') ?? 0
+
+  const salesTotal = Number((salesAggregate._sum.total ?? 0).toFixed(2))
+  const purchaseTotal = Number((purchaseAggregate._sum.subtotal ?? 0).toFixed(2))
+  const cashExpected = Number((salesTotal - purchaseTotal).toFixed(2))
+  const stockValue = Number(products.reduce((acc, product) => acc + product.price * product.stockQty, 0).toFixed(2))
+
+  const result = await prisma.$transaction(async (tx) => {
+    const monthClosure = await tx.monthlyClosure.upsert({
+      where: { companyId_year_month: { companyId, year, month } },
+      update: {},
+      create: {
+        year,
+        month,
+        monthKey,
+        companyId,
+      },
+      select: { id: true },
+    })
+
+    const closure = await tx.dailyClosure.upsert({
+      where: {
+        companyId_day: {
+          companyId,
+          day: start,
+        },
+      },
+      update: {
+        monthKey,
+        status: 'CLOSED',
+        notes: normalizedNotes,
+        salesCount,
+        salesTotal,
+        purchaseOrdersCount: purchaseCount,
+        purchaseTotal,
+        stockEntriesQty,
+        stockOutputsQty,
+        stockAdjustmentsQty,
+        stockBalanceQty: stockEntriesQty - stockOutputsQty,
+        cashExpected,
+        stockValue,
+        closedAt: new Date(),
+        closedById: user.id,
+        monthlyClosureId: monthClosure.id,
+      },
+      create: {
+        day: start,
+        monthKey,
+        status: 'CLOSED',
+        notes: normalizedNotes,
+        salesCount,
+        salesTotal,
+        purchaseOrdersCount: purchaseCount,
+        purchaseTotal,
+        stockEntriesQty,
+        stockOutputsQty,
+        stockAdjustmentsQty,
+        stockBalanceQty: stockEntriesQty - stockOutputsQty,
+        cashExpected,
+        stockValue,
+        closedAt: new Date(),
+        closedById: user.id,
+        monthlyClosureId: monthClosure.id,
+        companyId,
+      },
+      select: { id: true },
+    })
+
+    const monthClosedDays = await tx.dailyClosure.findMany({
+      where: {
+        companyId,
+        monthKey,
+        status: 'CLOSED',
+      },
+      select: {
+        salesCount: true,
+        salesTotal: true,
+        purchaseOrdersCount: true,
+        purchaseTotal: true,
+        stockEntriesQty: true,
+        stockOutputsQty: true,
+        stockAdjustmentsQty: true,
+        stockBalanceQty: true,
+        cashExpected: true,
+      },
+    })
+
+    await tx.monthlyClosure.update({
+      where: { companyId_year_month: { companyId, year, month } },
+      data: {
+        daysClosed: monthClosedDays.length,
+        salesCount: monthClosedDays.reduce((acc, day) => acc + day.salesCount, 0),
+        salesTotal: Number(monthClosedDays.reduce((acc, day) => acc + day.salesTotal, 0).toFixed(2)),
+        purchaseOrdersCount: monthClosedDays.reduce((acc, day) => acc + day.purchaseOrdersCount, 0),
+        purchaseTotal: Number(monthClosedDays.reduce((acc, day) => acc + day.purchaseTotal, 0).toFixed(2)),
+        stockEntriesQty: monthClosedDays.reduce((acc, day) => acc + day.stockEntriesQty, 0),
+        stockOutputsQty: monthClosedDays.reduce((acc, day) => acc + day.stockOutputsQty, 0),
+        stockAdjustmentsQty: monthClosedDays.reduce((acc, day) => acc + day.stockAdjustmentsQty, 0),
+        stockBalanceQty: monthClosedDays.reduce((acc, day) => acc + day.stockBalanceQty, 0),
+        cashExpected: Number(monthClosedDays.reduce((acc, day) => acc + day.cashExpected, 0).toFixed(2)),
+      },
+    })
+
+    return closure
+  })
+
+  await logAudit({
+    action: 'CLOSE',
+    entity: 'DAILY_CLOSURE',
+    entityId: result.id,
+    details: `Fechamento diario ${input.day}`,
+    companyId,
+    userId: user.id,
+  })
+
+  revalidatePath('/fechamento')
+  return { ok: true, id: result.id }
+}
+
+export async function reopenDailyClosure(input: { day: string }) {
+  const user = await requireRole(['ADMIN', 'MANAGER'])
+  const companyId = await getCompanyId()
+  const { start } = getDayBoundsUtc(input.day)
+  const year = start.getUTCFullYear()
+  const month = start.getUTCMonth() + 1
+  const monthKey = toMonthKey(year, month)
+
+  const monthClosure = await prisma.monthlyClosure.findUnique({
+    where: { companyId_year_month: { companyId, year, month } },
+    select: { status: true },
+  })
+
+  if (monthClosure?.status === 'CLOSED') {
+    throw new Error('Este mes esta fechado. Reabra o mes primeiro.')
+  }
+
+  const dayClosure = await prisma.dailyClosure.findUnique({
+    where: { companyId_day: { companyId, day: start } },
+    select: { id: true, status: true },
+  })
+
+  if (!dayClosure) {
+    throw new Error('Nao existe fechamento salvo para este dia.')
+  }
+
+  if (dayClosure.status !== 'CLOSED') {
+    return { ok: true, alreadyOpen: true, id: dayClosure.id }
+  }
+
+  await prisma.$transaction(async (tx) => {
+    await tx.dailyClosure.update({
+      where: { id: dayClosure.id },
+      data: {
+        status: 'OPEN',
+        closedAt: null,
+        closedById: null,
+      },
+    })
+
+    const monthClosedDays = await tx.dailyClosure.findMany({
+      where: {
+        companyId,
+        monthKey,
+        status: 'CLOSED',
+      },
+      select: {
+        salesCount: true,
+        salesTotal: true,
+        purchaseOrdersCount: true,
+        purchaseTotal: true,
+        stockEntriesQty: true,
+        stockOutputsQty: true,
+        stockAdjustmentsQty: true,
+        stockBalanceQty: true,
+        cashExpected: true,
+      },
+    })
+
+    await tx.monthlyClosure.upsert({
+      where: { companyId_year_month: { companyId, year, month } },
+      update: {
+        status: 'OPEN',
+        closedAt: null,
+        closedById: null,
+        daysClosed: monthClosedDays.length,
+        salesCount: monthClosedDays.reduce((acc, day) => acc + day.salesCount, 0),
+        salesTotal: Number(monthClosedDays.reduce((acc, day) => acc + day.salesTotal, 0).toFixed(2)),
+        purchaseOrdersCount: monthClosedDays.reduce((acc, day) => acc + day.purchaseOrdersCount, 0),
+        purchaseTotal: Number(monthClosedDays.reduce((acc, day) => acc + day.purchaseTotal, 0).toFixed(2)),
+        stockEntriesQty: monthClosedDays.reduce((acc, day) => acc + day.stockEntriesQty, 0),
+        stockOutputsQty: monthClosedDays.reduce((acc, day) => acc + day.stockOutputsQty, 0),
+        stockAdjustmentsQty: monthClosedDays.reduce((acc, day) => acc + day.stockAdjustmentsQty, 0),
+        stockBalanceQty: monthClosedDays.reduce((acc, day) => acc + day.stockBalanceQty, 0),
+        cashExpected: Number(monthClosedDays.reduce((acc, day) => acc + day.cashExpected, 0).toFixed(2)),
+      },
+      create: {
+        year,
+        month,
+        monthKey,
+        companyId,
+        status: 'OPEN',
+        daysClosed: monthClosedDays.length,
+        salesCount: monthClosedDays.reduce((acc, day) => acc + day.salesCount, 0),
+        salesTotal: Number(monthClosedDays.reduce((acc, day) => acc + day.salesTotal, 0).toFixed(2)),
+        purchaseOrdersCount: monthClosedDays.reduce((acc, day) => acc + day.purchaseOrdersCount, 0),
+        purchaseTotal: Number(monthClosedDays.reduce((acc, day) => acc + day.purchaseTotal, 0).toFixed(2)),
+        stockEntriesQty: monthClosedDays.reduce((acc, day) => acc + day.stockEntriesQty, 0),
+        stockOutputsQty: monthClosedDays.reduce((acc, day) => acc + day.stockOutputsQty, 0),
+        stockAdjustmentsQty: monthClosedDays.reduce((acc, day) => acc + day.stockAdjustmentsQty, 0),
+        stockBalanceQty: monthClosedDays.reduce((acc, day) => acc + day.stockBalanceQty, 0),
+        cashExpected: Number(monthClosedDays.reduce((acc, day) => acc + day.cashExpected, 0).toFixed(2)),
+      },
+    })
+  })
+
+  await logAudit({
+    action: 'REOPEN',
+    entity: 'DAILY_CLOSURE',
+    entityId: dayClosure.id,
+    details: `Reabertura do fechamento diario ${input.day}`,
+    companyId,
+    userId: user.id,
+  })
+
+  revalidatePath('/fechamento')
+  return { ok: true, id: dayClosure.id }
+}
+
+export async function closeMonthlyClosure(input: { year: number; month: number; notes?: string }) {
+  const user = await requireRole(['ADMIN', 'MANAGER'])
+  const companyId = await getCompanyId()
+  const { year, month, monthKey } = parseMonthParams({ year: input.year, month: input.month })
+  const { start, end } = getMonthBoundsUtc(year, month)
+  const daysInMonth = new Date(Date.UTC(year, month, 0)).getUTCDate()
+
+  const current = await prisma.monthlyClosure.findUnique({
+    where: { companyId_year_month: { companyId, year, month } },
+    select: { id: true, status: true },
+  })
+  if (current?.status === 'CLOSED') {
+    return { ok: true, alreadyClosed: true, id: current.id }
+  }
+
+  const closedDays = await prisma.dailyClosure.findMany({
+    where: {
+      companyId,
+      day: { gte: start, lt: end },
+      status: 'CLOSED',
+    },
+    select: {
+      id: true,
+      salesCount: true,
+      salesTotal: true,
+      purchaseOrdersCount: true,
+      purchaseTotal: true,
+      stockEntriesQty: true,
+      stockOutputsQty: true,
+      stockAdjustmentsQty: true,
+      stockBalanceQty: true,
+      cashExpected: true,
+    },
+  })
+
+  if (closedDays.length !== daysInMonth) {
+    throw new Error(`Nao e possivel fechar o mes. Dias fechados: ${closedDays.length}/${daysInMonth}.`)
+  }
+
+  const normalizedNotes = input.notes?.trim() || null
+
+  const result = await prisma.$transaction(async (tx) => {
+    const monthClosure = await tx.monthlyClosure.upsert({
+      where: { companyId_year_month: { companyId, year, month } },
+      update: {
+        status: 'CLOSED',
+        notes: normalizedNotes,
+        daysClosed: closedDays.length,
+        salesCount: closedDays.reduce((acc, day) => acc + day.salesCount, 0),
+        salesTotal: Number(closedDays.reduce((acc, day) => acc + day.salesTotal, 0).toFixed(2)),
+        purchaseOrdersCount: closedDays.reduce((acc, day) => acc + day.purchaseOrdersCount, 0),
+        purchaseTotal: Number(closedDays.reduce((acc, day) => acc + day.purchaseTotal, 0).toFixed(2)),
+        stockEntriesQty: closedDays.reduce((acc, day) => acc + day.stockEntriesQty, 0),
+        stockOutputsQty: closedDays.reduce((acc, day) => acc + day.stockOutputsQty, 0),
+        stockAdjustmentsQty: closedDays.reduce((acc, day) => acc + day.stockAdjustmentsQty, 0),
+        stockBalanceQty: closedDays.reduce((acc, day) => acc + day.stockBalanceQty, 0),
+        cashExpected: Number(closedDays.reduce((acc, day) => acc + day.cashExpected, 0).toFixed(2)),
+        closedAt: new Date(),
+        closedById: user.id,
+      },
+      create: {
+        year,
+        month,
+        monthKey,
+        status: 'CLOSED',
+        notes: normalizedNotes,
+        daysClosed: closedDays.length,
+        salesCount: closedDays.reduce((acc, day) => acc + day.salesCount, 0),
+        salesTotal: Number(closedDays.reduce((acc, day) => acc + day.salesTotal, 0).toFixed(2)),
+        purchaseOrdersCount: closedDays.reduce((acc, day) => acc + day.purchaseOrdersCount, 0),
+        purchaseTotal: Number(closedDays.reduce((acc, day) => acc + day.purchaseTotal, 0).toFixed(2)),
+        stockEntriesQty: closedDays.reduce((acc, day) => acc + day.stockEntriesQty, 0),
+        stockOutputsQty: closedDays.reduce((acc, day) => acc + day.stockOutputsQty, 0),
+        stockAdjustmentsQty: closedDays.reduce((acc, day) => acc + day.stockAdjustmentsQty, 0),
+        stockBalanceQty: closedDays.reduce((acc, day) => acc + day.stockBalanceQty, 0),
+        cashExpected: Number(closedDays.reduce((acc, day) => acc + day.cashExpected, 0).toFixed(2)),
+        closedAt: new Date(),
+        closedById: user.id,
+        companyId,
+      },
+      select: { id: true },
+    })
+
+    await tx.dailyClosure.updateMany({
+      where: {
+        companyId,
+        day: { gte: start, lt: end },
+      },
+      data: {
+        monthlyClosureId: monthClosure.id,
+      },
+    })
+
+    return monthClosure
+  })
+
+  await logAudit({
+    action: 'CLOSE',
+    entity: 'MONTHLY_CLOSURE',
+    entityId: result.id,
+    details: `Fechamento mensal ${monthKey}`,
+    companyId,
+    userId: user.id,
+  })
+
+  revalidatePath('/fechamento')
+  return { ok: true, id: result.id }
+}
+
+export async function reopenMonthlyClosure(input: { year: number; month: number }) {
+  const user = await requireRole(['ADMIN'])
+  const companyId = await getCompanyId()
+  const { year, month, monthKey } = parseMonthParams({ year: input.year, month: input.month })
+
+  const monthClosure = await prisma.monthlyClosure.findUnique({
+    where: { companyId_year_month: { companyId, year, month } },
+    select: { id: true, status: true },
+  })
+
+  if (!monthClosure) {
+    throw new Error('Fechamento mensal nao encontrado.')
+  }
+
+  if (monthClosure.status !== 'CLOSED') {
+    return { ok: true, alreadyOpen: true, id: monthClosure.id }
+  }
+
+  await prisma.monthlyClosure.update({
+    where: { id: monthClosure.id },
+    data: {
+      status: 'OPEN',
+      closedAt: null,
+      closedById: null,
+    },
+  })
+
+  await logAudit({
+    action: 'REOPEN',
+    entity: 'MONTHLY_CLOSURE',
+    entityId: monthClosure.id,
+    details: `Reabertura do fechamento mensal ${monthKey}`,
+    companyId,
+    userId: user.id,
+  })
+
+  revalidatePath('/fechamento')
+  return { ok: true, id: monthClosure.id }
+}
+
 // =====================
 // DASHBOARD STATS
 // =====================

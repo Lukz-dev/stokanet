@@ -19,6 +19,8 @@ model User {
   isSystemAdmin Boolean @default(false)
   companyId String?
   company   Company? @relation(fields: [companyId], references: [id])
+  closedDailyClosures DailyClosure[] @relation("DailyClosureClosedBy")
+  closedMonthlyClosures MonthlyClosure[] @relation("MonthlyClosureClosedBy")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
@@ -39,6 +41,8 @@ model Company {
   transfers   WarehouseTransfer[]
   batches     Batch[]
   auditLogs   AuditLog[]
+  dailyClosures DailyClosure[]
+  monthlyClosures MonthlyClosure[]
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
 }
@@ -265,4 +269,65 @@ model AuditLog {
 
   @@index([companyId, createdAt])
   @@index([entity, entityId])
+}
+
+model DailyClosure {
+  id                   String   @id @default(cuid())
+  day                  DateTime
+  monthKey             String
+  status               String   @default("OPEN") // OPEN | CLOSED
+  notes                String?
+  salesCount           Int      @default(0)
+  salesTotal           Float    @default(0.0)
+  purchaseOrdersCount  Int      @default(0)
+  purchaseTotal        Float    @default(0.0)
+  stockEntriesQty      Int      @default(0)
+  stockOutputsQty      Int      @default(0)
+  stockAdjustmentsQty  Int      @default(0)
+  stockBalanceQty      Int      @default(0)
+  cashExpected         Float    @default(0.0)
+  stockValue           Float    @default(0.0)
+  closedAt             DateTime?
+  closedById           String?
+  closedBy             User?    @relation("DailyClosureClosedBy", fields: [closedById], references: [id])
+  monthlyClosureId     String?
+  monthlyClosure       MonthlyClosure? @relation(fields: [monthlyClosureId], references: [id])
+  companyId            String
+  company              Company  @relation(fields: [companyId], references: [id])
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  @@unique([companyId, day])
+  @@index([companyId, monthKey])
+  @@index([monthKey, day])
+}
+
+model MonthlyClosure {
+  id                  String   @id @default(cuid())
+  year                Int
+  month               Int
+  monthKey            String
+  status              String   @default("OPEN") // OPEN | CLOSED
+  notes               String?
+  daysClosed          Int      @default(0)
+  salesCount          Int      @default(0)
+  salesTotal          Float    @default(0.0)
+  purchaseOrdersCount Int      @default(0)
+  purchaseTotal       Float    @default(0.0)
+  stockEntriesQty     Int      @default(0)
+  stockOutputsQty     Int      @default(0)
+  stockAdjustmentsQty Int      @default(0)
+  stockBalanceQty     Int      @default(0)
+  cashExpected        Float    @default(0.0)
+  closedAt            DateTime?
+  closedById          String?
+  closedBy            User?    @relation("MonthlyClosureClosedBy", fields: [closedById], references: [id])
+  companyId           String
+  company             Company  @relation(fields: [companyId], references: [id])
+  dailyClosures       DailyClosure[]
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@unique([companyId, year, month])
+  @@index([companyId, monthKey])
 }

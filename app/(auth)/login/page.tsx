@@ -45,7 +45,7 @@ export default function Login() {
           <div className="w-14 h-14 bg-primary/10 text-primary rounded-2xl flex items-center justify-center mb-6 border border-primary/30 shadow-lg shadow-primary/10">
             <Box className="w-7 h-7" />
           </div>
-          <h1 className="text-2xl font-bold tracking-tight text-foreground">Bem-vindo ao Estoque Flex</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-foreground">Bem-vindo ao StokaNet</h1>
           <p className="text-muted-foreground text-sm mt-2 mb-8 text-center">Faça login para controlar produtos, variações e reposições da sua loja.</p>
 
           {error && (

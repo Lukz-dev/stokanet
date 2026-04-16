@@ -61,7 +61,7 @@ async function sendExternalAlertIfConfigured(companyId: string, payload: { title
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        source: 'Estoque Flex',
+        source: 'StokaNet',
         companyId,
         companyName: company?.name ?? '',
         ...payload,
@@ -1361,7 +1361,7 @@ export async function testNotificationWebhook() {
   await sendExternalAlertIfConfigured(companyId, {
     level: 'info',
     title: 'Teste de webhook',
-    message: 'Este e um teste de notificacao externa do Estoque Flex.',
+    message: 'Este e um teste de notificacao externa do StokaNet.',
   })
 
   return { ok: true }

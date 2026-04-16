@@ -8,7 +8,7 @@ const font = Plus_Jakarta_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "Estoque Flex",
+  title: "StokaNet",
   description: "Sistema de controle de estoque para lojas de qualquer segmento, com produtos, variações e reposições.",
 };
 

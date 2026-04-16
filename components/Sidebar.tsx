@@ -68,7 +68,7 @@ export function Sidebar() {
           <Box className="w-4 h-4 text-primary" />
         </div>
         <div className="min-w-0">
-          <span className="text-sm font-bold tracking-tight block">Estoque Flex</span>
+          <span className="text-sm font-bold tracking-tight block">StokaNet</span>
           <span className="text-xs text-muted-foreground truncate block">Controle de estoque para qualquer loja</span>
         </div>
       </div>

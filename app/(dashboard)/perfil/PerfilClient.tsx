@@ -5,14 +5,16 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
-import { Building2, Clock3, KeyRound, Mail, Shield, Store, UserRound, ArrowRight, LockKeyhole, Camera, Trash2 } from 'lucide-react'
-import { changePassword, updateAccountProfile } from '@/lib/actions'
+import { Building2, Clock3, KeyRound, Mail, Shield, Store, UserRound, ArrowRight, LockKeyhole, Camera, Trash2, Palette, Check } from 'lucide-react'
+import { changePassword, updateAccountProfile, updateThemePreference } from '@/lib/actions'
+import { THEME_ATTRIBUTE_MAP, type ThemePreference } from '@/lib/theme'
 
 type UserData = {
   id: string
   name: string | null
   email: string
   avatarUrl: string | null
+  themePreference: ThemePreference
   role: string
   createdAt: string
   updatedAt: string
@@ -36,10 +38,12 @@ export function PerfilClient({ user, company }: Props) {
   const [profilePending, startProfileTransition] = useTransition()
   const [passwordPending, startPasswordTransition] = useTransition()
   const [avatarPending, startAvatarTransition] = useTransition()
+  const [themePending, startThemeTransition] = useTransition()
   const [profileError, setProfileError] = useState('')
   const [passwordError, setPasswordError] = useState('')
   const [profileSuccess, setProfileSuccess] = useState('')
   const [passwordSuccess, setPasswordSuccess] = useState('')
+  const [themePreference, setThemePreference] = useState<ThemePreference>(user.themePreference)
   const [profileForm, setProfileForm] = useState({
     name: user.name ?? '',
     email: user.email,
@@ -148,6 +152,39 @@ export function PerfilClient({ user, company }: Props) {
 
   const handleAvatarRemove = () => {
     saveAvatarUrl(null, 'Foto de perfil removida.')
+  }
+
+  const themeOptions: Array<{ value: ThemePreference; label: string; description: string; swatch: string }> = [
+    { value: 'SUNSET', label: 'Sunset', description: 'Laranja quente (padrão)', swatch: 'bg-[#e0a15f]' },
+    { value: 'OCEAN', label: 'Ocean', description: 'Azul profundo e frio', swatch: 'bg-[#3f8fbf]' },
+    { value: 'FOREST', label: 'Forest', description: 'Verde sóbrio', swatch: 'bg-[#5f9a58]' },
+    { value: 'ROSE', label: 'Rose', description: 'Rosa elegante', swatch: 'bg-[#cf6f7a]' },
+  ]
+
+  const applyThemeToDocument = (value: ThemePreference) => {
+    document.documentElement.setAttribute('data-theme-color', THEME_ATTRIBUTE_MAP[value])
+  }
+
+  const handleThemePreferenceChange = (nextTheme: ThemePreference) => {
+    if (nextTheme === themePreference || themePending) return
+
+    const previousTheme = themePreference
+    setProfileError('')
+    setProfileSuccess('')
+    setThemePreference(nextTheme)
+    applyThemeToDocument(nextTheme)
+
+    startThemeTransition(async () => {
+      try {
+        await updateThemePreference(nextTheme)
+        setProfileSuccess('Tema do layout atualizado com sucesso.')
+        router.refresh()
+      } catch (error: any) {
+        setThemePreference(previousTheme)
+        applyThemeToDocument(previousTheme)
+        setProfileError(error.message || 'Não foi possível atualizar o tema.')
+      }
+    })
   }
 
   return (
@@ -354,6 +391,47 @@ export function PerfilClient({ user, company }: Props) {
                 </button>
               </div>
             </form>
+          </section>
+
+          <section className="bg-card border border-border rounded-2xl shadow-sm p-6">
+            <div className="flex items-center justify-between gap-4 mb-6">
+              <div>
+                <h2 className="text-lg font-semibold">Aparência</h2>
+                <p className="text-sm text-muted-foreground">Escolha a cor principal do layout para a sua conta.</p>
+              </div>
+              <Palette className="w-5 h-5 text-primary" />
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {themeOptions.map((option) => {
+                const isActive = option.value === themePreference
+
+                return (
+                  <button
+                    key={option.value}
+                    type="button"
+                    disabled={themePending}
+                    onClick={() => handleThemePreferenceChange(option.value)}
+                    className={`w-full rounded-xl border p-4 text-left transition-all disabled:opacity-60 ${
+                      isActive
+                        ? 'border-primary bg-primary/10 ring-2 ring-primary/20'
+                        : 'border-border bg-background hover:border-primary/40 hover:bg-muted/20'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-center gap-3">
+                        <span className={`h-8 w-8 rounded-full border border-white/15 ${option.swatch}`} />
+                        <span>
+                          <p className="text-sm font-semibold">{option.label}</p>
+                          <p className="text-xs text-muted-foreground">{option.description}</p>
+                        </span>
+                      </div>
+                      {isActive && <Check className="w-4 h-4 text-primary mt-0.5" />}
+                    </div>
+                  </button>
+                )
+              })}
+            </div>
           </section>
         </div>
 

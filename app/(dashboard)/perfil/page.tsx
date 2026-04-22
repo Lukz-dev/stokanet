@@ -21,6 +21,7 @@ export default async function PerfilPage() {
         name: user.name,
         email: user.email,
         avatarUrl: user.avatarUrl,
+        themePreference: user.themePreference,
         role: user.role,
         createdAt: user.createdAt.toISOString(),
         updatedAt: user.updatedAt.toISOString(),

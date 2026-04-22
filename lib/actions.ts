@@ -5,6 +5,7 @@ import { Prisma } from '@prisma/client'
 import { revalidatePath } from 'next/cache'
 import bcrypt from 'bcryptjs'
 import { AppRole, getActiveCompanyId, getActiveUser } from '@/lib/access'
+import { THEME_PREFERENCES, type ThemePreference } from '@/lib/theme'
 
 async function getCompanyId(): Promise<string> {
   return getActiveCompanyId()
@@ -940,6 +941,23 @@ export async function updateCompanyPreferences(data: {
     companyId,
     userId: user.id,
   })
+}
+
+export async function updateThemePreference(themePreference: ThemePreference) {
+  const user = await getAuthenticatedUser()
+
+  if (!THEME_PREFERENCES.includes(themePreference)) {
+    throw new Error('Tema inválido.')
+  }
+
+  await prisma.user.update({
+    where: { id: user.id },
+    data: { themePreference },
+  })
+
+  revalidatePath('/perfil')
+  revalidatePath('/configuracoes')
+  revalidatePath('/')
 }
 
 export async function changePassword(data: {

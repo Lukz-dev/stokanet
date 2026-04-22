@@ -1,9 +1,10 @@
 import prisma from '@/lib/prisma'
-import { getOrCreateDefaultCompany } from '@/lib/access'
+import { getActiveUser, getOrCreateDefaultCompany } from '@/lib/access'
 import { SettingsClient } from './SettingsClient'
 
 export default async function ConfiguracoesPage() {
   const company = await getOrCreateDefaultCompany()
+  const user = await getActiveUser()
 
   const currentCompany = await prisma.company.findUnique({
     where: { id: company.id },
@@ -19,6 +20,7 @@ export default async function ConfiguracoesPage() {
       companyName={currentCompany.name}
       defaultMinStock={currentCompany.defaultMinStock}
       notificationWebhookUrl={currentCompany.notificationWebhookUrl ?? ''}
+      currentThemePreference={user.themePreference as 'SUNSET' | 'OCEAN' | 'FOREST' | 'ROSE'}
     />
   )
 }

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback, useMemo, useRef, useTransition } from 'react'
+import { useState, useCallback, useEffect, useMemo, useRef, useTransition } from 'react'
 import { Plus, ArrowUpCircle, ArrowDownCircle, SlidersHorizontal, Package, Search, ChevronLeft, ChevronRight } from 'lucide-react'
 import { MovementModal } from '@/components/MovementModal'
 import { createSaleByCode } from '@/lib/actions'
@@ -36,8 +36,11 @@ export function MovimentacoesClient({
   const [page, setPage] = useState(1)
   const [scanCode, setScanCode] = useState('')
   const [scanQty, setScanQty] = useState('1')
+  const [scannerModeEnabled, setScannerModeEnabled] = useState(true)
   const [scanError, setScanError] = useState('')
   const [scanSuccess, setScanSuccess] = useState('')
+  const scannerBufferRef = useRef('')
+  const lastKeyAtRef = useRef(0)
 
   const filtered = useMemo(() => {
     return initialMovements.filter(m => {
@@ -54,6 +57,65 @@ export function MovimentacoesClient({
   const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
 
   const handleSuccess = useCallback(() => router.refresh(), [router])
+
+  useEffect(() => {
+    if (!scannerModeEnabled) {
+      scannerBufferRef.current = ''
+      return
+    }
+
+    scanInputRef.current?.focus()
+  }, [scannerModeEnabled])
+
+  useEffect(() => {
+    if (!scannerModeEnabled) return
+
+    const isEditableElement = (element: Element | null) => {
+      if (!element) return false
+      if (element instanceof HTMLInputElement) return true
+      if (element instanceof HTMLTextAreaElement) return true
+      if (element instanceof HTMLSelectElement) return true
+      return (element as HTMLElement).isContentEditable
+    }
+
+    const handleGlobalScannerInput = (event: KeyboardEvent) => {
+      const activeElement = document.activeElement
+      const isScannerInputFocused = activeElement === scanInputRef.current
+      const shouldCapture = !isEditableElement(activeElement) || isScannerInputFocused
+
+      if (!shouldCapture || event.ctrlKey || event.metaKey || event.altKey) return
+
+      if (event.key === 'Enter') {
+        const scannedCode = scannerBufferRef.current.trim()
+        if (scannedCode.length > 0) {
+          event.preventDefault()
+          scannerBufferRef.current = ''
+          setScanError('')
+          setScanSuccess('')
+          setScanCode(scannedCode)
+          scanInputRef.current?.form?.requestSubmit()
+        }
+        return
+      }
+
+      if (event.key.length !== 1) return
+
+      const now = Date.now()
+      const elapsed = now - lastKeyAtRef.current
+      lastKeyAtRef.current = now
+
+      if (elapsed > 120) {
+        scannerBufferRef.current = event.key
+      } else {
+        scannerBufferRef.current += event.key
+      }
+    }
+
+    window.addEventListener('keydown', handleGlobalScannerInput)
+    return () => {
+      window.removeEventListener('keydown', handleGlobalScannerInput)
+    }
+  }, [scannerModeEnabled])
 
   const handleScannerSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -144,9 +206,29 @@ export function MovimentacoesClient({
 
         <div className="bg-card border border-border rounded-xl shadow-sm p-4 md:p-5">
           <div className="flex flex-col gap-4">
-            <div>
-              <h2 className="text-base font-semibold">Leitura no caixa</h2>
-              <p className="text-sm text-muted-foreground mt-1">Leia o codigo no leitor e pressione Enter para registrar automaticamente a saida no estoque.</p>
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <h2 className="text-base font-semibold">Leitura no caixa</h2>
+                <p className="text-sm text-muted-foreground mt-1">Leia o codigo no leitor e pressione Enter para registrar automaticamente a saida no estoque.</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <span
+                  className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold ${
+                    scannerModeEnabled
+                      ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-600'
+                      : 'border-amber-500/40 bg-amber-500/10 text-amber-600'
+                  }`}
+                >
+                  Modo scanner: {scannerModeEnabled ? 'Ligado' : 'Desligado'}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setScannerModeEnabled((current) => !current)}
+                  className="border border-border hover:bg-muted text-foreground px-3 py-1.5 rounded-lg text-xs font-medium transition-colors"
+                >
+                  {scannerModeEnabled ? 'Desativar scanner' : 'Ativar scanner'}
+                </button>
+              </div>
             </div>
 
             <form onSubmit={handleScannerSubmit} className="grid grid-cols-1 md:grid-cols-[1fr_120px_140px] gap-3">

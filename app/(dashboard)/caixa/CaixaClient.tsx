@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState, useTransition } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import { CreditCard, Plus, ScanLine, Trash2 } from 'lucide-react'
 import { completeSale, findProductByCode } from '@/lib/actions'
 import { useRouter } from 'next/navigation'
@@ -50,7 +50,11 @@ export function CaixaClient({ products, initialSales }: { products: Product[]; i
   const [paymentMethod, setPaymentMethod] = useState('DINHEIRO')
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
+  const [scannerModeEnabled, setScannerModeEnabled] = useState(true)
   const [cart, setCart] = useState<CartItem[]>([])
+  const scannerInputRef = useRef<HTMLInputElement | null>(null)
+  const scannerBufferRef = useRef('')
+  const lastKeyAtRef = useRef(0)
 
   const subtotal = useMemo(() => cart.reduce((acc, item) => acc + item.quantity * item.unitPrice, 0), [cart])
   const parsedDiscount = Math.max(0, Number(discount) || 0)
@@ -59,7 +63,7 @@ export function CaixaClient({ products, initialSales }: { products: Product[]; i
 
   const formatCurrency = (value: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value)
 
-  const addProductToCart = (product: Product) => {
+  const addProductToCart = useCallback((product: Product) => {
     if (product.stockQty <= 0) {
       setError('Este produto está sem estoque.')
       return
@@ -85,14 +89,10 @@ export function CaixaClient({ products, initialSales }: { products: Product[]; i
 
       return current.map((item) => item.productId === product.id ? { ...item, quantity: item.quantity + 1 } : item)
     })
-  }
+  }, [])
 
-  const handleReadCode = (event: React.FormEvent) => {
-    event.preventDefault()
-    setError('')
-    setSuccess('')
-
-    const value = code.trim()
+  const readCodeAndAddToCart = useCallback((rawCode: string) => {
+    const value = rawCode.trim()
     if (!value) {
       setError('Informe um código para leitura.')
       return
@@ -107,7 +107,72 @@ export function CaixaClient({ products, initialSales }: { products: Product[]; i
         setError(currentError?.message || 'Não foi possível ler o código.')
       }
     })
+  }, [addProductToCart])
+
+  const handleReadCode = (event: React.FormEvent) => {
+    event.preventDefault()
+    setError('')
+    setSuccess('')
+    readCodeAndAddToCart(code)
   }
+
+  useEffect(() => {
+    if (!scannerModeEnabled) return
+    scannerInputRef.current?.focus()
+  }, [scannerModeEnabled])
+
+  useEffect(() => {
+    if (!scannerModeEnabled) {
+      scannerBufferRef.current = ''
+      return
+    }
+
+    const isEditableElement = (element: Element | null) => {
+      if (!element) return false
+      if (element instanceof HTMLInputElement) return true
+      if (element instanceof HTMLTextAreaElement) return true
+      if (element instanceof HTMLSelectElement) return true
+      return (element as HTMLElement).isContentEditable
+    }
+
+    const handleGlobalScannerInput = (event: KeyboardEvent) => {
+      const activeElement = document.activeElement
+      const isScannerInputFocused = activeElement === scannerInputRef.current
+      const shouldCapture = !isEditableElement(activeElement) || isScannerInputFocused
+
+      if (!shouldCapture || event.ctrlKey || event.metaKey || event.altKey) return
+
+      if (event.key === 'Enter') {
+        const scannedCode = scannerBufferRef.current.trim()
+        if (scannedCode.length > 0) {
+          event.preventDefault()
+          scannerBufferRef.current = ''
+          setError('')
+          setSuccess('')
+          setCode(scannedCode)
+          readCodeAndAddToCart(scannedCode)
+        }
+        return
+      }
+
+      if (event.key.length !== 1) return
+
+      const now = Date.now()
+      const elapsed = now - lastKeyAtRef.current
+      lastKeyAtRef.current = now
+
+      if (elapsed > 120) {
+        scannerBufferRef.current = event.key
+      } else {
+        scannerBufferRef.current += event.key
+      }
+    }
+
+    window.addEventListener('keydown', handleGlobalScannerInput)
+    return () => {
+      window.removeEventListener('keydown', handleGlobalScannerInput)
+    }
+  }, [readCodeAndAddToCart, scannerModeEnabled])
 
   const updateQuantity = (productId: string, quantity: number) => {
     setCart((current) => {
@@ -154,12 +219,30 @@ export function CaixaClient({ products, initialSales }: { products: Product[]; i
       <div>
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h1 className="text-3xl font-bold tracking-tight">Caixa e vendas</h1>
-          <a
-            href="/api/export/sales"
-            className="border border-border hover:bg-muted text-foreground px-4 py-2 rounded-lg text-sm font-medium transition-colors"
-          >
-            Exportar vendas CSV
-          </a>
+          <div className="flex flex-wrap items-center gap-2">
+            <span
+              className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold ${
+                scannerModeEnabled
+                  ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-600'
+                  : 'border-amber-500/40 bg-amber-500/10 text-amber-600'
+              }`}
+            >
+              Modo scanner: {scannerModeEnabled ? 'Ligado' : 'Desligado'}
+            </span>
+            <button
+              type="button"
+              onClick={() => setScannerModeEnabled((current) => !current)}
+              className="border border-border hover:bg-muted text-foreground px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+            >
+              {scannerModeEnabled ? 'Desativar scanner' : 'Ativar scanner'}
+            </button>
+            <a
+              href="/api/export/sales"
+              className="border border-border hover:bg-muted text-foreground px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+            >
+              Exportar vendas CSV
+            </a>
+          </div>
         </div>
         <p className="text-muted-foreground mt-1">Registre vendas, aplique desconto e atualize o estoque automaticamente.</p>
       </div>
@@ -170,10 +253,12 @@ export function CaixaClient({ products, initialSales }: { products: Product[]; i
             <div className="relative">
               <ScanLine className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
               <input
+                ref={scannerInputRef}
                 type="text"
                 value={code}
                 onChange={e => setCode(e.target.value)}
                 placeholder="Leia ou digite o SKU do produto"
+                autoFocus
                 className="w-full pl-10 pr-4 py-2.5 bg-background border border-border rounded-lg text-sm font-mono outline-none focus:border-primary/60 focus:ring-2 focus:ring-primary/20"
               />
             </div>

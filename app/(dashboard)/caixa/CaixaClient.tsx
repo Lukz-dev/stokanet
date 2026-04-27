@@ -42,26 +42,56 @@ type CartItem = {
   quantity: number
 }
 
+const DISCOUNT_PERCENT_PRESETS = ['0', '5', '10', '15', '20'] as const
+
 export function CaixaClient({ products, initialSales }: { products: Product[]; initialSales: Sale[] }) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [code, setCode] = useState('')
-  const [discount, setDiscount] = useState('0')
+  const [discountPercent, setDiscountPercent] = useState('0')
+  const [discountPreset, setDiscountPreset] = useState<string>('0')
   const [paymentMethod, setPaymentMethod] = useState('DINHEIRO')
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   const [scannerModeEnabled, setScannerModeEnabled] = useState(true)
   const [cart, setCart] = useState<CartItem[]>([])
+  const [showOnlyDiscountedSales, setShowOnlyDiscountedSales] = useState(false)
   const scannerInputRef = useRef<HTMLInputElement | null>(null)
   const scannerBufferRef = useRef('')
   const lastKeyAtRef = useRef(0)
 
   const subtotal = useMemo(() => cart.reduce((acc, item) => acc + item.quantity * item.unitPrice, 0), [cart])
-  const parsedDiscount = Math.max(0, Number(discount) || 0)
-  const boundedDiscount = Math.min(parsedDiscount, subtotal)
+  const parsedDiscountPercent = Math.min(100, Math.max(0, Number(discountPercent) || 0))
+  const boundedDiscount = Number(((subtotal * parsedDiscountPercent) / 100).toFixed(2))
   const total = Math.max(0, subtotal - boundedDiscount)
+  const recentSales = useMemo(
+    () => (showOnlyDiscountedSales ? initialSales.filter((sale) => sale.discount > 0) : initialSales),
+    [initialSales, showOnlyDiscountedSales],
+  )
 
   const formatCurrency = (value: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value)
+
+  const normalizePercentInput = (value: string) => {
+    const numeric = Number(value)
+    if (!Number.isFinite(numeric)) return 0
+    return Math.min(100, Math.max(0, numeric))
+  }
+
+  const handlePresetChange = (value: string) => {
+    setDiscountPreset(value)
+    if (value === 'custom') return
+    setDiscountPercent(value)
+  }
+
+  const handlePercentChange = (value: string) => {
+    setDiscountPercent(value)
+    const normalized = String(normalizePercentInput(value))
+    if (DISCOUNT_PERCENT_PRESETS.includes(normalized as (typeof DISCOUNT_PERCENT_PRESETS)[number])) {
+      setDiscountPreset(normalized)
+      return
+    }
+    setDiscountPreset('custom')
+  }
 
   const addProductToCart = useCallback((product: Product) => {
     if (product.stockQty <= 0) {
@@ -206,7 +236,8 @@ export function CaixaClient({ products, initialSales }: { products: Product[]; i
         })
         setSuccess(`Venda ${result.code} finalizada com sucesso.`)
         setCart([])
-        setDiscount('0')
+        setDiscountPercent('0')
+        setDiscountPreset('0')
         router.refresh()
       } catch (currentError: any) {
         setError(currentError?.message || 'Não foi possível finalizar a venda.')
@@ -282,15 +313,30 @@ export function CaixaClient({ products, initialSales }: { products: Product[]; i
               <option value="CARTAO_DEBITO">Cartão de débito</option>
               <option value="PIX">PIX</option>
             </select>
-            <input
-              type="number"
-              min="0"
-              step="0.01"
-              value={discount}
-              onChange={e => setDiscount(e.target.value)}
-              placeholder="Desconto"
-              className="px-4 py-2.5 bg-background border border-border rounded-lg text-sm outline-none focus:border-primary/60 focus:ring-2 focus:ring-primary/20"
-            />
+            <div className="grid grid-cols-2 gap-2">
+              <select
+                value={discountPreset}
+                onChange={e => handlePresetChange(e.target.value)}
+                className="px-4 py-2.5 bg-background border border-border rounded-lg text-sm outline-none focus:border-primary/60 focus:ring-2 focus:ring-primary/20"
+              >
+                <option value="0">0%</option>
+                <option value="5">5%</option>
+                <option value="10">10%</option>
+                <option value="15">15%</option>
+                <option value="20">20%</option>
+                <option value="custom">Personalizado</option>
+              </select>
+              <input
+                type="number"
+                min="0"
+                max="100"
+                step="0.01"
+                value={discountPercent}
+                onChange={e => handlePercentChange(e.target.value)}
+                placeholder="Desconto %"
+                className="px-4 py-2.5 bg-background border border-border rounded-lg text-sm outline-none focus:border-primary/60 focus:ring-2 focus:ring-primary/20"
+              />
+            </div>
           </div>
 
           {error && <p className="text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded-lg px-4 py-3 mb-4">{error}</p>}
@@ -351,7 +397,7 @@ export function CaixaClient({ products, initialSales }: { products: Product[]; i
             <h2 className="font-semibold text-lg mb-4">Resumo da venda</h2>
             <div className="space-y-2 text-sm">
               <div className="flex items-center justify-between"><span className="text-muted-foreground">Subtotal</span><span>{formatCurrency(subtotal)}</span></div>
-              <div className="flex items-center justify-between"><span className="text-muted-foreground">Desconto</span><span>- {formatCurrency(boundedDiscount)}</span></div>
+              <div className="flex items-center justify-between"><span className="text-muted-foreground">Desconto ({parsedDiscountPercent.toFixed(2)}%)</span><span>- {formatCurrency(boundedDiscount)}</span></div>
               <div className="h-px bg-border my-2" />
               <div className="flex items-center justify-between text-base font-bold"><span>Total</span><span>{formatCurrency(total)}</span></div>
             </div>
@@ -366,17 +412,37 @@ export function CaixaClient({ products, initialSales }: { products: Product[]; i
           </div>
 
           <div className="bg-card border border-border rounded-xl p-5 shadow-sm">
-            <h2 className="font-semibold text-lg mb-4">Vendas recentes</h2>
+            <div className="mb-4 flex items-center justify-between gap-2">
+              <h2 className="font-semibold text-lg">Vendas recentes</h2>
+              <button
+                type="button"
+                onClick={() => setShowOnlyDiscountedSales((current) => !current)}
+                className={`rounded-lg border px-3 py-1 text-xs font-semibold transition-colors ${
+                  showOnlyDiscountedSales
+                    ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-700'
+                    : 'border-border text-muted-foreground hover:bg-muted'
+                }`}
+              >
+                {showOnlyDiscountedSales ? 'Somente com desconto' : 'Mostrar todos'}
+              </button>
+            </div>
             <div className="space-y-3 max-h-[320px] overflow-y-auto pr-1">
-              {initialSales.length === 0 ? (
-                <p className="text-sm text-muted-foreground">Nenhuma venda registrada ainda.</p>
-              ) : initialSales.map((sale) => (
+              {recentSales.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  {showOnlyDiscountedSales ? 'Nenhuma venda com desconto encontrada.' : 'Nenhuma venda registrada ainda.'}
+                </p>
+              ) : recentSales.map((sale) => (
                 <div key={sale.id} className="rounded-lg border border-border p-3">
                   <div className="flex items-center justify-between">
                     <p className="font-semibold text-sm">{sale.code}</p>
                     <span className="text-xs text-muted-foreground">{new Date(sale.createdAt).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}</span>
                   </div>
                   <p className="text-xs text-muted-foreground mt-1">{sale.items.reduce((acc, item) => acc + item.quantity, 0)} item(ns)</p>
+                  {sale.discount > 0 && sale.subtotal > 0 ? (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Desconto: {((sale.discount / sale.subtotal) * 100).toFixed(2)}% ({formatCurrency(sale.discount)})
+                    </p>
+                  ) : null}
                   <p className="font-bold text-sm mt-2">{formatCurrency(sale.total)}</p>
                 </div>
               ))}

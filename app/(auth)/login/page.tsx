@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { signIn } from 'next-auth/react'
@@ -13,16 +13,27 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
+  const [rememberLogin, setRememberLogin] = useState(true)
+
+  useEffect(() => {
+    const savedPreference = window.localStorage.getItem('stokanet.rememberLogin')
+    if (savedPreference === 'false') {
+      setRememberLogin(false)
+    }
+  }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
     setError('')
 
+    window.localStorage.setItem('stokanet.rememberLogin', String(rememberLogin))
+
     const res = await signIn('credentials', {
       redirect: false,
       email,
       password,
+      rememberLogin: String(rememberLogin),
     })
 
     if (res?.ok) {
@@ -93,6 +104,19 @@ export default function Login() {
                 </button>
               </div>
             </div>
+
+            <label className="flex items-start gap-3 rounded-lg border border-border bg-muted/20 px-4 py-3 text-sm">
+              <input
+                type="checkbox"
+                checked={rememberLogin}
+                onChange={(event) => setRememberLogin(event.target.checked)}
+                className="mt-1 h-4 w-4 rounded border-border text-primary focus:ring-primary/30"
+              />
+              <span>
+                <span className="block font-medium text-foreground">Manter conectado</span>
+                <span className="block text-xs text-muted-foreground">Seu login permanece salvo por mais tempo neste dispositivo.</span>
+              </span>
+            </label>
 
             <button
               id="login-submit"

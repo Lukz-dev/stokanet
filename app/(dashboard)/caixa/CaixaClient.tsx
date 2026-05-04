@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import { CreditCard, Plus, ScanLine, Trash2 } from 'lucide-react'
 import { completeSale, findProductByCode } from '@/lib/actions'
@@ -56,6 +57,8 @@ export function CaixaClient({ products, initialSales }: { products: Product[]; i
   const [scannerModeEnabled, setScannerModeEnabled] = useState(true)
   const [cart, setCart] = useState<CartItem[]>([])
   const [showOnlyDiscountedSales, setShowOnlyDiscountedSales] = useState(false)
+  const [lastSaleId, setLastSaleId] = useState<string | null>(null)
+  const [lastSaleCode, setLastSaleCode] = useState<string | null>(null)
   const scannerInputRef = useRef<HTMLInputElement | null>(null)
   const scannerBufferRef = useRef('')
   const lastKeyAtRef = useRef(0)
@@ -235,6 +238,8 @@ export function CaixaClient({ products, initialSales }: { products: Product[]; i
           discount: boundedDiscount,
         })
         setSuccess(`Venda ${result.code} finalizada com sucesso.`)
+        setLastSaleId(result.id)
+        setLastSaleCode(result.code)
         setCart([])
         setDiscountPercent('0')
         setDiscountPreset('0')
@@ -273,6 +278,16 @@ export function CaixaClient({ products, initialSales }: { products: Product[]; i
             >
               Exportar vendas CSV
             </a>
+            {lastSaleId ? (
+              <Link
+                href={`/api/export/nfse/${lastSaleId}`}
+                target="_blank"
+                rel="noreferrer"
+                className="border border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/15 text-emerald-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+              >
+                Gerar NFS-e{lastSaleCode ? ` ${lastSaleCode}` : ''}
+              </Link>
+            ) : null}
           </div>
         </div>
         <p className="text-muted-foreground mt-1">Registre vendas, aplique desconto e atualize o estoque automaticamente.</p>
@@ -435,7 +450,17 @@ export function CaixaClient({ products, initialSales }: { products: Product[]; i
                 <div key={sale.id} className="rounded-lg border border-border p-3">
                   <div className="flex items-center justify-between">
                     <p className="font-semibold text-sm">{sale.code}</p>
-                    <span className="text-xs text-muted-foreground">{new Date(sale.createdAt).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}</span>
+                    <div className="flex items-center gap-2">
+                      <Link
+                        href={`/api/export/nfse/${sale.id}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-xs font-semibold rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-1 text-emerald-700 hover:bg-emerald-500/15 transition-colors"
+                      >
+                        NFS-e
+                      </Link>
+                      <span className="text-xs text-muted-foreground">{new Date(sale.createdAt).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}</span>
+                    </div>
                   </div>
                   <p className="text-xs text-muted-foreground mt-1">{sale.items.reduce((acc, item) => acc + item.quantity, 0)} item(ns)</p>
                   {sale.discount > 0 && sale.subtotal > 0 ? (

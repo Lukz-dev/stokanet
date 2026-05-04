@@ -63,11 +63,25 @@ function formatMonthLabel(year: number, month: number) {
   })
 }
 
+function formatMonthInputValue(year: number, month: number) {
+  return `${year}-${String(month).padStart(2, '0')}`
+}
+
+function getMonthRange(days: ClosureDay[]) {
+  return {
+    start: days[0]?.date ?? '',
+    end: days[days.length - 1]?.date ?? '',
+  }
+}
+
 export function FechamentoClient({ initialData }: { initialData: ClosureCalendar }) {
   const [data, setData] = useState<ClosureCalendar>(initialData)
   const [selectedDate, setSelectedDate] = useState(initialData.days[0]?.date ?? '')
   const [notes, setNotes] = useState(initialData.days[0]?.notes ?? '')
   const [monthNotes, setMonthNotes] = useState(initialData.month.notes ?? '')
+  const [batchNotes, setBatchNotes] = useState('')
+  const [rangeStart, setRangeStart] = useState(initialData.days[0]?.date ?? '')
+  const [rangeEnd, setRangeEnd] = useState(initialData.days[initialData.days.length - 1]?.date ?? '')
   const [feedback, setFeedback] = useState<string>('')
   const [error, setError] = useState<string>('')
   const [isPending, startTransition] = useTransition()
@@ -85,6 +99,32 @@ export function FechamentoClient({ initialData }: { initialData: ClosureCalendar
     return [...blanks, ...data.days]
   }, [leadingBlanks, data.days])
 
+  const normalizedRange = useMemo(() => {
+    if (!rangeStart || !rangeEnd) {
+      return getMonthRange(data.days)
+    }
+
+    return rangeStart <= rangeEnd
+      ? { start: rangeStart, end: rangeEnd }
+      : { start: rangeEnd, end: rangeStart }
+  }, [data.days, rangeEnd, rangeStart])
+
+  const rangeDays = useMemo(() => {
+    return data.days.filter((day) => day.date >= normalizedRange.start && day.date <= normalizedRange.end)
+  }, [data.days, normalizedRange.end, normalizedRange.start])
+
+  const rangeSummary = useMemo(() => {
+    const closedDays = rangeDays.filter((item) => item.status === 'CLOSED')
+    return {
+      daysInRange: rangeDays.length,
+      closedDays: closedDays.length,
+      openDays: rangeDays.length - closedDays.length,
+      salesTotal: Number(rangeDays.reduce((acc, item) => acc + item.salesTotal, 0).toFixed(2)),
+      purchaseTotal: Number(rangeDays.reduce((acc, item) => acc + item.purchaseTotal, 0).toFixed(2)),
+      cashExpected: Number(rangeDays.reduce((acc, item) => acc + item.cashExpected, 0).toFixed(2)),
+    }
+  }, [rangeDays])
+
   const refreshMonth = (year: number, month: number, keepSelectedDate?: string) => {
     startTransition(async () => {
       try {
@@ -92,6 +132,9 @@ export function FechamentoClient({ initialData }: { initialData: ClosureCalendar
         const nextData = (await getMonthlyClosureCalendar({ year, month })) as ClosureCalendar
         setData(nextData)
         setMonthNotes(nextData.month.notes ?? '')
+        const nextRange = getMonthRange(nextData.days)
+        setRangeStart(nextRange.start)
+        setRangeEnd(nextRange.end)
 
         const nextSelected = keepSelectedDate && nextData.days.some((d) => d.date === keepSelectedDate)
           ? keepSelectedDate
@@ -114,6 +157,15 @@ export function FechamentoClient({ initialData }: { initialData: ClosureCalendar
     setError('')
   }
 
+  const handleMonthChange = (value: string) => {
+    if (!value) return
+
+    const [yearPart, monthPart] = value.split('-').map(Number)
+    if (!Number.isInteger(yearPart) || !Number.isInteger(monthPart)) return
+
+    refreshMonth(yearPart, monthPart)
+  }
+
   const handleCloseDay = () => {
     if (!selectedDay) return
 
@@ -126,6 +178,33 @@ export function FechamentoClient({ initialData }: { initialData: ClosureCalendar
         refreshMonth(data.month.year, data.month.month, selectedDay.date)
       } catch (currentError: any) {
         setError(currentError?.message || 'Nao foi possivel fechar o dia.')
+      }
+    })
+  }
+
+  const handleCloseRange = () => {
+    if (!rangeDays.length) return
+
+    const daysToClose = rangeDays.filter((day) => day.status !== 'CLOSED')
+    if (!daysToClose.length) {
+      setFeedback('Todos os dias do intervalo já estão fechados.')
+      setError('')
+      return
+    }
+
+    startTransition(async () => {
+      try {
+        setError('')
+        setFeedback('')
+
+        for (const day of daysToClose) {
+          await closeDailyClosure({ day: day.date, notes: batchNotes })
+        }
+
+        setFeedback(`Fechamento em lote concluído para ${daysToClose.length} dia(s).`)
+        refreshMonth(data.month.year, data.month.month, daysToClose[0]?.date)
+      } catch (currentError: any) {
+        setError(currentError?.message || 'Nao foi possivel fechar o intervalo selecionado.')
       }
     })
   }
@@ -185,7 +264,16 @@ export function FechamentoClient({ initialData }: { initialData: ClosureCalendar
           <h1 className="text-3xl font-bold tracking-tight">Fechamento mensal</h1>
           <p className="text-muted-foreground mt-1">Controle diario com calendario, snapshot por dia e fechamento consolidado do mes.</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <label className="flex items-center gap-2 px-3 py-2 rounded-lg border border-border bg-card text-sm">
+            <span className="text-muted-foreground">Mês</span>
+            <input
+              type="month"
+              value={formatMonthInputValue(data.month.year, data.month.month)}
+              onChange={(event) => handleMonthChange(event.target.value)}
+              className="bg-transparent outline-none"
+            />
+          </label>
           <button
             type="button"
             onClick={() => refreshMonth(data.prev.year, data.prev.month)}
@@ -225,6 +313,120 @@ export function FechamentoClient({ initialData }: { initialData: ClosureCalendar
           <p className="text-xs text-muted-foreground mt-2">Status do mes: {data.month.status === 'CLOSED' ? 'Fechado' : 'Aberto'}</p>
         </div>
       </div>
+
+      <section className="border border-border rounded-xl bg-card p-5 shadow-sm">
+        <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
+          <div>
+            <h2 className="text-lg font-semibold inline-flex items-center gap-2"><CalendarRange className="w-5 h-5 text-emerald-600" /> Recorte por periodo</h2>
+            <p className="text-sm text-muted-foreground mt-1">Escolha um dia inicial e um dia final dentro do mes atual para filtrar os dados exibidos.</p>
+          </div>
+          <div className="text-xs text-muted-foreground">
+            {normalizedRange.start && normalizedRange.end ? `${normalizedRange.start} até ${normalizedRange.end}` : 'Selecione um intervalo'}
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <label className="flex flex-col gap-2 rounded-lg border border-border px-3 py-2">
+            <span className="text-xs text-muted-foreground">Dia inicial</span>
+            <input
+              type="date"
+              value={rangeStart}
+              min={data.days[0]?.date}
+              max={data.days[data.days.length - 1]?.date}
+              onChange={(event) => setRangeStart(event.target.value)}
+              className="calendar-picker-white bg-transparent outline-none text-sm"
+            />
+          </label>
+          <label className="flex flex-col gap-2 rounded-lg border border-border px-3 py-2">
+            <span className="text-xs text-muted-foreground">Dia final</span>
+            <input
+              type="date"
+              value={rangeEnd}
+              min={data.days[0]?.date}
+              max={data.days[data.days.length - 1]?.date}
+              onChange={(event) => setRangeEnd(event.target.value)}
+              className="calendar-picker-white bg-transparent outline-none text-sm"
+            />
+          </label>
+          <div className="rounded-lg border border-border px-3 py-2 bg-muted/30">
+            <p className="text-xs text-muted-foreground">Dias no recorte</p>
+            <p className="text-xl font-bold mt-1">{rangeSummary.daysInRange}</p>
+            <p className="text-xs text-muted-foreground mt-1">Fechados: {rangeSummary.closedDays} | Abertos: {rangeSummary.openDays}</p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-4">
+          <div className="rounded-lg border border-border px-3 py-2">
+            <p className="text-xs text-muted-foreground">Vendas no periodo</p>
+            <p className="text-lg font-semibold mt-1">{formatCurrency(rangeSummary.salesTotal)}</p>
+          </div>
+          <div className="rounded-lg border border-border px-3 py-2">
+            <p className="text-xs text-muted-foreground">Compras no periodo</p>
+            <p className="text-lg font-semibold mt-1">{formatCurrency(rangeSummary.purchaseTotal)}</p>
+          </div>
+          <div className="rounded-lg border border-border px-3 py-2">
+            <p className="text-xs text-muted-foreground">Caixa esperado no periodo</p>
+            <p className="text-lg font-semibold mt-1">{formatCurrency(rangeSummary.cashExpected)}</p>
+          </div>
+        </div>
+
+        <textarea
+          value={batchNotes}
+          onChange={(event) => setBatchNotes(event.target.value)}
+          placeholder="Observacoes para o fechamento em lote"
+          className="mt-4 w-full min-h-20 px-3 py-2 rounded-lg border border-border bg-background text-sm outline-none focus:border-primary/60 focus:ring-2 focus:ring-primary/20"
+        />
+
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={handleCloseRange}
+            disabled={isPending || data.month.status === 'CLOSED' || !rangeDays.length}
+            className="px-3 py-2 rounded-lg bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700 disabled:opacity-60"
+          >
+            <span className="inline-flex items-center gap-1"><CalendarCheck2 className="w-4 h-4" /> Fechar periodo selecionado</span>
+          </button>
+          <span className="text-xs text-muted-foreground">Fecha apenas os dias abertos dentro do intervalo escolhido.</span>
+        </div>
+
+        <div className="mt-4 overflow-hidden rounded-lg border border-border">
+          <div className="max-h-72 overflow-auto">
+            <table className="min-w-full text-sm">
+              <thead className="sticky top-0 bg-muted/95 text-muted-foreground">
+                <tr>
+                  <th className="text-left font-medium px-3 py-2">Data</th>
+                  <th className="text-left font-medium px-3 py-2">Status</th>
+                  <th className="text-right font-medium px-3 py-2">Vendas</th>
+                  <th className="text-right font-medium px-3 py-2">Compras</th>
+                  <th className="text-right font-medium px-3 py-2">Caixa</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rangeDays.map((day) => (
+                  <tr key={day.date} className="border-t border-border/70">
+                    <td className="px-3 py-2">{day.date}</td>
+                    <td className="px-3 py-2">
+                      <span className={`inline-flex rounded-full px-2 py-1 text-xs ${day.status === 'CLOSED' ? 'bg-emerald-500/10 text-emerald-700' : 'bg-muted text-muted-foreground'}`}>
+                        {day.status === 'CLOSED' ? 'Fechado' : 'Aberto'}
+                      </span>
+                    </td>
+                    <td className="px-3 py-2 text-right">{formatCurrency(day.salesTotal)}</td>
+                    <td className="px-3 py-2 text-right">{formatCurrency(day.purchaseTotal)}</td>
+                    <td className="px-3 py-2 text-right">{formatCurrency(day.cashExpected)}</td>
+                  </tr>
+                ))}
+                {!rangeDays.length && (
+                  <tr>
+                    <td colSpan={5} className="px-3 py-6 text-center text-muted-foreground">
+                      Nenhum dia encontrado no intervalo selecionado.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
 
       {error && <p className="text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded-lg px-4 py-3">{error}</p>}
       {feedback && <p className="text-sm text-emerald-700 bg-emerald-500/10 border border-emerald-500/20 rounded-lg px-4 py-3">{feedback}</p>}
@@ -266,7 +468,9 @@ export function FechamentoClient({ initialData }: { initialData: ClosureCalendar
                 >
                   <div className="flex items-start justify-between">
                     <span className="font-semibold text-sm">{cell.day}</span>
-                    {isClosed ? <CalendarCheck2 className="w-4 h-4 text-emerald-600" /> : <CalendarClock className="w-4 h-4 text-muted-foreground" />}
+                    <span className={`inline-flex items-center justify-center rounded-full p-1 ${isClosed ? 'bg-emerald-500/15' : 'bg-sky-500/15'}`}>
+                      {isClosed ? <CalendarCheck2 className="w-4 h-4 text-emerald-700 drop-shadow-sm" /> : <CalendarClock className="w-4 h-4 text-sky-700 drop-shadow-sm" />}
+                    </span>
                   </div>
                   <p className="text-[11px] text-muted-foreground mt-1 truncate">{formatCurrency(cell.salesTotal)}</p>
                   <p className="text-[11px] text-muted-foreground truncate">{cell.salesCount} venda(s)</p>

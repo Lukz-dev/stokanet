@@ -117,6 +117,12 @@
   * {
     @apply border-border;
   }
+
+  .calendar-picker-white::-webkit-calendar-picker-indicator {
+    filter: brightness(0) invert(1);
+    cursor: pointer;
+  }
+
   body {
     @apply bg-background text-foreground antialiased;
     background-image:

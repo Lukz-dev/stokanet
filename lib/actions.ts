@@ -717,16 +717,17 @@ export async function getDashboardStats() {
 // =====================
 export async function getProducts(search?: string, status?: string) {
   const companyId = await getCompanyId()
+  const normalizedSearch = search?.trim()
 
   return prisma.product.findMany({
     where: {
       companyId,
-      ...(search ? {
+      ...(normalizedSearch ? {
         OR: [
-          { name: { contains: search } },
-          { sku: { contains: search } },
-            { size: { contains: search } },
-            { color: { contains: search } },
+          { name: { contains: normalizedSearch, mode: 'insensitive' } },
+          { sku: { contains: normalizedSearch, mode: 'insensitive' } },
+          { size: { contains: normalizedSearch, mode: 'insensitive' } },
+          { color: { contains: normalizedSearch, mode: 'insensitive' } },
         ]
       } : {}),
       ...(status && status !== 'todos' ? { status } : {}),
@@ -820,6 +821,20 @@ export async function deleteProduct(id: string) {
   const companyId = await getCompanyId()
   const product = await prisma.product.findFirst({ where: { id, companyId } })
   if (!product) throw new Error('Produto não encontrado')
+
+  const [movementCount, saleItemCount, purchaseItemCount, transferItemCount, warehouseStockCount, batchCount] = await Promise.all([
+    prisma.movement.count({ where: { productId: id, companyId } }),
+    prisma.saleItem.count({ where: { productId: id, sale: { companyId } } }),
+    prisma.purchaseOrderItem.count({ where: { productId: id, purchaseOrder: { companyId } } }),
+    prisma.warehouseTransferItem.count({ where: { productId: id, transfer: { companyId } } }),
+    prisma.warehouseStock.count({ where: { productId: id, warehouse: { companyId } } }),
+    prisma.batch.count({ where: { productId: id, companyId } }),
+  ])
+
+  if (movementCount || saleItemCount || purchaseItemCount || transferItemCount || warehouseStockCount || batchCount) {
+    throw new Error('Este produto possui movimentações ou histórico vinculado e não pode ser excluído.')
+  }
+
   await prisma.product.delete({ where: { id } })
   revalidatePath('/estoque')
   revalidatePath('/')
@@ -1137,9 +1152,7 @@ export async function findProductByCode(code: string) {
     where: {
       companyId,
       OR: [
-        { sku: normalizedCode },
-        { sku: normalizedCode.toUpperCase() },
-        { sku: normalizedCode.toLowerCase() },
+        { sku: { equals: normalizedCode, mode: 'insensitive' } },
       ],
     },
     select: {

@@ -22,7 +22,8 @@ export default async function RootLayout({
   children: React.ReactNode;
 }>) {
   const session = await getServerSession(authOptions)
-  const userId = (session?.user as { id?: string } | undefined)?.id
+  const sessionUser = session?.user as { id?: string; authExpiresAt?: number | null } | undefined
+  const userId = sessionUser?.id && (!sessionUser.authExpiresAt || Date.now() <= sessionUser.authExpiresAt) ? sessionUser.id : undefined
 
   const userThemePreference = userId
     ? await prisma.user.findUnique({

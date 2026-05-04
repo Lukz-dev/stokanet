@@ -10,6 +10,7 @@ export const authOptions: NextAuthOptions = {
       credentials: {
         email: { label: 'E-mail', type: 'email', placeholder: 'seu@email.com' },
         password: { label: 'Senha', type: 'password' },
+        rememberLogin: { label: 'Manter conectado', type: 'text' },
       },
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) return null
@@ -33,13 +34,14 @@ export const authOptions: NextAuthOptions = {
           isSystemAdmin: user.isSystemAdmin,
           companyId: user.companyId,
           companyName: user.company?.name ?? null,
+          rememberLogin: credentials.rememberLogin === 'true',
         }
       },
     }),
   ],
   session: {
     strategy: 'jwt',
-    maxAge: 24 * 60 * 60,
+    maxAge: 30 * 24 * 60 * 60,
   },
   pages: {
     signIn: '/login',
@@ -53,6 +55,8 @@ export const authOptions: NextAuthOptions = {
         token.isSystemAdmin = (user as any).isSystemAdmin
         token.companyId = (user as any).companyId
         token.companyName = (user as any).companyName
+        ;(token as any).rememberLogin = (user as any).rememberLogin === true
+        ;(token as any).authExpiresAt = Date.now() + ((user as any).rememberLogin === true ? 30 : 1) * 24 * 60 * 60 * 1000
         ;(token as any).avatarVersion = Date.now()
       }
 
@@ -73,6 +77,8 @@ export const authOptions: NextAuthOptions = {
         ;(session.user as any).isSystemAdmin = (token as any).isSystemAdmin
         ;(session.user as any).companyId = (token as any).companyId
         ;(session.user as any).companyName = (token as any).companyName
+        ;(session.user as any).rememberLogin = (token as any).rememberLogin ?? false
+        ;(session.user as any).authExpiresAt = (token as any).authExpiresAt ?? null
         ;(session.user as any).avatarVersion = (token as any).avatarVersion ?? null
       }
       return session

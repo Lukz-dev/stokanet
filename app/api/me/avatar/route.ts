@@ -5,7 +5,8 @@ import { authOptions } from '@/app/api/auth/[...nextauth]/route'
 
 export async function GET() {
   const session = await getServerSession(authOptions)
-  const userId = (session?.user as any)?.id as string | undefined
+  const sessionUser = session?.user as { id?: string; authExpiresAt?: number | null } | undefined
+  const userId = sessionUser?.id && (!sessionUser.authExpiresAt || Date.now() <= sessionUser.authExpiresAt) ? sessionUser.id : undefined
 
   if (!userId) {
     return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })

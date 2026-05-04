@@ -11,6 +11,7 @@ type SessionUser = {
   role?: AppRole
   isApproved?: boolean
   isSystemAdmin?: boolean
+  authExpiresAt?: number | null
 }
 
 type UserWithCompany = User & { company: Company | null }
@@ -21,6 +22,10 @@ async function getSessionUser(options?: { allowPending?: boolean; requireSystemA
 
   if (!user?.id) {
     throw new Error('Não autorizado')
+  }
+
+  if (typeof user.authExpiresAt === 'number' && Date.now() > user.authExpiresAt) {
+    throw new Error('Sessão expirada')
   }
 
   if (options?.requireSystemAdmin && !user.isSystemAdmin) {

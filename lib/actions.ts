@@ -716,25 +716,30 @@ export async function getDashboardStats() {
 // PRODUTOS
 // =====================
 export async function getProducts(search?: string, status?: string) {
-  const companyId = await getCompanyId()
-  const normalizedSearch = search?.trim()
+  try {
+    const companyId = await getCompanyId()
+    const normalizedSearch = search?.trim()
 
-  return prisma.product.findMany({
-    where: {
-      companyId,
-      ...(normalizedSearch ? {
-        OR: [
-          { name: { contains: normalizedSearch, mode: 'insensitive' } },
-          { sku: { contains: normalizedSearch, mode: 'insensitive' } },
-          { size: { contains: normalizedSearch, mode: 'insensitive' } },
-          { color: { contains: normalizedSearch, mode: 'insensitive' } },
-        ]
-      } : {}),
-      ...(status && status !== 'todos' ? { status } : {}),
-    },
-    include: { category: true },
-    orderBy: { createdAt: 'desc' },
-  })
+    return prisma.product.findMany({
+      where: {
+        companyId,
+        ...(normalizedSearch ? {
+          OR: [
+            { name: { contains: normalizedSearch, mode: 'insensitive' } },
+            { sku: { contains: normalizedSearch, mode: 'insensitive' } },
+            { size: { contains: normalizedSearch, mode: 'insensitive' } },
+            { color: { contains: normalizedSearch, mode: 'insensitive' } },
+          ]
+        } : {}),
+        ...(status && status !== 'todos' ? { status } : {}),
+      },
+      include: { category: true },
+      orderBy: { createdAt: 'desc' },
+    })
+  } catch (err) {
+    // Se não houver sessão/contexto (ex: revalidatePath em background), devolve lista vazia em vez de quebrar o render
+    return []
+  }
 }
 
 export async function createProduct(data: {

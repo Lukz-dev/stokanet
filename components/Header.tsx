@@ -68,27 +68,24 @@ export function Header() {
     }
   }
 
-  const loadAvatar = async () => {
-    if (!userId) {
-      setAvatarUrl(null)
-      return
-    }
-
-    try {
-      const response = await fetch('/api/me/avatar', { cache: 'no-store' })
-      if (!response.ok) {
-        setAvatarUrl(null)
-        return
-      }
-
-      const payload = (await response.json()) as { avatarUrl: string | null }
-      setAvatarUrl(payload.avatarUrl)
-    } catch {
-      setAvatarUrl(null)
-    }
-  }
-
   useEffect(() => {
+    const loadAvatar = async () => {
+      if (!userId) return
+
+      try {
+        const response = await fetch('/api/me/avatar', { cache: 'no-store' })
+        if (!response.ok) {
+          setAvatarUrl(null)
+          return
+        }
+
+        const payload = (await response.json()) as { avatarUrl: string | null }
+        setAvatarUrl(payload.avatarUrl)
+      } catch {
+        setAvatarUrl(null)
+      }
+    }
+
     void loadAvatar()
   }, [userId, avatarVersion])
 

@@ -725,10 +725,10 @@ export async function getProducts(search?: string, status?: string) {
         companyId,
         ...(normalizedSearch ? {
           OR: [
-            { name: { contains: normalizedSearch, mode: 'insensitive' } },
-            { sku: { contains: normalizedSearch, mode: 'insensitive' } },
-            { size: { contains: normalizedSearch, mode: 'insensitive' } },
-            { color: { contains: normalizedSearch, mode: 'insensitive' } },
+            { name: { contains: normalizedSearch } },
+            { sku: { contains: normalizedSearch } },
+            { size: { contains: normalizedSearch } },
+            { color: { contains: normalizedSearch } },
           ]
         } : {}),
         ...(status && status !== 'todos' ? { status } : {}),
@@ -736,7 +736,7 @@ export async function getProducts(search?: string, status?: string) {
       include: { category: true },
       orderBy: { createdAt: 'desc' },
     })
-  } catch (err) {
+  } catch {
     // Se não houver sessão/contexto (ex: revalidatePath em background), devolve lista vazia em vez de quebrar o render
     return []
   }
@@ -1157,7 +1157,7 @@ export async function findProductByCode(code: string) {
     where: {
       companyId,
       OR: [
-        { sku: { equals: normalizedCode, mode: 'insensitive' } },
+        { sku: { equals: normalizedCode } },
       ],
     },
     select: {

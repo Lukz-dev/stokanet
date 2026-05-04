@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { signIn } from 'next-auth/react'
@@ -13,14 +13,14 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
-  const [rememberLogin, setRememberLogin] = useState(true)
-
-  useEffect(() => {
-    const savedPreference = window.localStorage.getItem('stokanet.rememberLogin')
-    if (savedPreference === 'false') {
-      setRememberLogin(false)
+  const [rememberLogin, setRememberLogin] = useState<boolean>(() => {
+    try {
+      const savedPreference = window.localStorage.getItem('stokanet.rememberLogin')
+      return savedPreference === 'false' ? false : true
+    } catch {
+      return true
     }
-  }, [])
+  })
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()

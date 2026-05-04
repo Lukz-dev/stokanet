@@ -15,7 +15,7 @@ export default async function EstoquePage() {
     ])
 
     return <EstoqueClient initialProducts={products as any} categories={categories} defaultMinStock={company?.defaultMinStock ?? 5} />
-  } catch (err) {
+  } catch {
     // Em contextos sem sessão (ex: revalidatePath em background) evitar quebrar o render
     return <EstoqueClient initialProducts={[]} categories={[]} defaultMinStock={5} />
   }

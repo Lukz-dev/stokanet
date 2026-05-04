@@ -39,10 +39,7 @@ export function Sidebar() {
   const initials = userName.split(' ').map((name) => name[0]).slice(0, 2).join('').toUpperCase()
 
   useEffect(() => {
-    if (!userId) {
-      setAvatarUrl(null)
-      return
-    }
+    if (!userId) return
 
     const loadAvatar = async () => {
       try {

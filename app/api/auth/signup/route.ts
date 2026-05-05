@@ -25,6 +25,10 @@ export async function POST(req: NextRequest) {
 
     // Keep company + user creation atomic to avoid orphan companies on failures.
     await prisma.$transaction(async (tx) => {
+      // Bootstrap: if this is the first user ever, promote them so the system isn't locked
+      // behind the approval gate in a fresh production database.
+      const isFirstUser = (await tx.user.count()) === 0
+
       const company = await tx.company.create({
         data: { name: companyName },
       })
@@ -35,8 +39,8 @@ export async function POST(req: NextRequest) {
           email,
           password: hashedPassword,
           role: 'ADMIN',
-          isApproved: false,
-          isSystemAdmin: false,
+          isApproved: isFirstUser,
+          isSystemAdmin: isFirstUser,
           companyId: company.id,
         },
       })

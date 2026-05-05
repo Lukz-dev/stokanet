@@ -27,23 +27,32 @@ export default function Login() {
     setIsLoading(true)
     setError('')
 
-    window.localStorage.setItem('stokanet.rememberLogin', String(rememberLogin))
+    try {
+      try {
+        window.localStorage.setItem('stokanet.rememberLogin', String(rememberLogin))
+      } catch {
+        // Non-blocking: login should continue even if localStorage is unavailable.
+      }
 
-    const res = await signIn('credentials', {
-      redirect: false,
-      email,
-      password,
-      rememberLogin: String(rememberLogin),
-    })
+      const res = await signIn('credentials', {
+        redirect: false,
+        email,
+        password,
+        rememberLogin: String(rememberLogin),
+      })
 
-    if (res?.ok) {
-      router.push('/')
-      router.refresh()
-      return
+      if (res?.ok) {
+        router.push('/')
+        router.refresh()
+        return
+      }
+
+      setError('E-mail ou senha incorretos. Verifique suas credenciais.')
+    } catch {
+      setError('Falha ao conectar com o servidor. Tente novamente em instantes.')
+    } finally {
+      setIsLoading(false)
     }
-
-    setIsLoading(false)
-    setError('E-mail ou senha incorretos. Verifique suas credenciais.')
   }
 
   return (

@@ -47,11 +47,8 @@ export async function processSaleWithNfe(input: ProcessSaleInput): Promise<Proce
       },
     })
 
-    if (!nfeSettings) {
-      throw new NfeIntegrationError('Configurações de NF-e não encontradas. Configure ambiente/modelo/série/numeração.', {
-        code: 'NFE_SETTINGS_MISSING',
-      })
-    }
+    // If no NF-e settings or disabled, process as manual sale (no fiscal note)
+    const nfeEnabled = nfeSettings?.enabled ?? false
 
     if (!input.items || input.items.length === 0) {
       throw new NfeIntegrationError('Adicione pelo menos um item para finalizar a venda.', { code: 'SALE_EMPTY' })
@@ -110,7 +107,7 @@ export async function processSaleWithNfe(input: ProcessSaleInput): Promise<Proce
     const total = Math.max(0, subtotal - boundedDiscount)
     const saleCode = `VD-${Date.now().toString().slice(-8)}`
 
-    if (!nfeSettings.enabled) {
+    if (!nfeEnabled) {
       const manualSale = await prisma.$transaction(async (tx) => {
         const sale = await tx.sale.create({
           data: {

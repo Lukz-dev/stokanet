@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { processSaleWithNfe } from '@/lib/sales/processSaleWithNfe'
 import { NfeIntegrationError } from '@/lib/nfe/types'
-import prisma from '@/lib/prisma'
+
 
 export async function POST(request: Request) {
   try {

@@ -896,7 +896,7 @@ export async function deleteProduct(id: string) {
         message: `Erro ao excluir produto ${id}: ${error instanceof Error ? error.message : String(error)}`,
         level: 'warning',
       })
-    } catch (e) {
+    } catch {
       // ignore
     }
 
@@ -1254,7 +1254,8 @@ export async function completeSale(data: {
     throw new Error(prefix + (processed.sale.nfe.sefazMessage || 'NF-e rejeitada pela SEFAZ.'))
   }
 
-  if (processed.sale.nfe.status !== 'AUTORIZADO') {
+  // Allow sales without NF-e (status: PENDENTE) or with NF-e authorized (status: AUTORIZADO)
+  if (processed.sale.nfe.status !== 'AUTORIZADO' && processed.sale.nfe.status !== 'PENDENTE') {
     throw new Error('NF-e em processamento. Tente novamente em instantes.')
   }
 

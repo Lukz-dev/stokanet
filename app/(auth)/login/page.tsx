@@ -65,6 +65,10 @@ export default function Login() {
 
       if (res?.ok) {
         const session = await getSession()
+        if (!session?.user) {
+          setError('Login confirmado, mas a sessao nao foi criada no navegador. Isso quase sempre e configuracao do deploy (NEXTAUTH_URL / NEXTAUTH_SECRET) ou bloqueio de cookies. Verifique as env vars no Vercel e tente novamente.')
+          return
+        }
         const isApproved = session?.user?.isApproved === true || session?.user?.isSystemAdmin === true
         router.push(isApproved ? '/' : '/pending')
         router.refresh()

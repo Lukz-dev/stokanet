@@ -52,18 +52,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ sale: result.sale }, { status: 201 })
   } catch (error) {
     console.error('[api:/api/sales] Unexpected error', { error })
-    try {
-      await prisma.auditLog.create({
-        data: {
-          action: 'API_SALES_ERROR',
-          entity: 'SALE',
-          details: error instanceof Error ? error.message : String(error),
-          companyId: null,
-        },
-      })
-    } catch (e) {
-      console.error('[api:/api/sales] Failed to write audit log', e)
-    }
 
     if (error instanceof NfeIntegrationError) {
       return NextResponse.json(

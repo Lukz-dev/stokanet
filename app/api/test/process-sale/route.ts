@@ -1,10 +1,13 @@
 import prisma from '@/lib/prisma'
 
-if (process.env.NODE_ENV === 'production') {
-  throw new Error('Test endpoints disabled in production')
-}
-
 export async function POST(req: Request) {
+  if (process.env.NODE_ENV === 'production') {
+    return new Response(JSON.stringify({ error: 'not_found' }), {
+      status: 404,
+      headers: { 'Content-Type': 'application/json; charset=utf-8' },
+    })
+  }
+
   const body = await req.json().catch(() => ({}))
   const { companyId, items = [], paymentMethod, discount = 0, notes } = body
 
@@ -48,10 +51,14 @@ export async function POST(req: Request) {
     const sale = await prisma.$transaction(async (tx) => {
       const s = await tx.sale.create({ data: { code: `TEST-${Date.now()}`, subtotal, discount: boundedDiscount, total, paymentMethod: paymentMethod || null, notes: notes || null, companyId } as any })
       for (const item of items) {
-        const p = products.find((x) => x.id === item.productId)
-        await tx.saleItem.create({ data: { saleId: s.id, productId: p.id, productName: p.name, sku: p.sku, quantity: item.quantity, unitPrice: p.price, total: p.price * item.quantity } })
-        await tx.product.update({ where: { id: p.id }, data: { stockQty: { decrement: item.quantity } } as any })
-        await tx.movement.create({ data: { type: 'SAIDA', quantity: item.quantity, reason: `Teste venda ${s.code}`, productId: p.id, companyId } })
+        const product = products.find((x) => x.id === item.productId)
+        if (!product) {
+          throw new Error(`Produto não encontrado durante o processamento do teste: ${item.productId}`)
+        }
+
+        await tx.saleItem.create({ data: { saleId: s.id, productId: product.id, productName: product.name, sku: product.sku, quantity: item.quantity, unitPrice: product.price, total: product.price * item.quantity } })
+        await tx.product.update({ where: { id: product.id }, data: { stockQty: { decrement: item.quantity } } as any })
+        await tx.movement.create({ data: { type: 'SAIDA', quantity: item.quantity, reason: `Teste venda ${s.code}`, productId: product.id, companyId } })
       }
       return s
     })

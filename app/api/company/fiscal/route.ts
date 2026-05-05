@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { Prisma } from '@prisma/client'
 import prisma from '@/lib/prisma'
 import { getActiveCompanyId, getActiveUser } from '@/lib/access'
 
@@ -48,7 +49,12 @@ export async function PUT(request: Request) {
       legalName: body.legalName === undefined ? undefined : body.legalName?.trim() || null,
       cnpj: body.cnpj === undefined ? undefined : body.cnpj?.trim() || null,
       ie: body.ie === undefined ? undefined : body.ie?.trim() || null,
-      fiscalAddress: body.fiscalAddress === undefined ? undefined : (body.fiscalAddress ?? null),
+      fiscalAddress:
+        body.fiscalAddress === undefined
+          ? undefined
+          : body.fiscalAddress === null
+            ? Prisma.DbNull
+            : (body.fiscalAddress as Prisma.InputJsonValue),
     },
     select: {
       id: true,

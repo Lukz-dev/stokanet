@@ -1,11 +1,14 @@
 import bcrypt from 'bcryptjs'
 import prisma from '@/lib/prisma'
 
-if (process.env.NODE_ENV === 'production') {
-  throw new Error('Test endpoints disabled in production')
-}
-
 export async function POST(req: Request) {
+  if (process.env.NODE_ENV === 'production') {
+    return new Response(JSON.stringify({ error: 'not_found' }), {
+      status: 404,
+      headers: { 'Content-Type': 'application/json; charset=utf-8' },
+    })
+  }
+
   const body = await req.json().catch(() => ({}))
   const companyName = body.name || 'Test Company'
   const timestamp = Date.now()

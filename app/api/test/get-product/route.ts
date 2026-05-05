@@ -1,10 +1,13 @@
 import prisma from '@/lib/prisma'
 
-if (process.env.NODE_ENV === 'production') {
-  throw new Error('Test endpoints disabled in production')
-}
-
 export async function GET(req: Request) {
+  if (process.env.NODE_ENV === 'production') {
+    return new Response(JSON.stringify({ error: 'not_found' }), {
+      status: 404,
+      headers: { 'Content-Type': 'application/json; charset=utf-8' },
+    })
+  }
+
   const url = new URL(req.url)
   const productId = url.searchParams.get('productId')
 

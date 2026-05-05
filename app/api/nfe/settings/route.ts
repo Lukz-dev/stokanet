@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { Prisma } from '@prisma/client'
 import prisma from '@/lib/prisma'
 import { getActiveUser, getActiveCompanyId } from '@/lib/access'
 
@@ -77,7 +78,12 @@ export async function PUT(request: Request) {
       defaultCfop: body.defaultCfop?.trim() || null,
       naturezaOperacao: naturezaOperacao ?? 'Venda',
       taxRegime: body.taxRegime ?? 'SIMPLES_NACIONAL',
-      defaultTaxProfile: body.defaultTaxProfile === undefined ? null : (body.defaultTaxProfile ?? null),
+      defaultTaxProfile:
+        body.defaultTaxProfile === undefined
+          ? Prisma.DbNull
+          : body.defaultTaxProfile === null
+            ? Prisma.DbNull
+            : (body.defaultTaxProfile as Prisma.InputJsonValue),
     },
     update: {
       enabled: body.enabled,
@@ -88,7 +94,12 @@ export async function PUT(request: Request) {
       defaultCfop: body.defaultCfop === undefined ? undefined : body.defaultCfop?.trim() || null,
       naturezaOperacao,
       taxRegime: body.taxRegime,
-      defaultTaxProfile: body.defaultTaxProfile === undefined ? undefined : (body.defaultTaxProfile ?? null),
+      defaultTaxProfile:
+        body.defaultTaxProfile === undefined
+          ? undefined
+          : body.defaultTaxProfile === null
+            ? Prisma.DbNull
+            : (body.defaultTaxProfile as Prisma.InputJsonValue),
     },
     select: {
       enabled: true,

@@ -5,6 +5,10 @@ export default async function proxy(req: NextRequest) {
   const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET })
   const pathname = req.nextUrl.pathname
 
+  if (process.env.NODE_ENV !== 'production' && pathname === '/api/test/setup') {
+    return NextResponse.next()
+  }
+
   if (!token) {
     return NextResponse.redirect(new URL('/login', req.url))
   }

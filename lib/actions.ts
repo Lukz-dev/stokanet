@@ -6,6 +6,7 @@ import { revalidatePath } from 'next/cache'
 import bcrypt from 'bcryptjs'
 import { AppRole, getActiveCompanyId, getActiveUser } from '@/lib/access'
 import { THEME_PREFERENCES, type ThemePreference } from '@/lib/theme'
+import { processSaleWithNfe } from '@/lib/sales/processSaleWithNfe'
 
 async function getCompanyId(): Promise<string> {
   return getActiveCompanyId()
@@ -751,6 +752,10 @@ export async function createProduct(data: {
   stockQty: number
   minStock: number
   categoryId?: string
+  ncm?: string
+  cest?: string
+  cfop?: string
+  taxProfile?: unknown
 }) {
   const user = await getAuthenticatedUser()
   const companyId = await getCompanyId()
@@ -764,6 +769,10 @@ export async function createProduct(data: {
   await prisma.product.create({
     data: {
       ...data,
+      ncm: data.ncm?.trim() || null,
+      cest: data.cest?.trim() || null,
+      cfop: data.cfop?.trim() || null,
+      taxProfile: (data.taxProfile ?? null) as any,
       status,
       companyId,
     },
@@ -789,6 +798,10 @@ export async function updateProduct(id: string, data: {
   stockQty?: number
   minStock?: number
   categoryId?: string
+  ncm?: string
+  cest?: string
+  cfop?: string
+  taxProfile?: unknown
 }) {
   const user = await getAuthenticatedUser()
   const companyId = await getCompanyId()
@@ -806,7 +819,14 @@ export async function updateProduct(id: string, data: {
 
   await prisma.product.update({
     where: { id },
-    data: { ...data, status },
+    data: {
+      ...data,
+      ncm: data.ncm === undefined ? undefined : data.ncm?.trim() || null,
+      cest: data.cest === undefined ? undefined : data.cest?.trim() || null,
+      cfop: data.cfop === undefined ? undefined : data.cfop?.trim() || null,
+      taxProfile: data.taxProfile === undefined ? undefined : (data.taxProfile ?? null) as any,
+      status,
+    },
   })
   revalidatePath('/estoque')
   revalidatePath('/')
@@ -824,34 +844,58 @@ export async function updateProduct(id: string, data: {
 export async function deleteProduct(id: string) {
   const user = await getAuthenticatedUser()
   const companyId = await getCompanyId()
-  const product = await prisma.product.findFirst({ where: { id, companyId } })
-  if (!product) throw new Error('Produto não encontrado')
 
-  const [movementCount, saleItemCount, purchaseItemCount, transferItemCount, warehouseStockCount, batchCount] = await Promise.all([
-    prisma.movement.count({ where: { productId: id, companyId } }),
-    prisma.saleItem.count({ where: { productId: id, sale: { companyId } } }),
-    prisma.purchaseOrderItem.count({ where: { productId: id, purchaseOrder: { companyId } } }),
-    prisma.warehouseTransferItem.count({ where: { productId: id, transfer: { companyId } } }),
-    prisma.warehouseStock.count({ where: { productId: id, warehouse: { companyId } } }),
-    prisma.batch.count({ where: { productId: id, companyId } }),
-  ])
+  try {
+    const result = await prisma.$transaction(async (tx) => {
+      const product = await tx.product.findFirst({ where: { id, companyId } })
+      if (!product) return { ok: false, reason: 'Produto não encontrado' }
 
-  if (movementCount || saleItemCount || purchaseItemCount || transferItemCount || warehouseStockCount || batchCount) {
-    throw new Error('Este produto possui movimentações ou histórico vinculado e não pode ser excluído.')
+      const [movementCount, saleItemCount, purchaseItemCount, transferItemCount, warehouseStockCount, batchCount] = await Promise.all([
+        tx.movement.count({ where: { productId: id, companyId } }),
+        tx.saleItem.count({ where: { productId: id, sale: { companyId } } }),
+        tx.purchaseOrderItem.count({ where: { productId: id, purchaseOrder: { companyId } } }),
+        tx.warehouseTransferItem.count({ where: { productId: id, transfer: { companyId } } }),
+        tx.warehouseStock.count({ where: { productId: id, warehouse: { companyId } } }),
+        tx.batch.count({ where: { productId: id, companyId } }),
+      ])
+
+      if (movementCount || saleItemCount || purchaseItemCount || transferItemCount || warehouseStockCount || batchCount) {
+        return { ok: false, reason: 'Este produto possui movimentações ou histórico vinculado e não pode ser excluído.' }
+      }
+
+      await tx.product.delete({ where: { id } })
+      return { ok: true, productId: id }
+    })
+
+    if (!result.ok) {
+      throw new Error(result.reason || 'Não foi possível excluir o produto.')
+    }
+
+    revalidatePath('/estoque')
+    revalidatePath('/')
+
+    await logAudit({
+      action: 'DELETE',
+      entity: 'PRODUCT',
+      entityId: id,
+      details: `Produto ${id} removido`,
+      companyId,
+      userId: user.id,
+    })
+  } catch (error) {
+    console.error('[deleteProduct] Error deleting product', { id, companyId, userId: user?.id, error })
+    try {
+      await sendExternalAlertIfConfigured(companyId, {
+        title: 'Erro ao excluir produto',
+        message: `Erro ao excluir produto ${id}: ${error instanceof Error ? error.message : String(error)}`,
+        level: 'warning',
+      })
+    } catch (e) {
+      // ignore
+    }
+
+    throw error
   }
-
-  await prisma.product.delete({ where: { id } })
-  revalidatePath('/estoque')
-  revalidatePath('/')
-
-  await logAudit({
-    action: 'DELETE',
-    entity: 'PRODUCT',
-    entityId: id,
-    details: `Produto ${id} removido`,
-    companyId,
-    userId: user.id,
-  })
 }
 
 // =====================
@@ -1192,108 +1236,21 @@ export async function completeSale(data: {
   const user = await getAuthenticatedUser()
   const companyId = await getCompanyId()
 
-  if (!data.items || data.items.length === 0) {
-    throw new Error('Adicione pelo menos um item para finalizar a venda.')
-  }
-
-  const sanitizedItems = data.items
-    .map((item) => ({
-      productId: item.productId,
-      quantity: Math.max(1, Math.floor(item.quantity)),
-    }))
-    .filter((item) => item.productId)
-
-  if (sanitizedItems.length === 0) {
-    throw new Error('Itens inválidos para venda.')
-  }
-
-  const productIds = [...new Set(sanitizedItems.map((item) => item.productId))]
-  const products = await prisma.product.findMany({
-    where: { companyId, id: { in: productIds } },
-    select: { id: true, name: true, sku: true, price: true, stockQty: true, minStock: true },
+  const processed = await processSaleWithNfe({
+    items: data.items,
+    paymentMethod: data.paymentMethod,
+    discount: data.discount,
+    notes: data.notes,
   })
 
-  if (products.length !== productIds.length) {
-    throw new Error('Um ou mais produtos não foram encontrados para esta empresa.')
+  if (processed.sale.nfe.status === 'REJEITADO') {
+    const prefix = processed.sale.nfe.sefazCode ? `[SEFAZ ${processed.sale.nfe.sefazCode}] ` : ''
+    throw new Error(prefix + (processed.sale.nfe.sefazMessage || 'NF-e rejeitada pela SEFAZ.'))
   }
 
-  const productMap = new Map(products.map((product) => [product.id, product]))
-
-  let subtotal = 0
-  const resolvedItems = sanitizedItems.map((item) => {
-    const product = productMap.get(item.productId)
-    if (!product) {
-      throw new Error('Produto inválido na venda.')
-    }
-    if (product.stockQty < item.quantity) {
-      throw new Error(`Estoque insuficiente para ${product.name}. Disponível: ${product.stockQty}.`)
-    }
-
-    const lineTotal = product.price * item.quantity
-    subtotal += lineTotal
-    return {
-      ...item,
-      product,
-      unitPrice: product.price,
-      total: lineTotal,
-    }
-  })
-
-  const discount = Number.isFinite(data.discount) ? Math.max(0, Number(data.discount)) : 0
-  const boundedDiscount = Math.min(discount, subtotal)
-  const total = Math.max(0, subtotal - boundedDiscount)
-  const saleCode = `VD-${Date.now().toString().slice(-8)}`
-
-  const result = await prisma.$transaction(async (tx) => {
-    const sale = await tx.sale.create({
-      data: {
-        code: saleCode,
-        subtotal,
-        discount: boundedDiscount,
-        total,
-        paymentMethod: data.paymentMethod?.trim() || null,
-        notes: data.notes?.trim() || null,
-        companyId,
-      },
-    })
-
-    for (const item of resolvedItems) {
-      await tx.saleItem.create({
-        data: {
-          saleId: sale.id,
-          productId: item.product.id,
-          productName: item.product.name,
-          sku: item.product.sku,
-          quantity: item.quantity,
-          unitPrice: item.unitPrice,
-          total: item.total,
-        },
-      })
-
-      const newQty = item.product.stockQty - item.quantity
-      let newStatus = 'Normal'
-      if (newQty === 0) newStatus = 'Esgotado'
-      else if (newQty <= item.product.minStock * 0.5) newStatus = 'Crítico'
-      else if (newQty <= item.product.minStock) newStatus = 'Baixo'
-
-      await tx.product.update({
-        where: { id: item.product.id },
-        data: { stockQty: newQty, status: newStatus },
-      })
-
-      await tx.movement.create({
-        data: {
-          type: 'SAIDA',
-          quantity: item.quantity,
-          reason: `Venda ${sale.code}`,
-          productId: item.product.id,
-          companyId,
-        },
-      })
-    }
-
-    return sale
-  })
+  if (processed.sale.nfe.status !== 'AUTORIZADO') {
+    throw new Error('NF-e em processamento. Tente novamente em instantes.')
+  }
 
   revalidatePath('/movimentacoes')
   revalidatePath('/estoque')
@@ -1303,31 +1260,38 @@ export async function completeSale(data: {
   await logAudit({
     action: 'CREATE',
     entity: 'SALE',
-    entityId: result.id,
-    details: `Venda ${result.code} finalizada com total ${total.toFixed(2)}`,
+    entityId: processed.sale.id,
+    details: `Venda ${processed.sale.code} finalizada com total ${processed.sale.total.toFixed(2)} (NF-e autorizada)`,
     companyId,
     userId: user.id,
   })
 
-  const hasCriticalAfterSale = resolvedItems.some((item) => {
-    const remaining = item.product.stockQty - item.quantity
-    return remaining === 0 || remaining <= item.product.minStock * 0.5
-  })
-
-  if (hasCriticalAfterSale) {
-    await sendExternalAlertIfConfigured(companyId, {
-      level: 'warning',
-      title: 'Venda gerou alerta de estoque',
-      message: `A venda ${result.code} deixou ao menos um item em nível crítico ou esgotado.`,
+  try {
+    const productIds = [...new Set(data.items.map((item) => item.productId))]
+    const productsAfter = await prisma.product.findMany({
+      where: { companyId, id: { in: productIds } },
+      select: { id: true, name: true, stockQty: true, minStock: true },
     })
+
+    const hasCriticalAfterSale = productsAfter.some((product) => product.stockQty === 0 || product.stockQty <= product.minStock * 0.5)
+
+    if (hasCriticalAfterSale) {
+      await sendExternalAlertIfConfigured(companyId, {
+        level: 'warning',
+        title: 'Venda gerou alerta de estoque',
+        message: `A venda ${processed.sale.code} deixou ao menos um item em nível crítico ou esgotado.`,
+      })
+    }
+  } catch {
+    // Não bloqueia a finalização da venda.
   }
 
   return {
-    id: result.id,
-    code: result.code,
-    subtotal,
-    discount: boundedDiscount,
-    total,
+    id: processed.sale.id,
+    code: processed.sale.code,
+    subtotal: processed.sale.subtotal,
+    discount: processed.sale.discount,
+    total: processed.sale.total,
   }
 }
 

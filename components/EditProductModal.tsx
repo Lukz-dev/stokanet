@@ -8,6 +8,7 @@ interface Category { id: string; name: string }
 interface Product {
   id: string; name: string; sku: string; size: string | null; color: string | null; price: number
   stockQty: number; minStock: number; status: string
+  ncm?: string | null; cfop?: string | null; cest?: string | null
   categoryId: string | null; category: Category | null
 }
 
@@ -28,6 +29,9 @@ export function EditProductModal({ product, categories, onClose, onSuccess }: Pr
   const [form, setForm] = useState({
     name: product.name,
     sku: product.sku,
+    ncm: product.ncm ?? '',
+    cfop: product.cfop ?? '',
+    cest: product.cest ?? '',
     size: product.size ?? '',
     color: product.color ?? '',
     price: product.price.toString(),
@@ -48,6 +52,9 @@ export function EditProductModal({ product, categories, onClose, onSuccess }: Pr
         await updateProduct(product.id, {
           name: form.name,
           sku: form.sku,
+          ncm: form.ncm || undefined,
+          cfop: form.cfop || undefined,
+          cest: form.cest || undefined,
           size: form.size || undefined,
           color: form.color || undefined,
           price: parseFloat(form.price),
@@ -143,6 +150,40 @@ export function EditProductModal({ product, categories, onClose, onSuccess }: Pr
                   className="w-full pl-10 pr-4 py-2.5 bg-background border border-border rounded-lg text-sm outline-none focus:border-primary/60 focus:ring-2 focus:ring-primary/20 transition-all" />
               </div>
             </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="flex flex-col gap-2">
+              <label className="text-sm font-medium">NCM</label>
+              <input
+                name="ncm"
+                value={form.ncm}
+                onChange={handleChange}
+                placeholder="Ex: 85044030"
+                className="w-full px-4 py-2.5 bg-background border border-border rounded-lg text-sm font-mono outline-none focus:border-primary/60 focus:ring-2 focus:ring-primary/20 transition-all"
+              />
+            </div>
+            <div className="flex flex-col gap-2">
+              <label className="text-sm font-medium">CFOP</label>
+              <input
+                name="cfop"
+                value={form.cfop}
+                onChange={handleChange}
+                placeholder="Ex: 5102"
+                className="w-full px-4 py-2.5 bg-background border border-border rounded-lg text-sm font-mono outline-none focus:border-primary/60 focus:ring-2 focus:ring-primary/20 transition-all"
+              />
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-2">
+            <label className="text-sm font-medium">CEST (opcional)</label>
+            <input
+              name="cest"
+              value={form.cest}
+              onChange={handleChange}
+              placeholder="Ex: 0100100"
+              className="w-full px-4 py-2.5 bg-background border border-border rounded-lg text-sm font-mono outline-none focus:border-primary/60 focus:ring-2 focus:ring-primary/20 transition-all"
+            />
           </div>
 
           <div className="grid grid-cols-2 gap-4">

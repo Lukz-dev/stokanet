@@ -1,0 +1,526 @@
+import prisma from '@/lib/prisma'
+import { getActiveCompanyId } from '@/lib/access'
+import { issueNfeForSale } from '@/lib/nfe/issueFocusNfe'
+import type { NfeAuthorizationResult } from '@/lib/nfe/types'
+import { NfeIntegrationError } from '@/lib/nfe/types'
+
+export type ProcessSaleInput = {
+  items: Array<{ productId: string; quantity: number }>
+  paymentMethod?: string
+  discount?: number
+  notes?: string
+  customerId?: string | null
+}
+
+export type ProcessSaleResult = {
+  sale: {
+    id: string
+    code: string
+    subtotal: number
+    discount: number
+    total: number
+    nfeEnabled: boolean
+    nfe: NfeAuthorizationResult
+  }
+}
+
+function computeProductStatus(newQty: number, minStock: number) {
+  if (newQty === 0) return 'Esgotado'
+  if (newQty <= minStock * 0.5) return 'Crítico'
+  if (newQty <= minStock) return 'Baixo'
+  return 'Normal'
+}
+
+export async function processSaleWithNfe(input: ProcessSaleInput): Promise<ProcessSaleResult> {
+  const companyId = await getActiveCompanyId()
+
+  try {
+    const nfeSettings = await prisma.nfeSettings.findUnique({
+      where: { companyId },
+      select: {
+        enabled: true,
+        environment: true,
+        model: true,
+        series: true,
+        nextNumber: true,
+        defaultCfop: true,
+      },
+    })
+
+    if (!nfeSettings) {
+      throw new NfeIntegrationError('Configurações de NF-e não encontradas. Configure ambiente/modelo/série/numeração.', {
+        code: 'NFE_SETTINGS_MISSING',
+      })
+    }
+
+    if (!input.items || input.items.length === 0) {
+      throw new NfeIntegrationError('Adicione pelo menos um item para finalizar a venda.', { code: 'SALE_EMPTY' })
+    }
+
+    const sanitizedItems = input.items
+      .map((item) => ({
+        productId: item.productId,
+        quantity: Math.max(1, Math.floor(item.quantity)),
+      }))
+      .filter((item) => item.productId)
+
+    if (sanitizedItems.length === 0) {
+      throw new NfeIntegrationError('Itens inválidos para venda.', { code: 'SALE_INVALID_ITEMS' })
+    }
+
+    const productIds = [...new Set(sanitizedItems.map((item) => item.productId))]
+    const products = await prisma.product.findMany({
+      where: { companyId, id: { in: productIds } },
+      select: { id: true, name: true, sku: true, price: true, stockQty: true, minStock: true },
+    })
+
+    if (products.length !== productIds.length) {
+      throw new NfeIntegrationError('Um ou mais produtos não foram encontrados para esta empresa.', { code: 'PRODUCT_NOT_FOUND' })
+    }
+
+    const productMap = new Map(products.map((product) => [product.id, product]))
+
+    let subtotal = 0
+    const resolvedItems = sanitizedItems.map((item) => {
+      const product = productMap.get(item.productId)
+      if (!product) {
+        throw new NfeIntegrationError('Produto inválido na venda.', { code: 'PRODUCT_INVALID' })
+      }
+
+      if (product.stockQty < item.quantity) {
+        throw new NfeIntegrationError(`Estoque insuficiente para ${product.name}. Disponível: ${product.stockQty}.`, {
+          code: 'INSUFFICIENT_STOCK',
+          details: { productId: product.id, available: product.stockQty, requested: item.quantity },
+        })
+      }
+
+      const lineTotal = product.price * item.quantity
+      subtotal += lineTotal
+
+      return {
+        ...item,
+        product,
+        unitPrice: product.price,
+        total: lineTotal,
+      }
+    })
+
+    const discount = Number.isFinite(input.discount) ? Math.max(0, Number(input.discount)) : 0
+    const boundedDiscount = Math.min(discount, subtotal)
+    const total = Math.max(0, subtotal - boundedDiscount)
+    const saleCode = `VD-${Date.now().toString().slice(-8)}`
+
+    if (!nfeSettings.enabled) {
+      const manualSale = await prisma.$transaction(async (tx) => {
+        const sale = await tx.sale.create({
+          data: {
+            code: saleCode,
+            subtotal,
+            discount: boundedDiscount,
+            total,
+            paymentMethod: input.paymentMethod?.trim() || null,
+            notes: input.notes?.trim() || null,
+            companyId,
+            customerId: input.customerId ?? null,
+            nfeStatus: 'PENDENTE',
+            stockCommittedAt: new Date(),
+          } as any,
+        })
+
+        for (const item of resolvedItems) {
+          await tx.saleItem.create({
+            data: {
+              saleId: sale.id,
+              productId: item.product.id,
+              productName: item.product.name,
+              sku: item.product.sku,
+              quantity: item.quantity,
+              unitPrice: item.unitPrice,
+              total: item.total,
+            },
+          })
+
+          const updated = await tx.product.updateMany({
+            where: {
+              id: item.product.id,
+              companyId,
+              stockQty: { gte: item.quantity },
+            },
+            data: {
+              stockQty: { decrement: item.quantity },
+            },
+          })
+
+          if (updated.count !== 1) {
+            throw new NfeIntegrationError('Estoque alterado durante a venda. Tente novamente.', { code: 'STOCK_CHANGED' })
+          }
+
+          const fresh = await tx.product.findUnique({
+            where: { id: item.product.id },
+            select: { stockQty: true, minStock: true },
+          })
+
+          await tx.product.update({
+            where: { id: item.product.id },
+            data: {
+              status: computeProductStatus(fresh?.stockQty ?? 0, fresh?.minStock ?? 0),
+            },
+          })
+
+          await tx.movement.create({
+            data: {
+              type: 'SAIDA',
+              quantity: item.quantity,
+              reason: `Venda ${sale.code} (sem emissao fiscal automatica)`,
+              productId: item.product.id,
+              companyId,
+            },
+          })
+        }
+
+        return sale
+      })
+
+      return {
+        sale: {
+          id: manualSale.id,
+          code: manualSale.code,
+          subtotal,
+          discount: boundedDiscount,
+          total,
+          nfeEnabled: false,
+          nfe: { status: 'PENDENTE' },
+        },
+      }
+    }
+
+    const draftSale = await prisma.$transaction(async (tx) => {
+      const reservedNumber = nfeSettings.nextNumber
+
+      const sale = await tx.sale.create({
+        data: {
+          code: saleCode,
+          subtotal,
+          discount: boundedDiscount,
+          total,
+          paymentMethod: input.paymentMethod?.trim() || null,
+          notes: input.notes?.trim() || null,
+          companyId,
+          customerId: input.customerId ?? null,
+          nfeStatus: 'PROCESSANDO',
+          nfeEnvironment: nfeSettings.environment,
+          nfeModel: nfeSettings.model,
+          nfeSeries: nfeSettings.series,
+          nfeNumber: reservedNumber,
+          nfeLastAttemptAt: new Date(),
+        } as any,
+      })
+
+      await tx.nfeSettings.update({
+        where: { companyId },
+        data: { nextNumber: { increment: 1 } },
+      })
+
+      for (const item of resolvedItems) {
+        await tx.saleItem.create({
+          data: {
+            saleId: sale.id,
+            productId: item.product.id,
+            productName: item.product.name,
+            sku: item.product.sku,
+            quantity: item.quantity,
+            unitPrice: item.unitPrice,
+            total: item.total,
+          },
+        })
+      }
+
+      return sale
+    })
+
+    let nfe: NfeAuthorizationResult
+    try {
+      nfe = await issueNfeForSale(draftSale.id)
+    } catch (error) {
+      const details = error instanceof NfeIntegrationError ? error.details : undefined
+
+      await prisma.sale.update({
+        where: { id: draftSale.id },
+        data: {
+          nfeStatus: 'ERRO',
+          nfeErrorCode: error instanceof NfeIntegrationError ? error.code : 'NFE_UNKNOWN',
+          nfeErrorMessage: error instanceof Error ? error.message : String(error),
+          nfeRawResponse: details as any,
+          nfeLastAttemptAt: new Date(),
+        } as any,
+      })
+
+      throw error
+    }
+
+    if (nfe.status !== 'AUTORIZADO') {
+      await prisma.sale.update({
+        where: { id: draftSale.id },
+        data: {
+          nfeStatus: nfe.status,
+          nfeErrorCode: nfe.sefazCode,
+          nfeErrorMessage: nfe.sefazMessage,
+          nfeRawResponse: nfe.raw as any,
+          nfeLastAttemptAt: new Date(),
+        } as any,
+      })
+
+      return {
+        sale: {
+          id: draftSale.id,
+          code: draftSale.code,
+          subtotal,
+          discount: boundedDiscount,
+          total,
+          nfeEnabled: true,
+          nfe,
+        },
+      }
+    }
+
+    await prisma.$transaction(async (tx) => {
+      for (const item of resolvedItems) {
+        const updated = await tx.product.updateMany({
+          where: {
+            id: item.product.id,
+            companyId,
+            stockQty: { gte: item.quantity },
+          },
+          data: {
+            stockQty: { decrement: item.quantity },
+          },
+        })
+
+        if (updated.count !== 1) {
+          throw new NfeIntegrationError('Estoque alterado durante a emissão. Tente novamente.', { code: 'STOCK_CHANGED' })
+        }
+
+        const fresh = await tx.product.findUnique({
+          where: { id: item.product.id },
+          select: { stockQty: true, minStock: true },
+        })
+
+        await tx.product.update({
+          where: { id: item.product.id },
+          data: {
+            status: computeProductStatus(fresh?.stockQty ?? 0, fresh?.minStock ?? 0),
+          },
+        })
+
+        await tx.movement.create({
+          data: {
+            type: 'SAIDA',
+            quantity: item.quantity,
+            reason: `Venda ${draftSale.code} (NF-e autorizada)`,
+            productId: item.product.id,
+            companyId,
+          },
+        })
+      }
+
+      await tx.sale.update({
+        where: { id: draftSale.id },
+        data: {
+          nfeStatus: 'AUTORIZADO',
+          nfeAccessKey: nfe.accessKey,
+          nfeProtocol: nfe.protocol,
+          nfeDanfeUrl: nfe.danfeUrl,
+          nfeRawResponse: nfe.raw as any,
+          nfeIssuedAt: new Date(),
+          nfeLastAttemptAt: new Date(),
+          stockCommittedAt: new Date(),
+        } as any,
+      })
+    })
+
+    return {
+      sale: {
+        id: draftSale.id,
+        code: draftSale.code,
+        subtotal,
+        discount: boundedDiscount,
+        total,
+        nfeEnabled: true,
+        nfe,
+      },
+    }
+  } catch (error) {
+    try {
+      console.error('[processSaleWithNfe] Error processing sale', { companyId, input, error })
+      await prisma.auditLog.create({
+        data: {
+          action: 'SALE_PROCESS_ERROR',
+          entity: 'SALE',
+          entityId: null,
+          details: JSON.stringify({ message: error instanceof Error ? error.message : String(error), stack: error instanceof Error ? error.stack : undefined, input }),
+          companyId,
+        },
+      })
+    } catch (e) {
+      console.error('[processSaleWithNfe] Failed to write audit log', e)
+    }
+
+    throw error
+  }
+
+  const draftSale = await prisma.$transaction(async (tx) => {
+    const reservedNumber = nfeSettings.nextNumber
+
+    const sale = await tx.sale.create({
+      data: {
+        code: saleCode,
+        subtotal,
+        discount: boundedDiscount,
+        total,
+        paymentMethod: input.paymentMethod?.trim() || null,
+        notes: input.notes?.trim() || null,
+        companyId,
+        customerId: input.customerId ?? null,
+        nfeStatus: 'PROCESSANDO',
+        nfeEnvironment: nfeSettings.environment,
+        nfeModel: nfeSettings.model,
+        nfeSeries: nfeSettings.series,
+        nfeNumber: reservedNumber,
+        nfeLastAttemptAt: new Date(),
+      } as any,
+    })
+
+    await tx.nfeSettings.update({
+      where: { companyId },
+      data: { nextNumber: { increment: 1 } },
+    })
+
+    for (const item of resolvedItems) {
+      await tx.saleItem.create({
+        data: {
+          saleId: sale.id,
+          productId: item.product.id,
+          productName: item.product.name,
+          sku: item.product.sku,
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+          total: item.total,
+        },
+      })
+    }
+
+    return sale
+  })
+
+  let nfe: NfeAuthorizationResult
+  try {
+    nfe = await issueNfeForSale(draftSale.id)
+  } catch (error) {
+    const details = error instanceof NfeIntegrationError ? error.details : undefined
+
+    await prisma.sale.update({
+      where: { id: draftSale.id },
+      data: {
+        nfeStatus: 'ERRO',
+        nfeErrorCode: error instanceof NfeIntegrationError ? error.code : 'NFE_UNKNOWN',
+        nfeErrorMessage: error instanceof Error ? error.message : String(error),
+        nfeRawResponse: details as any,
+        nfeLastAttemptAt: new Date(),
+      } as any,
+    })
+
+    throw error
+  }
+
+  if (nfe.status !== 'AUTORIZADO') {
+    await prisma.sale.update({
+      where: { id: draftSale.id },
+      data: {
+        nfeStatus: nfe.status,
+        nfeErrorCode: nfe.sefazCode,
+        nfeErrorMessage: nfe.sefazMessage,
+        nfeRawResponse: nfe.raw as any,
+        nfeLastAttemptAt: new Date(),
+      } as any,
+    })
+
+    return {
+      sale: {
+        id: draftSale.id,
+        code: draftSale.code,
+        subtotal,
+        discount: boundedDiscount,
+        total,
+        nfeEnabled: true,
+        nfe,
+      },
+    }
+  }
+
+  await prisma.$transaction(async (tx) => {
+    for (const item of resolvedItems) {
+      const updated = await tx.product.updateMany({
+        where: {
+          id: item.product.id,
+          companyId,
+          stockQty: { gte: item.quantity },
+        },
+        data: {
+          stockQty: { decrement: item.quantity },
+        },
+      })
+
+      if (updated.count !== 1) {
+        throw new NfeIntegrationError('Estoque alterado durante a emissão. Tente novamente.', { code: 'STOCK_CHANGED' })
+      }
+
+      const fresh = await tx.product.findUnique({
+        where: { id: item.product.id },
+        select: { stockQty: true, minStock: true },
+      })
+
+      await tx.product.update({
+        where: { id: item.product.id },
+        data: {
+          status: computeProductStatus(fresh?.stockQty ?? 0, fresh?.minStock ?? 0),
+        },
+      })
+
+      await tx.movement.create({
+        data: {
+          type: 'SAIDA',
+          quantity: item.quantity,
+          reason: `Venda ${draftSale.code} (NF-e autorizada)`,
+          productId: item.product.id,
+          companyId,
+        },
+      })
+    }
+
+    await tx.sale.update({
+      where: { id: draftSale.id },
+      data: {
+        nfeStatus: 'AUTORIZADO',
+        nfeAccessKey: nfe.accessKey,
+        nfeProtocol: nfe.protocol,
+        nfeDanfeUrl: nfe.danfeUrl,
+        nfeRawResponse: nfe.raw as any,
+        nfeIssuedAt: new Date(),
+        nfeLastAttemptAt: new Date(),
+        stockCommittedAt: new Date(),
+      } as any,
+    })
+  })
+
+  return {
+    sale: {
+      id: draftSale.id,
+      code: draftSale.code,
+      subtotal,
+      discount: boundedDiscount,
+      total,
+      nfeEnabled: true,
+      nfe,
+    },
+  }
+}

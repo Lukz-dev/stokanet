@@ -3,7 +3,7 @@ generator client {
 }
 
 datasource db {
-  provider  = "postgresql"
+  provider  = "sqlite"
   url       = env("DATABASE_URL")
   directUrl = env("DIRECT_URL")
 }
@@ -13,6 +13,30 @@ enum ThemePreference {
   OCEAN
   FOREST
   ROSE
+}
+
+enum NfeStatus {
+  PENDENTE
+  PROCESSANDO
+  AUTORIZADO
+  REJEITADO
+  ERRO
+}
+
+enum NfeEnvironment {
+  HOMOLOGACAO
+  PRODUCAO
+}
+
+enum NfeModel {
+  NFE_55
+  NFCE_65
+}
+
+enum NfeTaxRegime {
+  SIMPLES_NACIONAL
+  SIMPLES_EXCESSO_SUBLIMITE
+  REGIME_NORMAL
 }
 
 model User {
@@ -36,13 +60,19 @@ model User {
 model Company {
   id          String      @id @default(cuid())
   name        String
+  legalName   String?
+  cnpj        String?
+  ie          String?
+  fiscalAddress Json?
   defaultMinStock Int      @default(5)
   notificationWebhookUrl String?
   users       User[]
+  customers   Customer[]
   products    Product[]
   categories  Category[]
   movements   Movement[]
   sales       Sale[]
+  nfeSettings NfeSettings?
   suppliers   Supplier[]
   purchaseOrders PurchaseOrder[]
   warehouses  Warehouse[]
@@ -70,6 +100,10 @@ model Product {
   id          String      @id @default(cuid())
   name        String
   sku         String
+  ncm         String?
+  cest        String?
+  cfop        String?
+  taxProfile  Json?
   size        String?
   color       String?
   price       Float       @default(0.0)
@@ -110,12 +144,63 @@ model Sale {
   total         Float      @default(0.0)
   paymentMethod String?
   notes         String?
+  customerId    String?
+  customer      Customer?  @relation(fields: [customerId], references: [id])
+  nfeStatus     NfeStatus  @default(PENDENTE)
+  nfeEnvironment NfeEnvironment?
+  nfeModel      NfeModel?
+  nfeSeries     String?
+  nfeNumber     Int?
+  nfeAccessKey  String?
+  nfeProtocol   String?
+  nfeDanfeUrl   String?
+  nfeErrorCode  String?
+  nfeErrorMessage String?
+  nfeRawResponse Json?
+  nfeIssuedAt   DateTime?
+  nfeLastAttemptAt DateTime?
+  stockCommittedAt DateTime?
   companyId     String
   company       Company    @relation(fields: [companyId], references: [id])
   items         SaleItem[]
   createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
 
   @@index([companyId, createdAt])
+  @@index([companyId, nfeStatus])
+}
+
+model NfeSettings {
+  id           String         @id @default(cuid())
+  companyId    String         @unique
+  company      Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  enabled      Boolean        @default(false)
+  environment  NfeEnvironment @default(HOMOLOGACAO)
+  model        NfeModel       @default(NFE_55)
+  series       String         @default("1")
+  nextNumber   Int            @default(1)
+  defaultCfop  String?
+  naturezaOperacao String     @default("Venda")
+  taxRegime    NfeTaxRegime   @default(SIMPLES_NACIONAL)
+  defaultTaxProfile Json?
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+}
+
+model Customer {
+  id        String   @id @default(cuid())
+  name      String
+  cpfCnpj   String
+  email     String?
+  phone     String?
+  address   Json?
+  companyId String
+  company   Company  @relation(fields: [companyId], references: [id])
+  sales     Sale[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([companyId, name])
 }
 
 model SaleItem {

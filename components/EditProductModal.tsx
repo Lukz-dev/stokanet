@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import { X, Package, Tag, DollarSign, Hash, Layers, Plus } from 'lucide-react'
-import { updateProduct, deleteProduct, createCategory } from '@/lib/actions'
+import { updateProduct, deleteProduct, createCategory, archiveProduct } from '@/lib/actions'
 
 interface Category { id: string; name: string }
 interface Product {
@@ -25,6 +25,7 @@ export function EditProductModal({ product, categories, onClose, onSuccess }: Pr
   const [isCreatingCategory, startCategoryTransition] = useTransition()
   const [error, setError] = useState('')
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [deletionBlockedReason, setDeletionBlockedReason] = useState<string | null>(null)
   const [newCategoryName, setNewCategoryName] = useState('')
   const [form, setForm] = useState({
     name: product.name,
@@ -75,6 +76,7 @@ export function EditProductModal({ product, categories, onClose, onSuccess }: Pr
       try {
         const res: any = await deleteProduct(product.id)
         if (res && res.ok === false) {
+          setDeletionBlockedReason(res.reason || null)
           setError(res.reason || 'Erro ao excluir produto.')
           return
         }
@@ -82,6 +84,18 @@ export function EditProductModal({ product, categories, onClose, onSuccess }: Pr
         onClose()
       } catch (err: any) {
         setError(err.message || 'Erro ao excluir produto.')
+      }
+    })
+  }
+
+  const handleArchive = () => {
+    startDeleteTransition(async () => {
+      try {
+        await archiveProduct(product.id)
+        onSuccess()
+        onClose()
+      } catch (err: any) {
+        setError(err.message || 'Erro ao arquivar produto.')
       }
     })
   }
@@ -283,6 +297,12 @@ export function EditProductModal({ product, categories, onClose, onSuccess }: Pr
                   className="px-4 py-2 bg-destructive text-destructive-foreground rounded-lg text-sm font-semibold hover:bg-destructive/90 transition-colors disabled:opacity-60">
                   {isDeleting ? 'Excluindo...' : 'Sim, Excluir'}
                 </button>
+                {deletionBlockedReason && (
+                  <button type="button" onClick={handleArchive} disabled={isDeleting}
+                    className="px-4 py-2 bg-secondary text-secondary-foreground rounded-lg text-sm font-semibold hover:bg-secondary/90 transition-colors disabled:opacity-60">
+                    {isDeleting ? 'Processando...' : 'Arquivar em vez de excluir'}
+                  </button>
+                )}
               </>
             ) : (
               <>

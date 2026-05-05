@@ -904,6 +904,46 @@ export async function deleteProduct(id: string) {
   }
 }
 
+export async function archiveProduct(id: string) {
+  const user = await getAuthenticatedUser()
+  const companyId = await getCompanyId()
+
+  try {
+    const product = await prisma.product.findFirst({ where: { id, companyId } })
+    if (!product) throw new Error('Produto não encontrado')
+
+    await prisma.product.update({ where: { id }, data: { status: 'Arquivado' } as any })
+
+    revalidatePath('/estoque')
+    revalidatePath('/')
+
+    await logAudit({
+      action: 'UPDATE',
+      entity: 'PRODUCT',
+      entityId: id,
+      details: `Produto ${id} arquivado`,
+      companyId,
+      userId: user.id,
+    })
+
+    return { ok: true, productId: id }
+  } catch (error) {
+    const errInfo = error instanceof Error ? { message: error.message, stack: error.stack } : { message: String(error) }
+    console.error('[archiveProduct] Error archiving product', { id, companyId, userId: user?.id, error: errInfo })
+    try {
+      await sendExternalAlertIfConfigured(companyId, {
+        title: 'Erro ao arquivar produto',
+        message: `Erro ao arquivar produto ${id}: ${error instanceof Error ? error.message : String(error)}`,
+        level: 'warning',
+      })
+    } catch {
+      // ignore
+    }
+
+    throw error
+  }
+}
+
 // =====================
 // CATEGORIAS
 // =====================

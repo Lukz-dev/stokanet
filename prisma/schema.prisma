@@ -164,7 +164,7 @@ model Sale {
   company       Company    @relation(fields: [companyId], references: [id])
   items         SaleItem[]
   createdAt     DateTime   @default(now())
-  updatedAt     DateTime   @updatedAt
+  updatedAt     DateTime   @default(now()) @updatedAt
 
   @@index([companyId, createdAt])
   @@index([companyId, nfeStatus])

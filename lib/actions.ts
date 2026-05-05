@@ -868,7 +868,10 @@ export async function deleteProduct(id: string) {
     })
 
     if (!result.ok) {
-      throw new Error(result.reason || 'Não foi possível excluir o produto.')
+      // Return structured failure instead of throwing for expected business
+      // validation (product has history). Callers should handle the result.
+      console.info('[deleteProduct] deletion prevented by history', { id, companyId, reason: result.reason })
+      return result
     }
 
     revalidatePath('/estoque')
@@ -882,8 +885,11 @@ export async function deleteProduct(id: string) {
       companyId,
       userId: user.id,
     })
+    return { ok: true, productId: id }
   } catch (error) {
-    console.error('[deleteProduct] Error deleting product', { id, companyId, userId: user?.id, error })
+    const errInfo = error instanceof Error ? { message: error.message, stack: error.stack } : { message: String(error) }
+    console.error('[deleteProduct] Error deleting product', { id, companyId, userId: user?.id, error: errInfo })
+    console.error(error instanceof Error ? error.stack : String(error))
     try {
       await sendExternalAlertIfConfigured(companyId, {
         title: 'Erro ao excluir produto',

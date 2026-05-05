@@ -73,7 +73,11 @@ export function EditProductModal({ product, categories, onClose, onSuccess }: Pr
   const handleDelete = () => {
     startDeleteTransition(async () => {
       try {
-        await deleteProduct(product.id)
+        const res: any = await deleteProduct(product.id)
+        if (res && res.ok === false) {
+          setError(res.reason || 'Erro ao excluir produto.')
+          return
+        }
         onSuccess()
         onClose()
       } catch (err: any) {

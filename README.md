@@ -1,36 +1,57 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# StokaNet (saas-estoque)
 
-## Getting Started
+Sistema de controle de estoque multi-empresa com login (NextAuth Credentials), painel e rotas protegidas.
 
-First, run the development server:
+## Rodar localmente
+
+1) Instale dependencias:
+
+```bash
+npm install
+```
+
+2) Configure as variaveis de ambiente (Postgres):
+
+- Copie `.env.example` para `.env.local` e preencha com um Postgres valido.
+- Gere um secret forte para `NEXTAUTH_SECRET`.
+
+3) Gere o Prisma e sincronize o schema:
+
+```bash
+npx prisma generate
+npx prisma db push
+```
+
+4) (Opcional) Seed com usuario admin:
+
+```bash
+npm run seed
+```
+
+5) Inicie o servidor:
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Deploy no Vercel
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+O Vercel precisa de um banco remoto (serverless nao persiste SQLite em arquivo).
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+1) Crie um Postgres (recomendado: Neon) e copie as URLs.
 
-## Learn More
+2) No Vercel (Project Settings -> Environment Variables), configure:
 
-To learn more about Next.js, take a look at the following resources:
+- `DATABASE_URL` (pooler/pooled)
+- `DIRECT_URL` (direct)
+- `NEXTAUTH_SECRET`
+- `NEXTAUTH_URL` (ex: `https://seu-app.vercel.app`)
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+3) Faça o deploy. O script `build` roda `prisma generate` e `prisma db push` antes do `next build`.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Login seed (dev)
 
-## Deploy on Vercel
+Se voce rodar `npm run seed`, o admin sera:
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- Email: `admin@auroracomercio.com`
+- Senha: `admin123`

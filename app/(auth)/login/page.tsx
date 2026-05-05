@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { signIn } from 'next-auth/react'
+import { getSession, signIn } from 'next-auth/react'
 import { Box, Lock, Mail, Eye, EyeOff, AlertCircle } from 'lucide-react'
 
 function loginErrorMessage(code?: string | null) {
@@ -64,7 +64,9 @@ export default function Login() {
       const res = await Promise.race([loginRequest, timeout])
 
       if (res?.ok) {
-        router.push('/')
+        const session = await getSession()
+        const isApproved = session?.user?.isApproved === true || session?.user?.isSystemAdmin === true
+        router.push(isApproved ? '/' : '/pending')
         router.refresh()
         return
       }

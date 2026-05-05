@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import bcrypt from 'bcryptjs'
 import prisma from '@/lib/prisma'
+import { Prisma } from '@prisma/client'
 
 export async function POST(req: NextRequest) {
   try {
@@ -20,28 +21,45 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Este e-mail já está cadastrado.' }, { status: 409 })
     }
 
-    // Cria empresa
-    const company = await prisma.company.create({
-      data: { name: companyName }
-    })
-
-    // Cria usuário admin com bcrypt
     const hashedPassword = await bcrypt.hash(password, 12)
-    await prisma.user.create({
-      data: {
-        name,
-        email,
-        password: hashedPassword,
-        role: 'ADMIN',
-        isApproved: false,
-        isSystemAdmin: false,
-        companyId: company.id,
-      }
+
+    // Keep company + user creation atomic to avoid orphan companies on failures.
+    await prisma.$transaction(async (tx) => {
+      const company = await tx.company.create({
+        data: { name: companyName },
+      })
+
+      await tx.user.create({
+        data: {
+          name,
+          email,
+          password: hashedPassword,
+          role: 'ADMIN',
+          isApproved: false,
+          isSystemAdmin: false,
+          companyId: company.id,
+        },
+      })
     })
 
     return NextResponse.json({ success: true, message: 'Cadastro criado com sucesso. Ele ficará aguardando liberação no painel admin.' }, { status: 201 })
   } catch (error) {
     console.error('[SIGNUP ERROR]', error)
+
+    if (error instanceof Prisma.PrismaClientKnownRequestError) {
+      if (error.code === 'P2002') {
+        return NextResponse.json({ error: 'Este e-mail já está cadastrado.' }, { status: 409 })
+      }
+
+      if (error.code === 'P2021') {
+        return NextResponse.json({ error: 'Banco de dados não está sincronizado. Atualize o deploy e tente novamente.' }, { status: 500 })
+      }
+    }
+
+    if (error instanceof Prisma.PrismaClientInitializationError) {
+      return NextResponse.json({ error: 'Falha de conexão com o banco de dados no ambiente de produção.' }, { status: 500 })
+    }
+
     return NextResponse.json({ error: 'Erro interno ao criar conta.' }, { status: 500 })
   }
 }

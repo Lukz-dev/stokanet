@@ -6,6 +6,22 @@ import Link from 'next/link'
 import { signIn } from 'next-auth/react'
 import { Box, Lock, Mail, Eye, EyeOff, AlertCircle } from 'lucide-react'
 
+function loginErrorMessage(code?: string | null) {
+  if (!code || code === 'CredentialsSignin') {
+    return 'E-mail ou senha incorretos. Verifique suas credenciais.'
+  }
+
+  if (code === 'Configuration') {
+    return 'Falha de configuração de autenticação no servidor. Verifique NEXTAUTH_URL e NEXTAUTH_SECRET no Vercel.'
+  }
+
+  if (code === 'AccessDenied') {
+    return 'Acesso negado para esta conta.'
+  }
+
+  return 'Falha ao autenticar. Tente novamente em instantes.'
+}
+
 export default function Login() {
   const router = useRouter()
   const [email, setEmail] = useState('')
@@ -34,12 +50,18 @@ export default function Login() {
         // Non-blocking: login should continue even if localStorage is unavailable.
       }
 
-      const res = await signIn('credentials', {
+      const loginRequest = signIn('credentials', {
         redirect: false,
         email,
         password,
         rememberLogin: String(rememberLogin),
       })
+
+      const timeout = new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error('LOGIN_TIMEOUT')), 15000)
+      })
+
+      const res = await Promise.race([loginRequest, timeout])
 
       if (res?.ok) {
         router.push('/')
@@ -47,9 +69,13 @@ export default function Login() {
         return
       }
 
-      setError('E-mail ou senha incorretos. Verifique suas credenciais.')
-    } catch {
-      setError('Falha ao conectar com o servidor. Tente novamente em instantes.')
+      setError(loginErrorMessage(res?.error))
+    } catch (caughtError) {
+      if (caughtError instanceof Error && caughtError.message === 'LOGIN_TIMEOUT') {
+        setError('O servidor demorou para responder no login. Tente novamente em alguns segundos.')
+      } else {
+        setError('Falha ao conectar com o servidor. Tente novamente em instantes.')
+      }
     } finally {
       setIsLoading(false)
     }

@@ -192,7 +192,11 @@ export async function processSaleWithNfe(input: ProcessSaleInput): Promise<Proce
     }
 
     const draftSale = await prisma.$transaction(async (tx) => {
-      const reservedNumber = nfeSettings.nextNumber
+      // `nfeSettings` may be null in some environments; assert non-null here
+      // because this block only runs when NF-e is enabled (`nfeEnabled === true`).
+      const settings = nfeSettings!
+
+      const reservedNumber = settings.nextNumber
 
       const sale = await tx.sale.create({
         data: {
@@ -205,9 +209,9 @@ export async function processSaleWithNfe(input: ProcessSaleInput): Promise<Proce
           companyId,
           customerId: input.customerId ?? null,
           nfeStatus: 'PROCESSANDO',
-          nfeEnvironment: nfeSettings.environment,
-          nfeModel: nfeSettings.model,
-          nfeSeries: nfeSettings.series,
+          nfeEnvironment: settings.environment,
+          nfeModel: settings.model,
+          nfeSeries: settings.series,
           nfeNumber: reservedNumber,
           nfeLastAttemptAt: new Date(),
         } as any,

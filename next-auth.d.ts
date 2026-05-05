@@ -7,7 +7,7 @@ declare module 'next-auth' {
       role?: string
       isApproved?: boolean
       isSystemAdmin?: boolean
-      companyId?: string
+      companyId?: string | null
       companyName?: string | null
       rememberLogin?: boolean
       authExpiresAt?: number | null
@@ -20,7 +20,7 @@ declare module 'next-auth' {
     role?: string
     isApproved?: boolean
     isSystemAdmin?: boolean
-    companyId?: string
+    companyId?: string | null
     companyName?: string | null
     rememberLogin?: boolean
   }
@@ -32,7 +32,7 @@ declare module 'next-auth/jwt' {
     role?: string
     isApproved?: boolean
     isSystemAdmin?: boolean
-    companyId?: string
+    companyId?: string | null
     companyName?: string | null
     rememberLogin?: boolean
     authExpiresAt?: number | null

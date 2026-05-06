@@ -71,9 +71,9 @@ export function EstoqueClient({ initialProducts, categories, defaultMinStock }: 
         {/* Cabeçalho */}
         <div className="flex justify-between items-end">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">Produtos e variações</h1>
+            <h1 className="text-3xl font-bold tracking-tight">Produtos ativos e variações</h1>
             <p className="text-muted-foreground mt-1">
-              {filtered.length} item{filtered.length !== 1 ? 's' : ''} encontrado{filtered.length !== 1 ? 's' : ''}
+              {filtered.length} item{filtered.length !== 1 ? 's' : ''} encontrado{filtered.length !== 1 ? 's' : ''} no estoque ativo
             </p>
           </div>
           <div className="flex items-center gap-2">

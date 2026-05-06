@@ -14,9 +14,9 @@ export default async function Dashboard() {
 
   const cards = [
     {
-      label: 'Produtos cadastrados',
+      label: 'Produtos ativos',
       value: stats.totalProducts.toString(),
-      sub: `${stats.totalQty.toLocaleString('pt-BR')} unidades somadas no estoque`,
+      sub: `${stats.totalQty.toLocaleString('pt-BR')} unidades somadas no estoque ativo`,
       icon: Package,
       color: 'primary',
       trend: '+',
@@ -24,7 +24,7 @@ export default async function Dashboard() {
     {
       label: 'Valor em estoque',
       value: formatCurrency(stats.totalValue),
-      sub: 'Baseado no preço de venda atual',
+      sub: 'Considera apenas produtos ativos',
       icon: TrendingUp,
       color: 'indigo',
       trend: '+',
@@ -51,7 +51,7 @@ export default async function Dashboard() {
     <div className="flex flex-col gap-8">
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Visão geral da operação</h1>
-        <p className="text-muted-foreground mt-1 text-lg">Acompanhe produtos, reposição e giro do seu mix em tempo real.</p>
+        <p className="text-muted-foreground mt-1 text-lg">Acompanhe produtos, reposição e giro do seu mix em tempo real. Arquivados não entram no estoque ativo.</p>
       </div>
 
       {/* Cards de estatísticas */}
@@ -110,7 +110,7 @@ export default async function Dashboard() {
           <div className="grid grid-cols-2 gap-4 flex-1">
             {[
               { label: 'Produtos com atenção', value: attentionItems.toString(), hint: 'Abaixo do nível ideal' },
-              { label: 'Movimentação total', value: stats.totalQty.toLocaleString('pt-BR'), hint: 'Unidades somadas em loja' },
+              { label: 'Movimentação total', value: stats.totalQty.toLocaleString('pt-BR'), hint: 'Unidades somadas no estoque ativo' },
               { label: 'Categorias ativas', value: '—', hint: 'Organize por linha de produto' },
               { label: 'Cobertura saudável', value: `${stockHealth}%`, hint: 'Maior é melhor' },
             ].map((item) => (

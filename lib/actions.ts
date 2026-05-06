@@ -303,7 +303,7 @@ export async function closeDailyClosure(input: { day: string; notes?: string }) 
       _sum: { quantity: true },
     }),
     prisma.product.findMany({
-      where: { companyId },
+      where: { companyId, status: { not: 'Arquivado' } },
       select: { price: true, stockQty: true },
     }),
   ])
@@ -693,19 +693,20 @@ export async function reopenMonthlyClosure(input: { year: number; month: number 
 // =====================
 export async function getDashboardStats() {
   const companyId = await getCompanyId()
+  const activeProductWhere = { companyId, status: { not: 'Arquivado' } }
 
   const [totalProducts, lowStockProducts, criticalProducts, products] = await Promise.all([
-    prisma.product.count({ where: { companyId } }),
-    prisma.product.count({ where: { companyId, status: 'Baixo' } }),
-    prisma.product.count({ where: { companyId, OR: [{ status: 'Crítico' }, { status: 'Esgotado' }] } }),
-    prisma.product.findMany({ where: { companyId } }),
+    prisma.product.count({ where: activeProductWhere }),
+    prisma.product.count({ where: { ...activeProductWhere, status: 'Baixo' } }),
+    prisma.product.count({ where: { ...activeProductWhere, OR: [{ status: 'Crítico' }, { status: 'Esgotado' }] } }),
+    prisma.product.findMany({ where: activeProductWhere }),
   ])
 
   const totalValue = products.reduce((acc, p) => acc + p.price * p.stockQty, 0)
   const totalQty = products.reduce((acc, p) => acc + p.stockQty, 0)
 
   const criticalList = await prisma.product.findMany({
-    where: { companyId, OR: [{ status: 'Crítico' }, { status: 'Esgotado' }, { status: 'Baixo' }] },
+    where: { ...activeProductWhere, OR: [{ status: 'Crítico' }, { status: 'Esgotado' }, { status: 'Baixo' }] },
     orderBy: { stockQty: 'asc' },
     take: 6,
   })
@@ -732,7 +733,7 @@ export async function getProducts(search?: string, status?: string) {
             { color: { contains: normalizedSearch } },
           ]
         } : {}),
-        ...(status && status !== 'todos' ? { status } : {}),
+        ...(status && status !== 'todos' ? { status } : { status: { not: 'Arquivado' } }),
       },
       include: { category: true },
       orderBy: { createdAt: 'desc' },

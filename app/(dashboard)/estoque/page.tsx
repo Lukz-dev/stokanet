@@ -6,7 +6,7 @@ import { EstoqueClient } from './EstoqueClient'
 export default async function EstoquePage() {
   try {
     const [products, categories, company] = await Promise.all([
-      getProducts(),
+      getProducts(undefined, undefined, true),
       getCategories(),
       getOrCreateDefaultCompany().then((currentCompany) => prisma.company.findUnique({
         where: { id: currentCompany.id },

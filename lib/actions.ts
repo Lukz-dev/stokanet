@@ -717,7 +717,7 @@ export async function getDashboardStats() {
 // =====================
 // PRODUTOS
 // =====================
-export async function getProducts(search?: string, status?: string) {
+export async function getProducts(search?: string, status?: string, includeArchived = false) {
   try {
     const companyId = await getCompanyId()
     const normalizedSearch = search?.trim()
@@ -733,7 +733,7 @@ export async function getProducts(search?: string, status?: string) {
             { color: { contains: normalizedSearch } },
           ]
         } : {}),
-        ...(status && status !== 'todos' ? { status } : { status: { not: 'Arquivado' } }),
+        ...(status && status !== 'todos' ? { status } : includeArchived ? {} : { status: { not: 'Arquivado' } }),
       },
       include: { category: true },
       orderBy: { createdAt: 'desc' },
@@ -742,6 +742,13 @@ export async function getProducts(search?: string, status?: string) {
     // Se não houver sessão/contexto (ex: revalidatePath em background), devolve lista vazia em vez de quebrar o render
     return []
   }
+}
+
+function resolveProductStatus(stockQty: number, minStock: number) {
+  if (stockQty === 0) return 'Esgotado'
+  if (stockQty <= minStock * 0.5) return 'Crítico'
+  if (stockQty <= minStock) return 'Baixo'
+  return 'Normal'
 }
 
 export async function createProduct(data: {
@@ -762,10 +769,7 @@ export async function createProduct(data: {
   const companyId = await getCompanyId()
 
   // Calcular status automático
-  let status = 'Normal'
-  if (data.stockQty === 0) status = 'Esgotado'
-  else if (data.stockQty <= data.minStock * 0.5) status = 'Crítico'
-  else if (data.stockQty <= data.minStock) status = 'Baixo'
+  const status = resolveProductStatus(data.stockQty, data.minStock)
 
   await prisma.product.create({
     data: {
@@ -813,10 +817,7 @@ export async function updateProduct(id: string, data: {
 
   const stockQty = data.stockQty ?? product.stockQty
   const minStock = data.minStock ?? product.minStock
-  let status = 'Normal'
-  if (stockQty === 0) status = 'Esgotado'
-  else if (stockQty <= minStock * 0.5) status = 'Crítico'
-  else if (stockQty <= minStock) status = 'Baixo'
+  const status = resolveProductStatus(stockQty, minStock)
 
   await prisma.product.update({
     where: { id },
@@ -935,6 +936,48 @@ export async function archiveProduct(id: string) {
       await sendExternalAlertIfConfigured(companyId, {
         title: 'Erro ao arquivar produto',
         message: `Erro ao arquivar produto ${id}: ${error instanceof Error ? error.message : String(error)}`,
+        level: 'warning',
+      })
+    } catch {
+      // ignore
+    }
+
+    throw error
+  }
+}
+
+export async function unarchiveProduct(id: string) {
+  const user = await getAuthenticatedUser()
+  const companyId = await getCompanyId()
+
+  try {
+    const product = await prisma.product.findFirst({ where: { id, companyId } })
+    if (!product) throw new Error('Produto não encontrado')
+
+    const status = resolveProductStatus(product.stockQty, product.minStock)
+
+    await prisma.product.update({ where: { id }, data: { status } as any })
+
+    revalidatePath('/estoque')
+    revalidatePath('/')
+
+    await logAudit({
+      action: 'UPDATE',
+      entity: 'PRODUCT',
+      entityId: id,
+      details: `Produto ${id} desarquivado`,
+      companyId,
+      userId: user.id,
+    })
+
+    return { ok: true, productId: id }
+  } catch (error) {
+    const errInfo = error instanceof Error ? { message: error.message, stack: error.stack } : { message: String(error) }
+    console.error('[unarchiveProduct] Error unarchiving product', { id, companyId, userId: user?.id, error: errInfo })
+    try {
+      await sendExternalAlertIfConfigured(companyId, {
+        title: 'Erro ao desarquivar produto',
+        message: `Erro ao desarquivar produto ${id}: ${error instanceof Error ? error.message : String(error)}`,
         level: 'warning',
       })
     } catch {

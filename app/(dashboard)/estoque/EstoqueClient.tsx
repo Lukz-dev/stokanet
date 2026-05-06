@@ -1,10 +1,11 @@
 'use client'
 
-import { useState, useMemo, useCallback } from 'react'
-import { Plus, Search, Filter, Edit2, Package, ChevronLeft, ChevronRight } from 'lucide-react'
+import { useState, useMemo, useCallback, useTransition } from 'react'
+import { Plus, Search, Filter, Edit2, Package, ChevronLeft, ChevronRight, RotateCcw } from 'lucide-react'
 import { ProductModal } from '@/components/ProductModal'
 import { EditProductModal } from '@/components/EditProductModal'
 import { useRouter } from 'next/navigation'
+import { unarchiveProduct } from '@/lib/actions'
 
 interface Category { id: string; name: string }
 interface Product {
@@ -13,31 +14,42 @@ interface Product {
   categoryId: string | null; category: Category | null
 }
 
+type ViewMode = 'ativos' | 'arquivados'
+
 const STATUS_COLORS: Record<string, string> = {
   Normal: 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20',
   Baixo: 'bg-amber-500/10 text-amber-500 border-amber-500/20',
   Crítico: 'bg-destructive/10 text-destructive border-destructive/20',
   Esgotado: 'bg-destructive/10 text-destructive border-destructive/20',
+  Arquivado: 'bg-muted text-muted-foreground border-border',
 }
 
 const STATUS_OPTIONS = ['todos', 'Normal', 'Baixo', 'Crítico', 'Esgotado']
+const VIEW_OPTIONS: Array<{ label: string; value: ViewMode }> = [
+  { label: 'Ativos', value: 'ativos' },
+  { label: 'Arquivados', value: 'arquivados' },
+]
 const PAGE_SIZE = 10
 
 export function EstoqueClient({ initialProducts, categories, defaultMinStock }: { initialProducts: Product[]; categories: Category[]; defaultMinStock: number }) {
   const router = useRouter()
   const [search, setSearch] = useState('')
+  const [view, setView] = useState<ViewMode>('ativos')
   const [statusFilter, setStatusFilter] = useState('todos')
   const [showCreate, setShowCreate] = useState(false)
   const [editingProduct, setEditingProduct] = useState<Product | null>(null)
   const [page, setPage] = useState(1)
+  const [isUnarchiving, startUnarchiveTransition] = useTransition()
+  const [unarchivingId, setUnarchivingId] = useState<string | null>(null)
 
   const filtered = useMemo(() => {
     return initialProducts.filter(p => {
+      const matchView = view === 'ativos' ? p.status !== 'Arquivado' : p.status === 'Arquivado'
       const matchSearch = !search || [p.name, p.sku, p.size ?? '', p.color ?? '', p.category?.name ?? ''].some(field => field.toLowerCase().includes(search.toLowerCase()))
-      const matchStatus = statusFilter === 'todos' || p.status === statusFilter
-      return matchSearch && matchStatus
+      const matchStatus = view === 'ativos' ? (statusFilter === 'todos' || p.status === statusFilter) : true
+      return matchView && matchSearch && matchStatus
     })
-  }, [initialProducts, search, statusFilter])
+  }, [initialProducts, search, statusFilter, view])
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
   const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
@@ -45,6 +57,18 @@ export function EstoqueClient({ initialProducts, categories, defaultMinStock }: 
   const handleSuccess = useCallback(() => {
     router.refresh()
   }, [router])
+
+  const handleUnarchive = useCallback((productId: string) => {
+    startUnarchiveTransition(async () => {
+      try {
+        setUnarchivingId(productId)
+        await unarchiveProduct(productId)
+        router.refresh()
+      } finally {
+        setUnarchivingId(null)
+      }
+    })
+  }, [router, startUnarchiveTransition])
 
   const formatCurrency = (v: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v)
 
@@ -69,28 +93,45 @@ export function EstoqueClient({ initialProducts, categories, defaultMinStock }: 
 
       <div className="flex flex-col gap-6 h-full">
         {/* Cabeçalho */}
-        <div className="flex justify-between items-end">
+        <div className="flex justify-between items-end gap-4 flex-wrap">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">Produtos ativos e variações</h1>
+            <h1 className="text-3xl font-bold tracking-tight">Produtos e arquivados</h1>
             <p className="text-muted-foreground mt-1">
-              {filtered.length} item{filtered.length !== 1 ? 's' : ''} encontrado{filtered.length !== 1 ? 's' : ''} no estoque ativo
+              {filtered.length} item{filtered.length !== 1 ? 's' : ''} encontrado{filtered.length !== 1 ? 's' : ''} na aba {view === 'ativos' ? 'ativa' : 'arquivada'}
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap justify-end">
+            <div className="flex items-center gap-2 rounded-lg border border-border bg-background p-1">
+              {VIEW_OPTIONS.map(option => (
+                <button
+                  key={option.value}
+                  onClick={() => { setView(option.value); setStatusFilter('todos'); setPage(1) }}
+                  className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                    view === option.value
+                      ? 'bg-primary text-primary-foreground shadow-sm'
+                      : 'text-muted-foreground hover:bg-muted'
+                  }`}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+            {view === 'ativos' && (
+              <button
+                id="btn-novo-produto"
+                onClick={() => setShowCreate(true)}
+                className="bg-primary hover:bg-primary/90 text-primary-foreground px-4 py-2.5 rounded-lg flex items-center gap-2 font-medium transition-all shadow-lg shadow-primary/25 hover:shadow-primary/40 active:scale-[0.98]"
+              >
+                <Plus className="w-4 h-4" />
+                Novo Produto
+              </button>
+            )}
             <a
               href="/api/export/products"
               className="border border-border hover:bg-muted text-foreground px-4 py-2.5 rounded-lg flex items-center gap-2 font-medium transition-colors"
             >
               Exportar CSV
             </a>
-            <button
-              id="btn-novo-produto"
-              onClick={() => setShowCreate(true)}
-              className="bg-primary hover:bg-primary/90 text-primary-foreground px-4 py-2.5 rounded-lg flex items-center gap-2 font-medium transition-all shadow-lg shadow-primary/25 hover:shadow-primary/40 active:scale-[0.98]"
-            >
-              <Plus className="w-4 h-4" />
-              Novo Produto
-            </button>
           </div>
         </div>
 
@@ -109,22 +150,24 @@ export function EstoqueClient({ initialProducts, categories, defaultMinStock }: 
                 className="bg-transparent border-none outline-none text-sm w-full placeholder:text-muted-foreground"
               />
             </div>
-            <div className="flex items-center gap-2">
-              <Filter className="w-4 h-4 text-muted-foreground" />
-              {STATUS_OPTIONS.map(s => (
-                <button
-                  key={s}
-                  onClick={() => { setStatusFilter(s); setPage(1) }}
-                  className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors capitalize ${
-                    statusFilter === s
-                      ? 'bg-primary text-primary-foreground shadow-sm'
-                      : 'bg-background border border-border text-muted-foreground hover:bg-muted'
-                  }`}
-                >
-                  {s === 'todos' ? 'Todos' : s}
-                </button>
-              ))}
-            </div>
+            {view === 'ativos' && (
+              <div className="flex items-center gap-2">
+                <Filter className="w-4 h-4 text-muted-foreground" />
+                {STATUS_OPTIONS.map(s => (
+                  <button
+                    key={s}
+                    onClick={() => { setStatusFilter(s); setPage(1) }}
+                    className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors capitalize ${
+                      statusFilter === s
+                        ? 'bg-primary text-primary-foreground shadow-sm'
+                        : 'bg-background border border-border text-muted-foreground hover:bg-muted'
+                    }`}
+                  >
+                    {s === 'todos' ? 'Todos' : s}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Tabela */}
@@ -189,13 +232,27 @@ export function EstoqueClient({ initialProducts, categories, defaultMinStock }: 
                         </span>
                       </td>
                       <td className="px-6 py-4 text-center">
-                        <button
-                          onClick={() => setEditingProduct(p)}
-                          className="p-2 rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
-                          title="Editar produto"
-                        >
-                          <Edit2 className="w-4 h-4" />
-                        </button>
+                        <div className="flex items-center justify-center gap-2">
+                          {p.status === 'Arquivado' ? (
+                            <button
+                              onClick={() => handleUnarchive(p.id)}
+                              disabled={isUnarchiving && unarchivingId === p.id}
+                              className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-primary/20 text-primary hover:bg-primary/10 transition-colors disabled:opacity-60"
+                              title="Desarquivar produto"
+                            >
+                              <RotateCcw className="w-4 h-4" />
+                              {isUnarchiving && unarchivingId === p.id ? 'Restaurando...' : 'Desarquivar'}
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => setEditingProduct(p)}
+                              className="p-2 rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
+                              title="Editar produto"
+                            >
+                              <Edit2 className="w-4 h-4" />
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))}

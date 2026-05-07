@@ -8,6 +8,7 @@ export type ProcessSaleInput = {
   items: Array<{ productId: string; quantity: number }>
   paymentMethod?: string
   discount?: number
+  amountReceived?: number
   notes?: string
   customerId?: string | null
 }
@@ -19,6 +20,8 @@ export type ProcessSaleResult = {
     subtotal: number
     discount: number
     total: number
+    amountReceived: number | null
+    change: number
     nfeEnabled: boolean
     nfe: NfeAuthorizationResult
   }
@@ -106,6 +109,22 @@ export async function processSaleWithNfe(input: ProcessSaleInput): Promise<Proce
     const boundedDiscount = Math.min(discount, subtotal)
     const total = Math.max(0, subtotal - boundedDiscount)
     const saleCode = `VD-${Date.now().toString().slice(-8)}`
+    const normalizedPaymentMethod = input.paymentMethod?.trim() || null
+    const normalizedAmountReceived = normalizedPaymentMethod === 'DINHEIRO' && Number.isFinite(input.amountReceived)
+      ? Math.max(0, Number(input.amountReceived))
+      : null
+
+    if (normalizedPaymentMethod === 'DINHEIRO' && normalizedAmountReceived === null) {
+      throw new NfeIntegrationError('Informe o valor recebido para pagamentos em dinheiro.', { code: 'SALE_AMOUNT_REQUIRED' })
+    }
+
+    if (normalizedPaymentMethod === 'DINHEIRO' && normalizedAmountReceived < total) {
+      throw new NfeIntegrationError('O valor recebido é menor que o total da venda.', { code: 'SALE_AMOUNT_INSUFFICIENT' })
+    }
+
+    const change = normalizedPaymentMethod === 'DINHEIRO' && normalizedAmountReceived !== null
+      ? Number((normalizedAmountReceived - total).toFixed(2))
+      : 0
 
     if (!nfeEnabled) {
       const manualSale = await prisma.$transaction(async (tx) => {
@@ -115,7 +134,7 @@ export async function processSaleWithNfe(input: ProcessSaleInput): Promise<Proce
             subtotal,
             discount: boundedDiscount,
             total,
-            paymentMethod: input.paymentMethod?.trim() || null,
+            paymentMethod: normalizedPaymentMethod,
             notes: input.notes?.trim() || null,
             companyId,
             customerId: input.customerId ?? null,
@@ -195,6 +214,8 @@ export async function processSaleWithNfe(input: ProcessSaleInput): Promise<Proce
           subtotal,
           discount: boundedDiscount,
           total,
+          amountReceived: normalizedAmountReceived,
+          change,
           nfeEnabled: false,
           nfe: { status: 'PENDENTE' },
         },
@@ -214,7 +235,7 @@ export async function processSaleWithNfe(input: ProcessSaleInput): Promise<Proce
           subtotal,
           discount: boundedDiscount,
           total,
-          paymentMethod: input.paymentMethod?.trim() || null,
+            paymentMethod: normalizedPaymentMethod,
           notes: input.notes?.trim() || null,
           companyId,
           customerId: input.customerId ?? null,
@@ -287,6 +308,8 @@ export async function processSaleWithNfe(input: ProcessSaleInput): Promise<Proce
           subtotal,
           discount: boundedDiscount,
           total,
+          amountReceived: normalizedAmountReceived,
+          change,
           nfeEnabled: true,
           nfe,
         },
@@ -364,6 +387,8 @@ export async function processSaleWithNfe(input: ProcessSaleInput): Promise<Proce
         subtotal,
         discount: boundedDiscount,
         total,
+        amountReceived: normalizedAmountReceived,
+        change,
         nfeEnabled: true,
         nfe,
       },

@@ -11,6 +11,7 @@ export async function POST(request: Request) {
       items?: Array<{ productId: string; quantity: number }>
       paymentMethod?: string
       discount?: number
+      amountReceived?: number
       notes?: string
       customerId?: string | null
     }
@@ -19,6 +20,7 @@ export async function POST(request: Request) {
       items: body.items ?? [],
       paymentMethod: body.paymentMethod,
       discount: body.discount,
+      amountReceived: body.amountReceived,
       notes: body.notes,
       customerId: body.customerId ?? null,
     })

@@ -52,6 +52,8 @@ export function CaixaClient({ products, initialSales }: { products: Product[]; i
   const [discountPercent, setDiscountPercent] = useState('0')
   const [discountPreset, setDiscountPreset] = useState<string>('0')
   const [paymentMethod, setPaymentMethod] = useState('DINHEIRO')
+  const [amountReceived, setAmountReceived] = useState('')
+  const [amountReceivedTouched, setAmountReceivedTouched] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   const [scannerModeEnabled, setScannerModeEnabled] = useState(true)
@@ -67,6 +69,10 @@ export function CaixaClient({ products, initialSales }: { products: Product[]; i
   const parsedDiscountPercent = Math.min(100, Math.max(0, Number(discountPercent) || 0))
   const boundedDiscount = Number(((subtotal * parsedDiscountPercent) / 100).toFixed(2))
   const total = Math.max(0, subtotal - boundedDiscount)
+  const parsedAmountReceived = Math.max(0, Number(amountReceived) || 0)
+  const isCashPayment = paymentMethod === 'DINHEIRO'
+  const change = isCashPayment ? Number(Math.max(0, parsedAmountReceived - total).toFixed(2)) : 0
+  const paymentMissing = isCashPayment && total > 0 && parsedAmountReceived < total
   const recentSales = useMemo(
     () => (showOnlyDiscountedSales ? initialSales.filter((sale) => sale.discount > 0) : initialSales),
     [initialSales, showOnlyDiscountedSales],
@@ -95,6 +101,23 @@ export function CaixaClient({ products, initialSales }: { products: Product[]; i
     }
     setDiscountPreset('custom')
   }
+
+  const handlePaymentMethodChange = (value: string) => {
+    setPaymentMethod(value)
+    if (value !== 'DINHEIRO') {
+      setAmountReceived('')
+      setAmountReceivedTouched(false)
+      return
+    }
+
+    setAmountReceivedTouched(false)
+    setAmountReceived(total.toFixed(2))
+  }
+
+  useEffect(() => {
+    if (!isCashPayment || amountReceivedTouched) return
+    setAmountReceived(total.toFixed(2))
+  }, [amountReceivedTouched, isCashPayment, total])
 
   const addProductToCart = useCallback((product: Product) => {
     if (product.stockQty <= 0) {
@@ -236,13 +259,17 @@ export function CaixaClient({ products, initialSales }: { products: Product[]; i
           items: cart.map((item) => ({ productId: item.productId, quantity: item.quantity })),
           paymentMethod,
           discount: boundedDiscount,
+          amountReceived: isCashPayment ? parsedAmountReceived : undefined,
         })
-        setSuccess(`Venda ${result.code} finalizada com sucesso.`)
+        const changeMessage = result.change > 0 ? ` Troco: ${formatCurrency(result.change)}.` : ''
+        setSuccess(`Venda ${result.code} finalizada com sucesso.${changeMessage}`)
         setLastSaleId(result.id)
         setLastSaleCode(result.code)
         setCart([])
         setDiscountPercent('0')
         setDiscountPreset('0')
+        setAmountReceived('')
+        setAmountReceivedTouched(false)
         router.refresh()
       } catch (currentError: any) {
         setError(currentError?.message || 'Não foi possível finalizar a venda.')
@@ -320,7 +347,7 @@ export function CaixaClient({ products, initialSales }: { products: Product[]; i
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-5">
             <select
               value={paymentMethod}
-              onChange={e => setPaymentMethod(e.target.value)}
+              onChange={e => handlePaymentMethodChange(e.target.value)}
               className="px-4 py-2.5 bg-background border border-border rounded-lg text-sm outline-none focus:border-primary/60 focus:ring-2 focus:ring-primary/20"
             >
               <option value="DINHEIRO">Dinheiro</option>
@@ -353,6 +380,35 @@ export function CaixaClient({ products, initialSales }: { products: Product[]; i
               />
             </div>
           </div>
+
+          {isCashPayment ? (
+            <div className="mb-5 grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div>
+                <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  Valor recebido
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={amountReceived}
+                  onChange={e => {
+                    setAmountReceivedTouched(true)
+                    setAmountReceived(e.target.value)
+                  }}
+                  placeholder="0,00"
+                  className="w-full px-4 py-2.5 bg-background border border-border rounded-lg text-sm outline-none focus:border-primary/60 focus:ring-2 focus:ring-primary/20"
+                />
+              </div>
+              <div className="rounded-lg border border-border bg-muted/20 px-4 py-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Troco</p>
+                <p className="mt-1 text-lg font-bold">{formatCurrency(change)}</p>
+                {paymentMissing ? (
+                  <p className="mt-1 text-xs text-amber-600">Informe um valor igual ou maior que o total para calcular o troco.</p>
+                ) : null}
+              </div>
+            </div>
+          ) : null}
 
           {error && <p className="text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded-lg px-4 py-3 mb-4">{error}</p>}
           {success && <p className="text-sm text-emerald-600 bg-emerald-500/10 border border-emerald-500/20 rounded-lg px-4 py-3 mb-4">{success}</p>}
@@ -419,7 +475,7 @@ export function CaixaClient({ products, initialSales }: { products: Product[]; i
             <button
               type="button"
               onClick={finalizeSale}
-              disabled={isPending || cart.length === 0}
+              disabled={isPending || cart.length === 0 || paymentMissing}
               className="mt-4 w-full px-4 py-2.5 rounded-lg bg-emerald-600 text-white font-semibold hover:bg-emerald-700 transition-colors disabled:opacity-60"
             >
               <span className="inline-flex items-center gap-2"><CreditCard className="w-4 h-4" /> {isPending ? 'Finalizando...' : 'Finalizar venda'}</span>

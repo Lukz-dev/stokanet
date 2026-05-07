@@ -1437,6 +1437,7 @@ export async function completeSale(data: {
   items: Array<{ productId: string; quantity: number }>
   paymentMethod?: string
   discount?: number
+  amountReceived?: number
   notes?: string
 }) {
   const user = await getAuthenticatedUser()
@@ -1446,6 +1447,7 @@ export async function completeSale(data: {
     items: data.items,
     paymentMethod: data.paymentMethod,
     discount: data.discount,
+    amountReceived: data.amountReceived,
     notes: data.notes,
   })
 
@@ -1499,6 +1501,8 @@ export async function completeSale(data: {
     subtotal: processed.sale.subtotal,
     discount: processed.sale.discount,
     total: processed.sale.total,
+    amountReceived: processed.sale.amountReceived,
+    change: processed.sale.change,
   }
 }
 

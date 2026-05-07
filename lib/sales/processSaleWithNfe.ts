@@ -118,7 +118,7 @@ export async function processSaleWithNfe(input: ProcessSaleInput): Promise<Proce
       throw new NfeIntegrationError('Informe o valor recebido para pagamentos em dinheiro.', { code: 'SALE_AMOUNT_REQUIRED' })
     }
 
-    if (normalizedPaymentMethod === 'DINHEIRO' && normalizedAmountReceived < total) {
+    if (normalizedPaymentMethod === 'DINHEIRO' && normalizedAmountReceived !== null && normalizedAmountReceived < total) {
       throw new NfeIntegrationError('O valor recebido é menor que o total da venda.', { code: 'SALE_AMOUNT_INSUFFICIENT' })
     }
 

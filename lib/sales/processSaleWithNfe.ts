@@ -124,19 +124,21 @@ export async function processSaleWithNfe(input: ProcessSaleInput): Promise<Proce
           } as any,
         })
 
-        for (const item of resolvedItems) {
-          await tx.saleItem.create({
-            data: {
-              saleId: sale.id,
-              productId: item.product.id,
-              productName: item.product.name,
-              sku: item.product.sku,
-              quantity: item.quantity,
-              unitPrice: item.unitPrice,
-              total: item.total,
-            },
-          })
+        // Create all SaleItems in a single batch operation
+        await tx.saleItem.createMany({
+          data: resolvedItems.map((item) => ({
+            saleId: sale.id,
+            productId: item.product.id,
+            productName: item.product.name,
+            sku: item.product.sku,
+            quantity: item.quantity,
+            unitPrice: item.unitPrice,
+            total: item.total,
+          })),
+        })
 
+        // Update all product stock quantities in batch
+        for (const item of resolvedItems) {
           const updated = await tx.product.updateMany({
             where: {
               id: item.product.id,
@@ -151,29 +153,37 @@ export async function processSaleWithNfe(input: ProcessSaleInput): Promise<Proce
           if (updated.count !== 1) {
             throw new NfeIntegrationError('Estoque alterado durante a venda. Tente novamente.', { code: 'STOCK_CHANGED' })
           }
+        }
 
-          const fresh = await tx.product.findUnique({
-            where: { id: item.product.id },
-            select: { stockQty: true, minStock: true },
-          })
+        // Fetch all updated products to compute their new status
+        const updatedProducts = await tx.product.findMany({
+          where: { id: { in: resolvedItems.map((item) => item.product.id) } },
+          select: { id: true, stockQty: true, minStock: true },
+        })
 
+        const statusUpdates = updatedProducts.map((product) => ({
+          id: product.id,
+          status: computeProductStatus(product.stockQty, product.minStock),
+        }))
+
+        // Update all product statuses in batch
+        for (const update of statusUpdates) {
           await tx.product.update({
-            where: { id: item.product.id },
-            data: {
-              status: computeProductStatus(fresh?.stockQty ?? 0, fresh?.minStock ?? 0),
-            },
-          })
-
-          await tx.movement.create({
-            data: {
-              type: 'SAIDA',
-              quantity: item.quantity,
-              reason: `Venda ${sale.code} (sem emissao fiscal automatica)`,
-              productId: item.product.id,
-              companyId,
-            },
+            where: { id: update.id },
+            data: { status: update.status },
           })
         }
+
+        // Create all movements in a single batch operation
+        await tx.movement.createMany({
+          data: resolvedItems.map((item) => ({
+            type: 'SAIDA' as const,
+            quantity: item.quantity,
+            reason: `Venda ${sale.code} (sem emissao fiscal automatica)`,
+            productId: item.product.id,
+            companyId,
+          })),
+        })
 
         return sale
       })
@@ -222,19 +232,18 @@ export async function processSaleWithNfe(input: ProcessSaleInput): Promise<Proce
         data: { nextNumber: { increment: 1 } },
       })
 
-      for (const item of resolvedItems) {
-        await tx.saleItem.create({
-          data: {
-            saleId: sale.id,
-            productId: item.product.id,
-            productName: item.product.name,
-            sku: item.product.sku,
-            quantity: item.quantity,
-            unitPrice: item.unitPrice,
-            total: item.total,
-          },
-        })
-      }
+      // Create all SaleItems in a single batch operation
+      await tx.saleItem.createMany({
+        data: resolvedItems.map((item) => ({
+          saleId: sale.id,
+          productId: item.product.id,
+          productName: item.product.name,
+          sku: item.product.sku,
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+          total: item.total,
+        })),
+      })
 
       return sale
     })
@@ -285,6 +294,7 @@ export async function processSaleWithNfe(input: ProcessSaleInput): Promise<Proce
     }
 
     await prisma.$transaction(async (tx) => {
+      // Update all product stock quantities in batch
       for (const item of resolvedItems) {
         const updated = await tx.product.updateMany({
           where: {
@@ -300,29 +310,37 @@ export async function processSaleWithNfe(input: ProcessSaleInput): Promise<Proce
         if (updated.count !== 1) {
           throw new NfeIntegrationError('Estoque alterado durante a emissão. Tente novamente.', { code: 'STOCK_CHANGED' })
         }
+      }
 
-        const fresh = await tx.product.findUnique({
-          where: { id: item.product.id },
-          select: { stockQty: true, minStock: true },
-        })
+      // Fetch all updated products to compute their new status
+      const updatedProducts = await tx.product.findMany({
+        where: { id: { in: resolvedItems.map((item) => item.product.id) } },
+        select: { id: true, stockQty: true, minStock: true },
+      })
 
+      const statusUpdates = updatedProducts.map((product) => ({
+        id: product.id,
+        status: computeProductStatus(product.stockQty, product.minStock),
+      }))
+
+      // Update all product statuses in batch
+      for (const update of statusUpdates) {
         await tx.product.update({
-          where: { id: item.product.id },
-          data: {
-            status: computeProductStatus(fresh?.stockQty ?? 0, fresh?.minStock ?? 0),
-          },
-        })
-
-        await tx.movement.create({
-          data: {
-            type: 'SAIDA',
-            quantity: item.quantity,
-            reason: `Venda ${draftSale.code} (NF-e autorizada)`,
-            productId: item.product.id,
-            companyId,
-          },
+          where: { id: update.id },
+          data: { status: update.status },
         })
       }
+
+      // Create all movements in a single batch operation
+      await tx.movement.createMany({
+        data: resolvedItems.map((item) => ({
+          type: 'SAIDA' as const,
+          quantity: item.quantity,
+          reason: `Venda ${draftSale.code} (NF-e autorizada)`,
+          productId: item.product.id,
+          companyId,
+        })),
+      })
 
       await tx.sale.update({
         where: { id: draftSale.id },

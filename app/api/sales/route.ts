@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server'
 import { processSaleWithNfe } from '@/lib/sales/processSaleWithNfe'
 import { NfeIntegrationError } from '@/lib/nfe/types'
 
+// Increase timeout to 60 seconds to allow processing large sales with many items
+export const maxDuration = 60
 
 export async function POST(request: Request) {
   try {

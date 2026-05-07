@@ -5,6 +5,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { useSession, signOut } from 'next-auth/react'
 import { Bell, ChevronDown, LogOut, Search, Settings, UserRound } from 'lucide-react'
+import { loadAvatarCached } from '@/lib/client-avatar'
 
 type NotificationLevel = 'critical' | 'warning' | 'info'
 
@@ -73,14 +74,9 @@ export function Header() {
       if (!userId) return
 
       try {
-        const response = await fetch('/api/me/avatar', { cache: 'no-store' })
-        if (!response.ok) {
-          setAvatarUrl(null)
-          return
-        }
-
-        const payload = (await response.json()) as { avatarUrl: string | null }
-        setAvatarUrl(payload.avatarUrl)
+        const key = `${userId}:${avatarVersion ?? 0}`
+        const nextAvatarUrl = await loadAvatarCached(key)
+        setAvatarUrl(nextAvatarUrl)
       } catch {
         setAvatarUrl(null)
       }

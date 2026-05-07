@@ -1,10 +1,12 @@
 'use client'
 
 import { useState, useCallback, useEffect, useMemo, useRef, useTransition } from 'react'
+import dynamic from 'next/dynamic'
 import { Plus, ArrowUpCircle, ArrowDownCircle, SlidersHorizontal, Package, Search, ChevronLeft, ChevronRight } from 'lucide-react'
-import { MovementModal } from '@/components/MovementModal'
 import { createSaleByCode } from '@/lib/actions'
 import { useRouter } from 'next/navigation'
+
+const MovementModal = dynamic(() => import('@/components/MovementModal').then((module) => module.MovementModal))
 
 interface Product { id: string; name: string; sku: string; size: string | null; color: string | null; stockQty: number }
 interface Movement {

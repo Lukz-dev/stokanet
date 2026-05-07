@@ -5,17 +5,17 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import { useSession, signOut } from 'next-auth/react'
-import { Package, LayoutDashboard, ArrowRightLeft, Box, Building2, UserRound, Settings, ScanLine, Truck, ClipboardList, Warehouse, Boxes, BarChart3, ShieldCheck, LogOut, CalendarCheck2 } from 'lucide-react'
+import { Package, LayoutDashboard, ArrowRightLeft, Box, Building2, UserRound, Settings, ScanLine, Truck, ClipboardList, BarChart3, ShieldCheck, LogOut, CalendarCheck2, Receipt } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { loadAvatarCached } from '@/lib/client-avatar'
 
 const navItems = [
   { name: 'Visão geral', href: '/', icon: LayoutDashboard },
   { name: 'Produtos', href: '/estoque', icon: Package },
   { name: 'Caixa', href: '/caixa', icon: ScanLine },
+  { name: 'Vendas', href: '/vendas', icon: Receipt },
   { name: 'Fornecedores', href: '/fornecedores', icon: Truck },
   { name: 'Compras', href: '/compras', icon: ClipboardList },
-  { name: 'Filiais', href: '/filiais', icon: Warehouse },
-  { name: 'Lotes', href: '/lotes', icon: Boxes },
   { name: 'Fechamento', href: '/fechamento', icon: CalendarCheck2 },
   { name: 'Relatórios', href: '/relatorios', icon: BarChart3 },
   { name: 'Auditoria', href: '/auditoria', icon: ShieldCheck },
@@ -43,13 +43,9 @@ export function Sidebar() {
 
     const loadAvatar = async () => {
       try {
-        const response = await fetch('/api/me/avatar', { cache: 'no-store' })
-        if (!response.ok) {
-          setAvatarUrl(null)
-          return
-        }
-        const payload = (await response.json()) as { avatarUrl: string | null }
-        setAvatarUrl(payload.avatarUrl)
+        const key = `${userId}:${avatarVersion ?? 0}`
+        const nextAvatarUrl = await loadAvatarCached(key)
+        setAvatarUrl(nextAvatarUrl)
       } catch {
         setAvatarUrl(null)
       }

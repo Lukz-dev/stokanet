@@ -25,11 +25,8 @@ export async function GET() {
     prisma.product.findMany({
       where: { companyId },
       select: {
-        id: true,
-        name: true,
         stockQty: true,
         minStock: true,
-        status: true,
         categoryId: true,
         movements: {
           select: { createdAt: true },

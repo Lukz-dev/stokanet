@@ -1,11 +1,13 @@
 'use client'
 
 import { useState, useMemo, useCallback, useTransition } from 'react'
+import dynamic from 'next/dynamic'
 import { Plus, Search, Filter, Edit2, Package, ChevronLeft, ChevronRight, RotateCcw } from 'lucide-react'
-import { ProductModal } from '@/components/ProductModal'
-import { EditProductModal } from '@/components/EditProductModal'
 import { useRouter } from 'next/navigation'
 import { unarchiveProduct } from '@/lib/actions'
+
+const ProductModal = dynamic(() => import('@/components/ProductModal').then((module) => module.ProductModal))
+const EditProductModal = dynamic(() => import('@/components/EditProductModal').then((module) => module.EditProductModal))
 
 interface Category { id: string; name: string }
 interface Product {

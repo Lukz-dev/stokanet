@@ -124,6 +124,75 @@ function toIsoDay(date: Date) {
   return date.toISOString().slice(0, 10)
 }
 
+const AUTO_SALES_SUMMARY_START = '### RESUMO AUTOMATICO - VENDAS POR PAGAMENTO ###'
+const AUTO_SALES_SUMMARY_END = '### FIM RESUMO AUTOMATICO ###'
+
+function formatCurrencyBr(value: number) {
+  return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value)
+}
+
+function mapPaymentMethodLabel(method: string | null) {
+  const normalized = (method ?? '').trim().toUpperCase()
+  if (!normalized) return 'Não informado'
+
+  const labels: Record<string, string> = {
+    PIX: 'PIX',
+    DINHEIRO: 'Dinheiro',
+    CASH: 'Dinheiro',
+    CARTAO_CREDITO: 'Cartão de crédito',
+    CREDIT_CARD: 'Cartão de crédito',
+    CARTAO_DEBITO: 'Cartão de débito',
+    DEBIT_CARD: 'Cartão de débito',
+  }
+
+  return labels[normalized] ?? method ?? 'Não informado'
+}
+
+function stripAutoSalesSummary(notes: string | null) {
+  if (!notes) return ''
+
+  const startIndex = notes.indexOf(AUTO_SALES_SUMMARY_START)
+  if (startIndex === -1) return notes.trim()
+
+  const endIndex = notes.indexOf(AUTO_SALES_SUMMARY_END)
+  if (endIndex === -1 || endIndex < startIndex) {
+    return notes.slice(0, startIndex).trim()
+  }
+
+  const before = notes.slice(0, startIndex).trim()
+  const after = notes.slice(endIndex + AUTO_SALES_SUMMARY_END.length).trim()
+  return [before, after].filter(Boolean).join('\n\n').trim()
+}
+
+function buildSalesByPaymentSummary(
+  groups: Array<{ paymentMethod: string | null; _sum: { total: number | null } }>,
+) {
+  const normalized = groups
+    .map((group) => ({
+      paymentLabel: mapPaymentMethodLabel(group.paymentMethod),
+      total: Number((group._sum.total ?? 0).toFixed(2)),
+    }))
+    .filter((item) => item.total > 0)
+    .sort((a, b) => b.total - a.total)
+
+  if (normalized.length === 0) {
+    return 'Sem vendas no período.'
+  }
+
+  return normalized.map((item) => `${formatCurrencyBr(item.total)} no ${item.paymentLabel}`).join('\n')
+}
+
+function buildClosureNotesWithSalesSummary(notes: string | null, salesSummary: string) {
+  const manualNotes = stripAutoSalesSummary(notes)
+  const summaryBlock = [
+    AUTO_SALES_SUMMARY_START,
+    salesSummary,
+    AUTO_SALES_SUMMARY_END,
+  ].join('\n')
+
+  return [manualNotes, summaryBlock].filter(Boolean).join('\n\n').trim()
+}
+
 export async function getMonthlyClosureCalendar(params?: { year?: number; month?: number }) {
   await requireRole(['ADMIN', 'MANAGER', 'OPERATOR'])
   const companyId = await getCompanyId()
@@ -265,7 +334,7 @@ export async function closeDailyClosure(input: { day: string; notes?: string }) 
     return { ok: true, alreadyClosed: true, id: existing.id }
   }
 
-  const [salesAggregate, salesCount, purchaseAggregate, purchaseCount, movementGroups, products] = await Promise.all([
+  const [salesAggregate, salesCount, salesByPaymentGroups, purchaseAggregate, purchaseCount, movementGroups, products] = await Promise.all([
     prisma.sale.aggregate({
       _sum: { total: true },
       where: {
@@ -278,6 +347,14 @@ export async function closeDailyClosure(input: { day: string; notes?: string }) 
         companyId,
         createdAt: { gte: start, lt: end },
       },
+    }),
+    prisma.sale.groupBy({
+      by: ['paymentMethod'],
+      where: {
+        companyId,
+        createdAt: { gte: start, lt: end },
+      },
+      _sum: { total: true },
     }),
     prisma.purchaseOrder.aggregate({
       _sum: { subtotal: true },
@@ -317,6 +394,8 @@ export async function closeDailyClosure(input: { day: string; notes?: string }) 
   const purchaseTotal = Number((purchaseAggregate._sum.subtotal ?? 0).toFixed(2))
   const cashExpected = Number((salesTotal - purchaseTotal).toFixed(2))
   const stockValue = Number(products.reduce((acc, product) => acc + product.price * product.stockQty, 0).toFixed(2))
+  const salesByPaymentSummary = buildSalesByPaymentSummary(salesByPaymentGroups)
+  const closureNotes = buildClosureNotesWithSalesSummary(normalizedNotes, salesByPaymentSummary)
 
   const result = await prisma.$transaction(async (tx) => {
     const monthClosure = await tx.monthlyClosure.upsert({
@@ -341,7 +420,7 @@ export async function closeDailyClosure(input: { day: string; notes?: string }) 
       update: {
         monthKey,
         status: 'CLOSED',
-        notes: normalizedNotes,
+        notes: closureNotes,
         salesCount,
         salesTotal,
         purchaseOrdersCount: purchaseCount,
@@ -360,7 +439,7 @@ export async function closeDailyClosure(input: { day: string; notes?: string }) 
         day: start,
         monthKey,
         status: 'CLOSED',
-        notes: normalizedNotes,
+        notes: closureNotes,
         salesCount,
         salesTotal,
         purchaseOrdersCount: purchaseCount,
@@ -554,38 +633,50 @@ export async function closeMonthlyClosure(input: { year: number; month: number; 
     return { ok: true, alreadyClosed: true, id: current.id }
   }
 
-  const closedDays = await prisma.dailyClosure.findMany({
-    where: {
-      companyId,
-      day: { gte: start, lt: end },
-      status: 'CLOSED',
-    },
-    select: {
-      id: true,
-      salesCount: true,
-      salesTotal: true,
-      purchaseOrdersCount: true,
-      purchaseTotal: true,
-      stockEntriesQty: true,
-      stockOutputsQty: true,
-      stockAdjustmentsQty: true,
-      stockBalanceQty: true,
-      cashExpected: true,
-    },
-  })
+  const [closedDays, salesByPaymentGroups] = await Promise.all([
+    prisma.dailyClosure.findMany({
+      where: {
+        companyId,
+        day: { gte: start, lt: end },
+        status: 'CLOSED',
+      },
+      select: {
+        id: true,
+        salesCount: true,
+        salesTotal: true,
+        purchaseOrdersCount: true,
+        purchaseTotal: true,
+        stockEntriesQty: true,
+        stockOutputsQty: true,
+        stockAdjustmentsQty: true,
+        stockBalanceQty: true,
+        cashExpected: true,
+      },
+    }),
+    prisma.sale.groupBy({
+      by: ['paymentMethod'],
+      where: {
+        companyId,
+        createdAt: { gte: start, lt: end },
+      },
+      _sum: { total: true },
+    }),
+  ])
 
   if (closedDays.length !== daysInMonth) {
     throw new Error(`Nao e possivel fechar o mes. Dias fechados: ${closedDays.length}/${daysInMonth}.`)
   }
 
   const normalizedNotes = input.notes?.trim() || null
+  const salesByPaymentSummary = buildSalesByPaymentSummary(salesByPaymentGroups)
+  const closureNotes = buildClosureNotesWithSalesSummary(normalizedNotes, salesByPaymentSummary)
 
   const result = await prisma.$transaction(async (tx) => {
     const monthClosure = await tx.monthlyClosure.upsert({
       where: { companyId_year_month: { companyId, year, month } },
       update: {
         status: 'CLOSED',
-        notes: normalizedNotes,
+        notes: closureNotes,
         daysClosed: closedDays.length,
         salesCount: closedDays.reduce((acc, day) => acc + day.salesCount, 0),
         salesTotal: Number(closedDays.reduce((acc, day) => acc + day.salesTotal, 0).toFixed(2)),
@@ -604,7 +695,7 @@ export async function closeMonthlyClosure(input: { year: number; month: number; 
         month,
         monthKey,
         status: 'CLOSED',
-        notes: normalizedNotes,
+        notes: closureNotes,
         daysClosed: closedDays.length,
         salesCount: closedDays.reduce((acc, day) => acc + day.salesCount, 0),
         salesTotal: Number(closedDays.reduce((acc, day) => acc + day.salesTotal, 0).toFixed(2)),
@@ -699,7 +790,10 @@ export async function getDashboardStats() {
     prisma.product.count({ where: activeProductWhere }),
     prisma.product.count({ where: { ...activeProductWhere, status: 'Baixo' } }),
     prisma.product.count({ where: { ...activeProductWhere, OR: [{ status: 'Crítico' }, { status: 'Esgotado' }] } }),
-    prisma.product.findMany({ where: activeProductWhere }),
+    prisma.product.findMany({
+      where: activeProductWhere,
+      select: { price: true, stockQty: true },
+    }),
   ])
 
   const totalValue = products.reduce((acc, p) => acc + p.price * p.stockQty, 0)
@@ -742,6 +836,28 @@ export async function getProducts(search?: string, status?: string, includeArchi
     // Se não houver sessão/contexto (ex: revalidatePath em background), devolve lista vazia em vez de quebrar o render
     return []
   }
+}
+
+export async function getQuickProducts(limit = 5) {
+  const companyId = await getCompanyId()
+
+  return prisma.product.findMany({
+    where: {
+      companyId,
+      status: { not: 'Arquivado' },
+    },
+    select: {
+      id: true,
+      name: true,
+      sku: true,
+      price: true,
+      stockQty: true,
+      size: true,
+      color: true,
+    },
+    orderBy: { createdAt: 'desc' },
+    take: Math.max(1, Math.min(limit, 20)),
+  })
 }
 
 function resolveProductStatus(stockQty: number, minStock: number) {
@@ -1384,6 +1500,117 @@ export async function completeSale(data: {
     discount: processed.sale.discount,
     total: processed.sale.total,
   }
+}
+
+function isSaleCancelled(notes: string | null) {
+  if (!notes) return false
+  return notes.includes('[CANCELADA]')
+}
+
+function buildCancelledSaleNotes(existingNotes: string | null, reason?: string) {
+  const trimmedReason = reason?.trim()
+  const header = `[CANCELADA] ${new Date().toISOString()}`
+  const reasonLine = trimmedReason ? `Motivo: ${trimmedReason}` : null
+  const previous = existingNotes?.trim() || null
+
+  return [header, reasonLine, previous].filter(Boolean).join('\n')
+}
+
+export async function cancelSale(input: { saleId: string; reason?: string }) {
+  const user = await requireRole(['ADMIN', 'MANAGER', 'OPERATOR'])
+  const companyId = await getCompanyId()
+  const saleId = input.saleId.trim()
+
+  if (!saleId) {
+    throw new Error('Venda inválida para cancelamento.')
+  }
+
+  const sale = await prisma.sale.findFirst({
+    where: { id: saleId, companyId },
+    include: {
+      items: {
+        select: {
+          id: true,
+          productId: true,
+          quantity: true,
+        },
+      },
+    },
+  })
+
+  if (!sale) {
+    throw new Error('Venda não encontrada.')
+  }
+
+  if (isSaleCancelled(sale.notes)) {
+    return { ok: true, alreadyCancelled: true, id: sale.id, code: sale.code }
+  }
+
+  if (sale.nfeStatus === 'AUTORIZADO') {
+    throw new Error('Não é possível cancelar por aqui uma venda com NF-e autorizada.')
+  }
+
+  if (!sale.items.length) {
+    throw new Error('A venda não possui itens para estorno de estoque.')
+  }
+
+  const productIds = [...new Set(sale.items.map((item) => item.productId))]
+
+  await prisma.$transaction(async (tx) => {
+    for (const item of sale.items) {
+      await tx.product.update({
+        where: { id: item.productId },
+        data: { stockQty: { increment: item.quantity } },
+      })
+    }
+
+    const productsAfter = await tx.product.findMany({
+      where: { id: { in: productIds }, companyId },
+      select: { id: true, stockQty: true, minStock: true },
+    })
+
+    for (const product of productsAfter) {
+      const status = resolveProductStatus(product.stockQty, product.minStock)
+      await tx.product.update({
+        where: { id: product.id },
+        data: { status },
+      })
+    }
+
+    await tx.movement.createMany({
+      data: sale.items.map((item) => ({
+        type: 'ENTRADA' as const,
+        quantity: item.quantity,
+        reason: `Cancelamento da venda ${sale.code}`,
+        productId: item.productId,
+        companyId,
+      })),
+    })
+
+    await tx.sale.update({
+      where: { id: sale.id },
+      data: {
+        notes: buildCancelledSaleNotes(sale.notes, input.reason),
+      },
+    })
+  })
+
+  revalidatePath('/vendas')
+  revalidatePath('/caixa')
+  revalidatePath('/movimentacoes')
+  revalidatePath('/estoque')
+  revalidatePath('/')
+
+  await logAudit({
+    action: 'CANCEL',
+    entity: 'SALE',
+    entityId: sale.id,
+    details: `Venda ${sale.code} cancelada${input.reason?.trim() ? `: ${input.reason.trim()}` : ''}`,
+    companyId,
+    userId: user.id,
+  })
+
+  return { ok: true, id: sale.id, code: sale.code }
 }
 
 export async function getSales(limit = 50) {

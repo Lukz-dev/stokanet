@@ -74,6 +74,43 @@ function getMonthRange(days: ClosureDay[]) {
   }
 }
 
+function parsePaymentMethods(notes: string | null): { method: string; amount: number }[] {
+  if (!notes) return []
+
+  const paymentMethods = [
+    { label: 'PIX', key: 'PIX' },
+    { label: 'DINHEIRO', key: 'DINHEIRO' },
+    { label: 'CARTAO_CREDITO', key: 'CARTÃO DE CRÉDITO' },
+    { label: 'CARTAO_DEBITO', key: 'CARTÃO DE DÉBITO' },
+  ]
+
+  const parsed: { method: string; amount: number }[] = []
+
+  for (const pm of paymentMethods) {
+    // Try both the key name and common variations
+    const patterns = [
+      new RegExp(`${pm.key}:\\s*R\\$\\s*([\\d,]+(?:\\.\\d+)?)`, 'i'),
+      new RegExp(`${pm.label}:\\s*R\\$\\s*([\\d,]+(?:\\.\\d+)?)`, 'i'),
+    ]
+
+    for (const pattern of patterns) {
+      const match = notes.match(pattern)
+      if (match) {
+        // Parse the amount: "1.200,50" or "1200.50" → 1200.50
+        let amountStr = match[1]
+        amountStr = amountStr.replace('.', '').replace(',', '.')
+        const amount = parseFloat(amountStr)
+        if (!isNaN(amount)) {
+          parsed.push({ method: pm.label, amount })
+          break
+        }
+      }
+    }
+  }
+
+  return parsed
+}
+
 export function FechamentoClient({ initialData }: { initialData: ClosureCalendar }) {
   const [data, setData] = useState<ClosureCalendar>(initialData)
   const [selectedDate, setSelectedDate] = useState(initialData.days[0]?.date ?? '')
@@ -257,6 +294,20 @@ export function FechamentoClient({ initialData }: { initialData: ClosureCalendar
     })
   }
 
+  const monthlyPaymentSummary = useMemo(() => {
+    const sums: Record<string, number> = {}
+    const closedDays = data.days.filter((d) => d.status === 'CLOSED')
+
+    for (const day of closedDays) {
+      const payments = parsePaymentMethods(day.notes)
+      for (const p of payments) {
+        sums[p.method] = (sums[p.method] || 0) + p.amount
+      }
+    }
+
+    return Object.entries(sums).map(([method, amount]) => ({ method, amount }))
+  }, [data.days])
+
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
@@ -313,6 +364,28 @@ export function FechamentoClient({ initialData }: { initialData: ClosureCalendar
           <p className="text-xs text-muted-foreground mt-2">Status do mes: {data.month.status === 'CLOSED' ? 'Fechado' : 'Aberto'}</p>
         </div>
       </div>
+      
+      <section className="border border-border rounded-xl bg-card p-5 shadow-sm">
+        <h2 className="text-lg font-semibold mb-3">Formas de pagamento (resumo mensal)</h2>
+        <div className="mb-4">
+          {monthlyPaymentSummary.length > 0 ? (
+            <div className="flex flex-wrap gap-3">
+              {monthlyPaymentSummary.map((p) => (
+                <div key={p.method} className="border rounded-md px-3 py-2">
+                  <div className="text-xs text-muted-foreground">{p.method}</div>
+                  <div className="font-semibold">{formatCurrency(p.amount)}</div>
+                </div>
+              ))}
+              <div className="border rounded-md px-3 py-2">
+                <div className="text-xs text-muted-foreground">Total</div>
+                <div className="font-semibold text-emerald-600">{formatCurrency(monthlyPaymentSummary.reduce((s, x) => s + x.amount, 0))}</div>
+              </div>
+            </div>
+          ) : (
+            <div className="text-sm text-muted-foreground">Nenhum registro de formas de pagamento encontradas para o mês.</div>
+          )}
+        </div>
+      </section>
 
       <section className="border border-border rounded-xl bg-card p-5 shadow-sm">
         <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
@@ -499,6 +572,38 @@ export function FechamentoClient({ initialData }: { initialData: ClosureCalendar
                   <p>Caixa esperado: <strong>{formatCurrency(selectedDay.cashExpected)}</strong></p>
                 </div>
 
+                {(() => {
+                  const payments = parsePaymentMethods(selectedDay.notes)
+                  if (payments.length > 0) {
+                    const total = payments.reduce((sum, p) => sum + p.amount, 0)
+                    const paymentLabels: { [key: string]: string } = {
+                      'PIX': 'PIX',
+                      'DINHEIRO': 'Dinheiro',
+                      'CARTÃO DE CRÉDITO': 'Cartão de Crédito',
+                      'CARTÃO DE DÉBITO': 'Cartão de Débito',
+                    }
+
+                    return (
+                      <div className="mt-4 pt-4 border-t border-border">
+                        <p className="text-xs font-semibold text-muted-foreground mb-2">FORMAS DE PAGAMENTO</p>
+                        <div className="space-y-2">
+                          {payments.map((payment) => (
+                            <div key={payment.method} className="flex justify-between items-center text-sm">
+                              <span className="text-muted-foreground">{paymentLabels[payment.method] || payment.method}</span>
+                              <span className="font-semibold">{formatCurrency(payment.amount)}</span>
+                            </div>
+                          ))}
+                          <div className="flex justify-between items-center text-sm pt-2 border-t border-border/50 font-semibold">
+                            <span>Total</span>
+                            <span className="text-emerald-600">{formatCurrency(total)}</span>
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  }
+                  return null
+                })()}
+
                 <textarea
                   value={notes}
                   onChange={(event) => setNotes(event.target.value)}
@@ -540,6 +645,32 @@ export function FechamentoClient({ initialData }: { initialData: ClosureCalendar
               placeholder="Observacoes do fechamento mensal"
               className="mt-3 w-full min-h-24 px-3 py-2 rounded-lg border border-border bg-background text-sm outline-none focus:border-primary/60 focus:ring-2 focus:ring-primary/20"
             />
+
+            {monthlyPaymentSummary.length > 0 && (
+              <div className="mt-4 pt-4 border-t border-border">
+                <p className="text-xs font-semibold text-muted-foreground mb-2">FORMAS DE PAGAMENTO (Mensal)</p>
+                <div className="space-y-2">
+                  {monthlyPaymentSummary.map((payment) => {
+                    const paymentLabels: { [key: string]: string } = {
+                      'PIX': 'PIX',
+                      'DINHEIRO': 'Dinheiro',
+                      'CARTÃO DE CRÉDITO': 'Cartão de Crédito',
+                      'CARTÃO DE DÉBITO': 'Cartão de Débito',
+                    }
+                    return (
+                      <div key={payment.method} className="flex justify-between items-center text-sm">
+                        <span className="text-muted-foreground">{paymentLabels[payment.method] || payment.method}</span>
+                        <span className="font-semibold">{formatCurrency(payment.amount)}</span>
+                      </div>
+                    )
+                  })}
+                  <div className="flex justify-between items-center text-sm pt-2 border-t border-border/50 font-semibold">
+                    <span>Total</span>
+                    <span className="text-emerald-600">{formatCurrency(monthlyPaymentSummary.reduce((s, p) => s + p.amount, 0))}</span>
+                  </div>
+                </div>
+              </div>
+            )}
 
             <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
               <button

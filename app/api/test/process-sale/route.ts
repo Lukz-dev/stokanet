@@ -50,16 +50,55 @@ export async function POST(req: Request) {
     const total = Math.max(0, subtotal - boundedDiscount)
     const sale = await prisma.$transaction(async (tx) => {
       const s = await tx.sale.create({ data: { code: `TEST-${Date.now()}`, subtotal, discount: boundedDiscount, total, paymentMethod: paymentMethod || null, notes: notes || null, companyId } as any })
+
+      // Create all SaleItems in a single batch operation
+      await tx.saleItem.createMany({
+        data: items.map((item: any) => {
+          const product = products.find((x) => x.id === item.productId)
+          if (!product) {
+            throw new Error(`Produto não encontrado durante o processamento do teste: ${item.productId}`)
+          }
+          return {
+            saleId: s.id,
+            productId: product.id,
+            productName: product.name,
+            sku: product.sku,
+            quantity: item.quantity,
+            unitPrice: product.price,
+            total: product.price * item.quantity,
+          }
+        }),
+      })
+
+      // Update all product stock quantities in batch
       for (const item of items) {
         const product = products.find((x) => x.id === item.productId)
         if (!product) {
           throw new Error(`Produto não encontrado durante o processamento do teste: ${item.productId}`)
         }
-
-        await tx.saleItem.create({ data: { saleId: s.id, productId: product.id, productName: product.name, sku: product.sku, quantity: item.quantity, unitPrice: product.price, total: product.price * item.quantity } })
-        await tx.product.update({ where: { id: product.id }, data: { stockQty: { decrement: item.quantity } } as any })
-        await tx.movement.create({ data: { type: 'SAIDA', quantity: item.quantity, reason: `Teste venda ${s.code}`, productId: product.id, companyId } })
+        await tx.product.update({
+          where: { id: product.id },
+          data: { stockQty: { decrement: item.quantity } } as any,
+        })
       }
+
+      // Create all movements in a single batch operation
+      await tx.movement.createMany({
+        data: items.map((item: any) => {
+          const product = products.find((x) => x.id === item.productId)
+          if (!product) {
+            throw new Error(`Produto não encontrado durante o processamento do teste: ${item.productId}`)
+          }
+          return {
+            type: 'SAIDA' as const,
+            quantity: item.quantity,
+            reason: `Teste venda ${s.code}`,
+            productId: product.id,
+            companyId,
+          }
+        }),
+      })
+
       return s
     })
 

@@ -66,3 +66,78 @@ test('process sale via test endpoint reduces stock and creates sale', async ({ p
   const prod2 = JSON.parse(prod2Response.text) as { product: { stockQty: number } }
   expect(prod2.product.stockQty).toBe(4)
 })
+
+test('process sale with 20+ items (batch optimization test)', async ({ page }) => {
+  const setup = await bootstrapAndLogin(page)
+  const companyId = setup.companyId
+
+  // Create 20 products
+  const productIds: string[] = []
+  for (let i = 1; i <= 20; i++) {
+    const pResponse = await postJson(page, '/api/test/create-product', {
+      companyId,
+      name: `Product-${i}`,
+      sku: `SKU-${i}-${Date.now()}`,
+      price: 10 + i,
+      stockQty: 100,
+    })
+    expect(pResponse.ok).toBeTruthy()
+    const p = JSON.parse(pResponse.text) as { product: { id: string } }
+    productIds.push(p.product.id)
+  }
+
+  // Process all 20 items in a single sale
+  const items = productIds.map((id, idx) => ({ productId: id, quantity: idx + 1 }))
+  const res = await postJson(page, '/api/test/process-sale', { companyId, items, paymentMethod: 'CREDIT_CARD', discount: 5.5 })
+  expect(res.ok).toBeTruthy()
+  const body = JSON.parse(res.text) as { sale: { id: string; code: string; total: number } }
+  expect(body.sale).toBeTruthy()
+  expect(body.sale.code).toBeDefined()
+  expect(body.sale.total).toBeGreaterThan(0)
+
+  // Verify stock was reduced for all products
+  for (let i = 0; i < productIds.length; i++) {
+    const prodResponse = await getJson(page, `/api/test/get-product?productId=${productIds[i]}`)
+    expect(prodResponse.ok).toBeTruthy()
+    const prod = JSON.parse(prodResponse.text) as { product: { stockQty: number } }
+    const expectedQty = 100 - (i + 1)
+    expect(prod.product.stockQty).toBe(expectedQty)
+  }
+})
+
+test('process sale with 50 items (stress test)', async ({ page }) => {
+  const setup = await bootstrapAndLogin(page)
+  const companyId = setup.companyId
+
+  // Create 50 products
+  const productIds: string[] = []
+  for (let i = 1; i <= 50; i++) {
+    const pResponse = await postJson(page, '/api/test/create-product', {
+      companyId,
+      name: `Product-Stress-${i}`,
+      sku: `STRESS-${i}-${Date.now()}`,
+      price: 5 + Math.floor(i / 2),
+      stockQty: 100,
+    })
+    expect(pResponse.ok).toBeTruthy()
+    const p = JSON.parse(pResponse.text) as { product: { id: string } }
+    productIds.push(p.product.id)
+  }
+
+  // Process all 50 items in a single sale
+  const items = productIds.map((id) => ({ productId: id, quantity: 2 }))
+  const res = await postJson(page, '/api/test/process-sale', { companyId, items, paymentMethod: 'PIX', discount: 10 })
+  expect(res.ok).toBeTruthy()
+  const body = JSON.parse(res.text) as { sale: { id: string; code: string; total: number } }
+  expect(body.sale).toBeTruthy()
+  expect(body.sale.code).toBeDefined()
+  expect(body.sale.total).toBeGreaterThan(0)
+
+  // Verify a sample of stock was reduced (not all 50 to save test time)
+  for (let i = 0; i < 10; i++) {
+    const prodResponse = await getJson(page, `/api/test/get-product?productId=${productIds[i]}`)
+    expect(prodResponse.ok).toBeTruthy()
+    const prod = JSON.parse(prodResponse.text) as { product: { stockQty: number } }
+    expect(prod.product.stockQty).toBe(98)
+  }
+})

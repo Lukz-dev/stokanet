@@ -242,6 +242,54 @@ export function CaixaClient({ products, initialSales }: { products: Product[]; i
     readCodeAndAddToCart(code)
   }
 
+  const finalizeSale = () => {
+    setError('')
+    setSuccess('')
+
+    if (cart.length === 0) {
+      setError('Adicione itens no carrinho antes de finalizar.')
+      return
+    }
+
+    if (paymentMode === 'MISTO' && splitPaymentMissing) {
+      setError('Preencha os dois meios de pagamento para fechar o valor total.')
+      return
+    }
+
+    startTransition(async () => {
+      try {
+        const result = await completeSale({
+          items: cart.map((item) => ({ productId: item.productId, quantity: item.quantity })),
+          paymentMethod: paymentMode === 'UNICO' ? paymentMethod : undefined,
+          paymentBreakdown: paymentMode === 'MISTO'
+            ? splitPaymentValues
+                .filter((item) => item.amountValue > 0)
+                .map((item) => ({ method: item.method, amount: item.amountValue }))
+            : undefined,
+          discount: boundedDiscount,
+          amountReceived: paymentMode === 'UNICO' && isCashPayment ? parsedAmountReceived : undefined,
+        })
+        const changeMessage = result.change > 0 ? ` Troco: ${formatCurrency(result.change)}.` : ''
+        setSuccess(`Venda ${result.code} finalizada com sucesso.${changeMessage}`)
+        setLastSaleId(result.id)
+        setLastSaleCode(result.code)
+        setCart([])
+        setDiscountPercent('0')
+        setDiscountPreset('0')
+        setAmountReceived('')
+        setAmountReceivedTouched(false)
+        setPaymentMode('UNICO')
+        setSplitPayments([
+          { method: 'CARTAO_CREDITO', amount: '' },
+          { method: 'DINHEIRO', amount: '' },
+        ])
+        router.refresh()
+      } catch (currentError: any) {
+        setError(currentError?.message || 'Não foi possível finalizar a venda.')
+      }
+    })
+  }
+
   useEffect(() => {
     if (!scannerModeEnabled) return
     scannerInputRef.current?.focus()
@@ -352,54 +400,6 @@ export function CaixaClient({ products, initialSales }: { products: Product[]; i
 
   const removeItem = (productId: string) => {
     setCart((current) => current.filter((item) => item.productId !== productId))
-  }
-
-  const finalizeSale = () => {
-    setError('')
-    setSuccess('')
-
-    if (cart.length === 0) {
-      setError('Adicione itens no carrinho antes de finalizar.')
-      return
-    }
-
-    if (paymentMode === 'MISTO' && splitPaymentMissing) {
-      setError('Preencha os dois meios de pagamento para fechar o valor total.')
-      return
-    }
-
-    startTransition(async () => {
-      try {
-        const result = await completeSale({
-          items: cart.map((item) => ({ productId: item.productId, quantity: item.quantity })),
-          paymentMethod: paymentMode === 'UNICO' ? paymentMethod : undefined,
-          paymentBreakdown: paymentMode === 'MISTO'
-            ? splitPaymentValues
-                .filter((item) => item.amountValue > 0)
-                .map((item) => ({ method: item.method, amount: item.amountValue }))
-            : undefined,
-          discount: boundedDiscount,
-          amountReceived: paymentMode === 'UNICO' && isCashPayment ? parsedAmountReceived : undefined,
-        })
-        const changeMessage = result.change > 0 ? ` Troco: ${formatCurrency(result.change)}.` : ''
-        setSuccess(`Venda ${result.code} finalizada com sucesso.${changeMessage}`)
-        setLastSaleId(result.id)
-        setLastSaleCode(result.code)
-        setCart([])
-        setDiscountPercent('0')
-        setDiscountPreset('0')
-        setAmountReceived('')
-        setAmountReceivedTouched(false)
-        setPaymentMode('UNICO')
-        setSplitPayments([
-          { method: 'CARTAO_CREDITO', amount: '' },
-          { method: 'DINHEIRO', amount: '' },
-        ])
-        router.refresh()
-      } catch (currentError: any) {
-        setError(currentError?.message || 'Não foi possível finalizar a venda.')
-      }
-    })
   }
 
   return (

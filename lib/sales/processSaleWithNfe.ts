@@ -7,6 +7,7 @@ import { NfeIntegrationError } from '@/lib/nfe/types'
 export type ProcessSaleInput = {
   items: Array<{ productId: string; quantity: number }>
   paymentMethod?: string
+  paymentBreakdown?: Array<{ method: string; amount: number }>
   discount?: number
   amountReceived?: number
   notes?: string
@@ -32,6 +33,73 @@ function computeProductStatus(newQty: number, minStock: number) {
   if (newQty <= minStock * 0.5) return 'Crítico'
   if (newQty <= minStock) return 'Baixo'
   return 'Normal'
+}
+
+async function applyInventoryChanges(
+  tx: Prisma.TransactionClient,
+  companyId: string,
+  items: Array<{ product: { id: string; minStock: number }; quantity: number }>,
+  stockErrorMessage: string,
+) {
+  const stockResults = await Promise.all(
+    items.map((item) =>
+      tx.product.updateMany({
+        where: {
+          id: item.product.id,
+          companyId,
+          stockQty: { gte: item.quantity },
+        },
+        data: {
+          stockQty: { decrement: item.quantity },
+        },
+      }),
+    ),
+  )
+
+  if (stockResults.some((result) => result.count !== 1)) {
+    throw new NfeIntegrationError(stockErrorMessage, { code: 'STOCK_CHANGED' })
+  }
+
+  const updatedProducts = await tx.product.findMany({
+    where: { id: { in: items.map((item) => item.product.id) } },
+    select: { id: true, stockQty: true, minStock: true },
+  })
+
+  await Promise.all(
+    updatedProducts.map((product) =>
+      tx.product.update({
+        where: { id: product.id },
+        data: { status: computeProductStatus(product.stockQty, product.minStock) },
+      }),
+    ),
+  )
+}
+
+function normalizePaymentMethod(method: string) {
+  return method.trim().toUpperCase()
+}
+
+function formatCurrency(value: number) {
+  return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value)
+}
+
+function paymentMethodLabel(method: string) {
+  const normalized = normalizePaymentMethod(method)
+  const labels: Record<string, string> = {
+    PIX: 'PIX',
+    DINHEIRO: 'Dinheiro',
+    CASH: 'Dinheiro',
+    CARTAO_CREDITO: 'Cartão de crédito',
+    CREDIT_CARD: 'Cartão de crédito',
+    CARTAO_DEBITO: 'Cartão de débito',
+    DEBIT_CARD: 'Cartão de débito',
+  }
+
+  return labels[normalized] ?? method.trim()
+}
+
+function formatPaymentBreakdown(breakdown: Array<{ method: string; amount: number }>) {
+  return breakdown.map((item) => `${paymentMethodLabel(item.method)} ${formatCurrency(item.amount)}`).join(' + ')
 }
 
 export async function processSaleWithNfe(input: ProcessSaleInput): Promise<ProcessSaleResult> {
@@ -116,22 +184,51 @@ export async function processSaleWithNfe(input: ProcessSaleInput): Promise<Proce
 
     if (normalizedPaymentMethod === 'DINHEIRO' && normalizedAmountReceived === null) {
       throw new NfeIntegrationError('Informe o valor recebido para pagamentos em dinheiro.', { code: 'SALE_AMOUNT_REQUIRED' })
-    }
+          const normalizedBreakdown = (input.paymentBreakdown ?? [])
+            .map((item) => ({
+              method: item.method?.trim() || '',
+              amount: Number.isFinite(item.amount) ? Math.max(0, Number(item.amount)) : 0,
+            }))
+            .filter((item) => item.method.length > 0 && item.amount > 0)
 
-    if (normalizedPaymentMethod === 'DINHEIRO' && normalizedAmountReceived !== null && normalizedAmountReceived < total) {
-      throw new NfeIntegrationError('O valor recebido é menor que o total da venda.', { code: 'SALE_AMOUNT_INSUFFICIENT' })
-    }
+          const hasPaymentBreakdown = normalizedBreakdown.length > 0
+          const normalizedPaymentMethod = hasPaymentBreakdown
+            ? formatPaymentBreakdown(normalizedBreakdown)
+            : input.paymentMethod?.trim() || null
 
-    const change = normalizedPaymentMethod === 'DINHEIRO' && normalizedAmountReceived !== null
-      ? Number((normalizedAmountReceived - total).toFixed(2))
-      : 0
+          const totalPaid = hasPaymentBreakdown
+            ? Number(normalizedBreakdown.reduce((acc, item) => acc + item.amount, 0).toFixed(2))
+            : null
 
-    if (!nfeEnabled) {
-      const manualSale = await prisma.$transaction(async (tx) => {
-        const sale = await tx.sale.create({
-          data: {
-            code: saleCode,
-            subtotal,
+          const normalizedAmountReceived = hasPaymentBreakdown
+            ? totalPaid
+            : normalizedPaymentMethod === 'DINHEIRO' && Number.isFinite(input.amountReceived)
+              ? Math.max(0, Number(input.amountReceived))
+              : null
+
+          if (hasPaymentBreakdown) {
+            if (totalPaid === null || totalPaid < total) {
+              throw new NfeIntegrationError('A soma dos pagamentos é menor que o total da venda.', { code: 'SALE_AMOUNT_INSUFFICIENT' })
+            }
+
+            if (totalPaid > total) {
+              throw new NfeIntegrationError('A soma dos pagamentos é maior que o total da venda.', { code: 'SALE_AMOUNT_EXCESS' })
+            }
+          } else {
+            if (normalizedPaymentMethod === 'DINHEIRO' && normalizedAmountReceived === null) {
+              throw new NfeIntegrationError('Informe o valor recebido para pagamentos em dinheiro.', { code: 'SALE_AMOUNT_REQUIRED' })
+            }
+
+            if (normalizedPaymentMethod === 'DINHEIRO' && normalizedAmountReceived !== null && normalizedAmountReceived < total) {
+              throw new NfeIntegrationError('O valor recebido é menor que o total da venda.', { code: 'SALE_AMOUNT_INSUFFICIENT' })
+            }
+          }
+
+          const change = hasPaymentBreakdown
+            ? 0
+            : normalizedPaymentMethod === 'DINHEIRO' && normalizedAmountReceived !== null
+              ? Number((normalizedAmountReceived - total).toFixed(2))
+              : 0
             discount: boundedDiscount,
             total,
             paymentMethod: normalizedPaymentMethod,
@@ -156,42 +253,7 @@ export async function processSaleWithNfe(input: ProcessSaleInput): Promise<Proce
           })),
         })
 
-        // Update all product stock quantities in batch
-        for (const item of resolvedItems) {
-          const updated = await tx.product.updateMany({
-            where: {
-              id: item.product.id,
-              companyId,
-              stockQty: { gte: item.quantity },
-            },
-            data: {
-              stockQty: { decrement: item.quantity },
-            },
-          })
-
-          if (updated.count !== 1) {
-            throw new NfeIntegrationError('Estoque alterado durante a venda. Tente novamente.', { code: 'STOCK_CHANGED' })
-          }
-        }
-
-        // Fetch all updated products to compute their new status
-        const updatedProducts = await tx.product.findMany({
-          where: { id: { in: resolvedItems.map((item) => item.product.id) } },
-          select: { id: true, stockQty: true, minStock: true },
-        })
-
-        const statusUpdates = updatedProducts.map((product) => ({
-          id: product.id,
-          status: computeProductStatus(product.stockQty, product.minStock),
-        }))
-
-        // Update all product statuses in batch
-        for (const update of statusUpdates) {
-          await tx.product.update({
-            where: { id: update.id },
-            data: { status: update.status },
-          })
-        }
+        await applyInventoryChanges(tx, companyId, resolvedItems, 'Estoque alterado durante a venda. Tente novamente.')
 
         // Create all movements in a single batch operation
         await tx.movement.createMany({
@@ -317,42 +379,7 @@ export async function processSaleWithNfe(input: ProcessSaleInput): Promise<Proce
     }
 
     await prisma.$transaction(async (tx) => {
-      // Update all product stock quantities in batch
-      for (const item of resolvedItems) {
-        const updated = await tx.product.updateMany({
-          where: {
-            id: item.product.id,
-            companyId,
-            stockQty: { gte: item.quantity },
-          },
-          data: {
-            stockQty: { decrement: item.quantity },
-          },
-        })
-
-        if (updated.count !== 1) {
-          throw new NfeIntegrationError('Estoque alterado durante a emissão. Tente novamente.', { code: 'STOCK_CHANGED' })
-        }
-      }
-
-      // Fetch all updated products to compute their new status
-      const updatedProducts = await tx.product.findMany({
-        where: { id: { in: resolvedItems.map((item) => item.product.id) } },
-        select: { id: true, stockQty: true, minStock: true },
-      })
-
-      const statusUpdates = updatedProducts.map((product) => ({
-        id: product.id,
-        status: computeProductStatus(product.stockQty, product.minStock),
-      }))
-
-      // Update all product statuses in batch
-      for (const update of statusUpdates) {
-        await tx.product.update({
-          where: { id: update.id },
-          data: { status: update.status },
-        })
-      }
+      await applyInventoryChanges(tx, companyId, resolvedItems, 'Estoque alterado durante a emissão. Tente novamente.')
 
       // Create all movements in a single batch operation
       await tx.movement.createMany({

@@ -10,6 +10,7 @@ export async function POST(request: Request) {
     const body = (await request.json()) as {
       items?: Array<{ productId: string; quantity: number }>
       paymentMethod?: string
+      paymentBreakdown?: Array<{ method: string; amount: number }>
       discount?: number
       amountReceived?: number
       notes?: string
@@ -19,6 +20,7 @@ export async function POST(request: Request) {
     const result = await processSaleWithNfe({
       items: body.items ?? [],
       paymentMethod: body.paymentMethod,
+      paymentBreakdown: body.paymentBreakdown,
       discount: body.discount,
       amountReceived: body.amountReceived,
       notes: body.notes,

@@ -43,7 +43,31 @@ type CartItem = {
   quantity: number
 }
 
+type PaymentMode = 'UNICO' | 'MISTO'
+
+type SplitPayment = {
+  method: string
+  amount: string
+}
+
 const DISCOUNT_PERCENT_PRESETS = ['0', '5', '10', '15', '20'] as const
+const PAYMENT_METHOD_LABELS: Record<string, string> = {
+  DINHEIRO: 'Dinheiro',
+  CARTAO_CREDITO: 'Cartão de crédito',
+  CARTAO_DEBITO: 'Cartão de débito',
+  PIX: 'PIX',
+}
+
+const PAYMENT_METHOD_OPTIONS = [
+  { value: 'DINHEIRO', label: 'Dinheiro' },
+  { value: 'CARTAO_CREDITO', label: 'Cartão de crédito' },
+  { value: 'CARTAO_DEBITO', label: 'Cartão de débito' },
+  { value: 'PIX', label: 'PIX' },
+]
+
+function paymentMethodLabel(method: string) {
+  return PAYMENT_METHOD_LABELS[method] ?? method
+}
 
 export function CaixaClient({ products, initialSales }: { products: Product[]; initialSales: Sale[] }) {
   const router = useRouter()
@@ -51,9 +75,14 @@ export function CaixaClient({ products, initialSales }: { products: Product[]; i
   const [code, setCode] = useState('')
   const [discountPercent, setDiscountPercent] = useState('0')
   const [discountPreset, setDiscountPreset] = useState<string>('0')
+  const [paymentMode, setPaymentMode] = useState<PaymentMode>('UNICO')
   const [paymentMethod, setPaymentMethod] = useState('DINHEIRO')
   const [amountReceived, setAmountReceived] = useState('')
   const [amountReceivedTouched, setAmountReceivedTouched] = useState(false)
+  const [splitPayments, setSplitPayments] = useState<SplitPayment[]>([
+    { method: 'CARTAO_CREDITO', amount: '' },
+    { method: 'DINHEIRO', amount: '' },
+  ])
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   const [scannerModeEnabled, setScannerModeEnabled] = useState(true)
@@ -62,6 +91,10 @@ export function CaixaClient({ products, initialSales }: { products: Product[]; i
   const [lastSaleId, setLastSaleId] = useState<string | null>(null)
   const [lastSaleCode, setLastSaleCode] = useState<string | null>(null)
   const scannerInputRef = useRef<HTMLInputElement | null>(null)
+  const paymentMethodSelectRef = useRef<HTMLSelectElement | null>(null)
+  const amountReceivedRef = useRef<HTMLInputElement | null>(null)
+  const discountInputRef = useRef<HTMLInputElement | null>(null)
+  const firstSplitAmountRef = useRef<HTMLInputElement | null>(null)
   const scannerBufferRef = useRef('')
   const lastKeyAtRef = useRef(0)
 
@@ -72,7 +105,16 @@ export function CaixaClient({ products, initialSales }: { products: Product[]; i
   const parsedAmountReceived = Math.max(0, Number(amountReceived) || 0)
   const isCashPayment = paymentMethod === 'DINHEIRO'
   const change = isCashPayment ? Number(Math.max(0, parsedAmountReceived - total).toFixed(2)) : 0
-  const paymentMissing = isCashPayment && total > 0 && parsedAmountReceived < total
+  const splitPaymentValues = useMemo(
+    () => splitPayments.map((item) => ({ ...item, amountValue: Math.max(0, Number(item.amount) || 0) })),
+    [splitPayments],
+  )
+  const splitPaymentTotal = Number(splitPaymentValues.reduce((acc, item) => acc + item.amountValue, 0).toFixed(2))
+  const splitPaymentDifference = Number((splitPaymentTotal - total).toFixed(2))
+  const splitPaymentRowsFilled = splitPaymentValues.every((item) => item.amountValue > 0)
+  const splitPaymentMethodsValid = new Set(splitPaymentValues.map((item) => item.method)).size === splitPaymentValues.length
+  const splitPaymentMissing = paymentMode === 'MISTO' && (!splitPaymentRowsFilled || !splitPaymentMethodsValid || splitPaymentDifference !== 0)
+  const paymentMissing = paymentMode === 'UNICO' && isCashPayment && total > 0 && parsedAmountReceived < total
   const recentSales = useMemo(
     () => (showOnlyDiscountedSales ? initialSales.filter((sale) => sale.discount > 0) : initialSales),
     [initialSales, showOnlyDiscountedSales],
@@ -112,6 +154,34 @@ export function CaixaClient({ products, initialSales }: { products: Product[]; i
 
     setAmountReceivedTouched(false)
     setAmountReceived(total.toFixed(2))
+  }
+
+  const handlePaymentModeChange = (value: PaymentMode) => {
+    setPaymentMode(value)
+
+    if (value === 'MISTO') {
+      const secondaryMethod = paymentMethod === 'DINHEIRO' ? 'CARTAO_CREDITO' : 'DINHEIRO'
+      setSplitPayments([
+        { method: paymentMethod, amount: total > 0 ? total.toFixed(2) : '' },
+        { method: secondaryMethod, amount: '' },
+      ])
+      setAmountReceived('')
+      setAmountReceivedTouched(false)
+      setError('')
+      return
+    }
+
+    setSplitPayments([
+      { method: 'CARTAO_CREDITO', amount: '' },
+      { method: 'DINHEIRO', amount: '' },
+    ])
+    setAmountReceivedTouched(false)
+    setAmountReceived(paymentMethod === 'DINHEIRO' ? total.toFixed(2) : '')
+    setError('')
+  }
+
+  const handleSplitPaymentChange = (index: number, field: keyof SplitPayment, value: string) => {
+    setSplitPayments((current) => current.map((item, currentIndex) => (currentIndex === index ? { ...item, [field]: value } : item)))
   }
 
   useEffect(() => {
@@ -196,6 +266,46 @@ export function CaixaClient({ products, initialSales }: { products: Product[]; i
       const isScannerInputFocused = activeElement === scannerInputRef.current
       const shouldCapture = !isEditableElement(activeElement) || isScannerInputFocused
 
+      if (event.ctrlKey && event.key === 'Enter') {
+        event.preventDefault()
+        finalizeSale()
+        return
+      }
+
+      if (event.key === 'F2') {
+        event.preventDefault()
+        scannerInputRef.current?.focus()
+        scannerInputRef.current?.select()
+        return
+      }
+
+      if (event.key === 'F4') {
+        event.preventDefault()
+        setScannerModeEnabled((current) => !current)
+        return
+      }
+
+      if (event.key === 'F6') {
+        event.preventDefault()
+        if (paymentMode === 'MISTO') {
+          firstSplitAmountRef.current?.focus()
+          firstSplitAmountRef.current?.select()
+        } else if (paymentMethod === 'DINHEIRO') {
+          amountReceivedRef.current?.focus()
+          amountReceivedRef.current?.select()
+        } else {
+          paymentMethodSelectRef.current?.focus()
+        }
+        return
+      }
+
+      if (event.key === 'F7') {
+        event.preventDefault()
+        discountInputRef.current?.focus()
+        discountInputRef.current?.select()
+        return
+      }
+
       if (!shouldCapture || event.ctrlKey || event.metaKey || event.altKey) return
 
       if (event.key === 'Enter') {
@@ -228,7 +338,7 @@ export function CaixaClient({ products, initialSales }: { products: Product[]; i
     return () => {
       window.removeEventListener('keydown', handleGlobalScannerInput)
     }
-  }, [readCodeAndAddToCart, scannerModeEnabled])
+  }, [finalizeSale, paymentMethod, paymentMode, readCodeAndAddToCart, scannerModeEnabled])
 
   const updateQuantity = (productId: string, quantity: number) => {
     setCart((current) => {
@@ -253,13 +363,23 @@ export function CaixaClient({ products, initialSales }: { products: Product[]; i
       return
     }
 
+    if (paymentMode === 'MISTO' && splitPaymentMissing) {
+      setError('Preencha os dois meios de pagamento para fechar o valor total.')
+      return
+    }
+
     startTransition(async () => {
       try {
         const result = await completeSale({
           items: cart.map((item) => ({ productId: item.productId, quantity: item.quantity })),
-          paymentMethod,
+          paymentMethod: paymentMode === 'UNICO' ? paymentMethod : undefined,
+          paymentBreakdown: paymentMode === 'MISTO'
+            ? splitPaymentValues
+                .filter((item) => item.amountValue > 0)
+                .map((item) => ({ method: item.method, amount: item.amountValue }))
+            : undefined,
           discount: boundedDiscount,
-          amountReceived: isCashPayment ? parsedAmountReceived : undefined,
+          amountReceived: paymentMode === 'UNICO' && isCashPayment ? parsedAmountReceived : undefined,
         })
         const changeMessage = result.change > 0 ? ` Troco: ${formatCurrency(result.change)}.` : ''
         setSuccess(`Venda ${result.code} finalizada com sucesso.${changeMessage}`)
@@ -270,6 +390,11 @@ export function CaixaClient({ products, initialSales }: { products: Product[]; i
         setDiscountPreset('0')
         setAmountReceived('')
         setAmountReceivedTouched(false)
+        setPaymentMode('UNICO')
+        setSplitPayments([
+          { method: 'CARTAO_CREDITO', amount: '' },
+          { method: 'DINHEIRO', amount: '' },
+        ])
         router.refresh()
       } catch (currentError: any) {
         setError(currentError?.message || 'Não foi possível finalizar a venda.')
@@ -318,6 +443,13 @@ export function CaixaClient({ products, initialSales }: { products: Product[]; i
           </div>
         </div>
         <p className="text-muted-foreground mt-1">Registre vendas, aplique desconto e atualize o estoque automaticamente.</p>
+        <div className="mt-3 flex flex-wrap gap-2 text-[11px] text-muted-foreground">
+          <span className="rounded-full border border-border bg-muted/30 px-2.5 py-1">F2: foco no SKU</span>
+          <span className="rounded-full border border-border bg-muted/30 px-2.5 py-1">F4: alternar scanner</span>
+          <span className="rounded-full border border-border bg-muted/30 px-2.5 py-1">F6: pagamento</span>
+          <span className="rounded-full border border-border bg-muted/30 px-2.5 py-1">F7: desconto</span>
+          <span className="rounded-full border border-border bg-muted/30 px-2.5 py-1">Ctrl+Enter: finalizar</span>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
@@ -345,16 +477,117 @@ export function CaixaClient({ products, initialSales }: { products: Product[]; i
           </form>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-5">
-            <select
-              value={paymentMethod}
-              onChange={e => handlePaymentMethodChange(e.target.value)}
-              className="px-4 py-2.5 bg-background border border-border rounded-lg text-sm outline-none focus:border-primary/60 focus:ring-2 focus:ring-primary/20"
-            >
-              <option value="DINHEIRO">Dinheiro</option>
-              <option value="CARTAO_CREDITO">Cartão de crédito</option>
-              <option value="CARTAO_DEBITO">Cartão de débito</option>
-              <option value="PIX">PIX</option>
-            </select>
+            <div className="space-y-3">
+              <select
+                value={paymentMode}
+                onChange={e => handlePaymentModeChange(e.target.value as PaymentMode)}
+                className="px-4 py-2.5 bg-background border border-border rounded-lg text-sm outline-none focus:border-primary/60 focus:ring-2 focus:ring-primary/20"
+              >
+                <option value="UNICO">Pagamento único</option>
+                <option value="MISTO">Dois meios de pagamento</option>
+              </select>
+
+              {paymentMode === 'UNICO' ? (
+                <div className="space-y-3">
+                  <select
+                    ref={paymentMethodSelectRef}
+                    value={paymentMethod}
+                    onChange={e => handlePaymentMethodChange(e.target.value)}
+                    className="w-full px-4 py-2.5 bg-background border border-border rounded-lg text-sm outline-none focus:border-primary/60 focus:ring-2 focus:ring-primary/20"
+                  >
+                    {PAYMENT_METHOD_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>{option.label}</option>
+                    ))}
+                  </select>
+
+                  {isCashPayment ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <div>
+                        <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                          Valor recebido
+                        </label>
+                        <input
+                          ref={amountReceivedRef}
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={amountReceived}
+                          onChange={e => {
+                            setAmountReceivedTouched(true)
+                            setAmountReceived(e.target.value)
+                          }}
+                          placeholder="0,00"
+                          className="w-full px-4 py-2.5 bg-background border border-border rounded-lg text-sm outline-none focus:border-primary/60 focus:ring-2 focus:ring-primary/20"
+                        />
+                      </div>
+                      <div className="rounded-lg border border-border bg-muted/20 px-4 py-3">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Troco</p>
+                        <p className="mt-1 text-lg font-bold">{formatCurrency(change)}</p>
+                        {paymentMissing ? (
+                          <p className="mt-1 text-xs text-amber-600">Informe um valor igual ou maior que o total para calcular o troco.</p>
+                        ) : null}
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+              ) : (
+                <div className="rounded-lg border border-border bg-muted/20 p-3 space-y-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-medium">Pagamento dividido</p>
+                      <p className="text-xs text-muted-foreground">Use dois meios e feche exatamente o valor total.</p>
+                    </div>
+                    <span className="text-xs font-semibold text-muted-foreground">Total: {formatCurrency(splitPaymentTotal)}</span>
+                  </div>
+
+                  <div className="grid gap-3">
+                    {splitPayments.map((item, index) => (
+                      <div key={index} className="grid grid-cols-1 md:grid-cols-[1fr_160px] gap-3">
+                        <select
+                          value={item.method}
+                          onChange={e => handleSplitPaymentChange(index, 'method', e.target.value)}
+                          className="px-4 py-2.5 bg-background border border-border rounded-lg text-sm outline-none focus:border-primary/60 focus:ring-2 focus:ring-primary/20"
+                        >
+                          {PAYMENT_METHOD_OPTIONS.map((option) => (
+                            <option key={option.value} value={option.value}>{option.label}</option>
+                          ))}
+                        </select>
+                        <input
+                          ref={index === 0 ? firstSplitAmountRef : undefined}
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={item.amount}
+                          onChange={e => handleSplitPaymentChange(index, 'amount', e.target.value)}
+                          placeholder="0,00"
+                          className="px-4 py-2.5 bg-background border border-border rounded-lg text-sm outline-none focus:border-primary/60 focus:ring-2 focus:ring-primary/20"
+                        />
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="rounded-lg border border-border bg-background px-4 py-3 text-sm">
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-muted-foreground">Soma dos pagamentos</span>
+                      <span className="font-semibold">{formatCurrency(splitPaymentTotal)}</span>
+                    </div>
+                    {splitPaymentDifference !== 0 ? (
+                      <p className="mt-1 text-xs text-amber-600">
+                        A soma precisa fechar {formatCurrency(total)} para finalizar.
+                      </p>
+                    ) : splitPaymentTotal > 0 ? (
+                      <p className="mt-1 text-xs text-emerald-600">
+                        Pagamento fechado com {splitPaymentValues.map((item) => `${paymentMethodLabel(item.method)} ${formatCurrency(item.amountValue)}`).join(' + ')}.
+                      </p>
+                    ) : null}
+                    {!splitPaymentMethodsValid ? (
+                      <p className="mt-1 text-xs text-amber-600">Escolha meios diferentes para cada parcela.</p>
+                    ) : null}
+                  </div>
+                </div>
+              )}
+            </div>
+
             <div className="grid grid-cols-2 gap-2">
               <select
                 value={discountPreset}
@@ -369,6 +602,7 @@ export function CaixaClient({ products, initialSales }: { products: Product[]; i
                 <option value="custom">Personalizado</option>
               </select>
               <input
+                ref={discountInputRef}
                 type="number"
                 min="0"
                 max="100"
@@ -380,35 +614,6 @@ export function CaixaClient({ products, initialSales }: { products: Product[]; i
               />
             </div>
           </div>
-
-          {isCashPayment ? (
-            <div className="mb-5 grid grid-cols-1 md:grid-cols-2 gap-3">
-              <div>
-                <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  Valor recebido
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={amountReceived}
-                  onChange={e => {
-                    setAmountReceivedTouched(true)
-                    setAmountReceived(e.target.value)
-                  }}
-                  placeholder="0,00"
-                  className="w-full px-4 py-2.5 bg-background border border-border rounded-lg text-sm outline-none focus:border-primary/60 focus:ring-2 focus:ring-primary/20"
-                />
-              </div>
-              <div className="rounded-lg border border-border bg-muted/20 px-4 py-3">
-                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Troco</p>
-                <p className="mt-1 text-lg font-bold">{formatCurrency(change)}</p>
-                {paymentMissing ? (
-                  <p className="mt-1 text-xs text-amber-600">Informe um valor igual ou maior que o total para calcular o troco.</p>
-                ) : null}
-              </div>
-            </div>
-          ) : null}
 
           {error && <p className="text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded-lg px-4 py-3 mb-4">{error}</p>}
           {success && <p className="text-sm text-emerald-600 bg-emerald-500/10 border border-emerald-500/20 rounded-lg px-4 py-3 mb-4">{success}</p>}

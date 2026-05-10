@@ -867,6 +867,10 @@ function resolveProductStatus(stockQty: number, minStock: number) {
   return 'Normal'
 }
 
+function normalizeSku(sku: string) {
+  return sku.trim()
+}
+
 export async function createProduct(data: {
   name: string
   sku: string
@@ -883,6 +887,16 @@ export async function createProduct(data: {
 }) {
   const user = await getAuthenticatedUser()
   const companyId = await getCompanyId()
+  const sku = normalizeSku(data.sku)
+
+  const existingProduct = await prisma.product.findFirst({
+    where: { companyId, sku },
+    select: { id: true },
+  })
+
+  if (existingProduct) {
+    throw new Error('Já existe um produto com este código. Use um código único.')
+  }
 
   // Calcular status automático
   const status = resolveProductStatus(data.stockQty, data.minStock)
@@ -890,6 +904,7 @@ export async function createProduct(data: {
   await prisma.product.create({
     data: {
       ...data,
+      sku,
       ncm: data.ncm?.trim() || null,
       cest: data.cest?.trim() || null,
       cfop: data.cfop?.trim() || null,
@@ -934,11 +949,28 @@ export async function updateProduct(id: string, data: {
   const stockQty = data.stockQty ?? product.stockQty
   const minStock = data.minStock ?? product.minStock
   const status = resolveProductStatus(stockQty, minStock)
+  const sku = data.sku === undefined ? undefined : normalizeSku(data.sku)
+
+  if (sku) {
+    const existingProduct = await prisma.product.findFirst({
+      where: {
+        companyId,
+        sku,
+        id: { not: id },
+      },
+      select: { id: true },
+    })
+
+    if (existingProduct) {
+      throw new Error('Já existe um produto com este código. Use um código único.')
+    }
+  }
 
   await prisma.product.update({
     where: { id },
     data: {
       ...data,
+      sku,
       ncm: data.ncm === undefined ? undefined : data.ncm?.trim() || null,
       cest: data.cest === undefined ? undefined : data.cest?.trim() || null,
       cfop: data.cfop === undefined ? undefined : data.cfop?.trim() || null,
@@ -1436,6 +1468,7 @@ export async function findProductByCode(code: string) {
 export async function completeSale(data: {
   items: Array<{ productId: string; quantity: number }>
   paymentMethod?: string
+  paymentBreakdown?: Array<{ method: string; amount: number }>
   discount?: number
   amountReceived?: number
   notes?: string
@@ -1446,6 +1479,7 @@ export async function completeSale(data: {
   const processed = await processSaleWithNfe({
     items: data.items,
     paymentMethod: data.paymentMethod,
+    paymentBreakdown: data.paymentBreakdown,
     discount: data.discount,
     amountReceived: data.amountReceived,
     notes: data.notes,

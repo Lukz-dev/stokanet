@@ -895,7 +895,7 @@ export async function createProduct(data: {
   })
 
   if (existingProduct) {
-    throw new Error('Já existe um produto com este código. Use um código único.')
+    throw new Error(`Não foi possível salvar: o código "${sku}" já está cadastrado em outro produto. Informe um código diferente.`)
   }
 
   // Calcular status automático
@@ -962,7 +962,7 @@ export async function updateProduct(id: string, data: {
     })
 
     if (existingProduct) {
-      throw new Error('Já existe um produto com este código. Use um código único.')
+      throw new Error(`Não foi possível salvar: o código "${sku}" já está cadastrado em outro produto. Informe um código diferente.`)
     }
   }
 

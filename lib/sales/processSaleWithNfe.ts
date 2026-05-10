@@ -178,57 +178,49 @@ export async function processSaleWithNfe(input: ProcessSaleInput): Promise<Proce
     const total = Math.max(0, subtotal - boundedDiscount)
     const saleCode = `VD-${Date.now().toString().slice(-8)}`
     const normalizedPaymentMethod = input.paymentMethod?.trim() || null
-    const normalizedAmountReceived = normalizedPaymentMethod === 'DINHEIRO' && Number.isFinite(input.amountReceived)
-      ? Math.max(0, Number(input.amountReceived))
+    const normalizedBreakdown = (input.paymentBreakdown ?? [])
+      .map((item) => ({
+        method: item.method?.trim() || '',
+        amount: Number.isFinite(item.amount) ? Math.max(0, Number(item.amount)) : 0,
+      }))
+      .filter((item) => item.method.length > 0 && item.amount > 0)
+
+    const hasPaymentBreakdown = normalizedBreakdown.length > 0
+    const normalizedPaymentLabel = hasPaymentBreakdown
+      ? formatPaymentBreakdown(normalizedBreakdown)
+      : normalizedPaymentMethod
+    const totalPaid = hasPaymentBreakdown
+      ? Number(normalizedBreakdown.reduce((acc, item) => acc + item.amount, 0).toFixed(2))
       : null
+    const normalizedAmountReceived = hasPaymentBreakdown
+      ? totalPaid
+      : normalizedPaymentMethod === 'DINHEIRO' && Number.isFinite(input.amountReceived)
+        ? Math.max(0, Number(input.amountReceived))
+        : null
 
-    if (normalizedPaymentMethod === 'DINHEIRO' && normalizedAmountReceived === null) {
-      throw new NfeIntegrationError('Informe o valor recebido para pagamentos em dinheiro.', { code: 'SALE_AMOUNT_REQUIRED' })
-          const normalizedBreakdown = (input.paymentBreakdown ?? [])
-            .map((item) => ({
-              method: item.method?.trim() || '',
-              amount: Number.isFinite(item.amount) ? Math.max(0, Number(item.amount)) : 0,
-            }))
-            .filter((item) => item.method.length > 0 && item.amount > 0)
+    if (hasPaymentBreakdown) {
+      if (totalPaid === null || totalPaid < total) {
+        throw new NfeIntegrationError('A soma dos pagamentos é menor que o total da venda.', { code: 'SALE_AMOUNT_INSUFFICIENT' })
+      }
 
-          const hasPaymentBreakdown = normalizedBreakdown.length > 0
-          const normalizedPaymentMethod = hasPaymentBreakdown
-            ? formatPaymentBreakdown(normalizedBreakdown)
-            : input.paymentMethod?.trim() || null
+      if (totalPaid > total) {
+        throw new NfeIntegrationError('A soma dos pagamentos é maior que o total da venda.', { code: 'SALE_AMOUNT_EXCESS' })
+      }
+    } else {
+      if (normalizedPaymentMethod === 'DINHEIRO' && normalizedAmountReceived === null) {
+        throw new NfeIntegrationError('Informe o valor recebido para pagamentos em dinheiro.', { code: 'SALE_AMOUNT_REQUIRED' })
+      }
 
-          const totalPaid = hasPaymentBreakdown
-            ? Number(normalizedBreakdown.reduce((acc, item) => acc + item.amount, 0).toFixed(2))
-            : null
+      if (normalizedPaymentMethod === 'DINHEIRO' && normalizedAmountReceived !== null && normalizedAmountReceived < total) {
+        throw new NfeIntegrationError('O valor recebido é menor que o total da venda.', { code: 'SALE_AMOUNT_INSUFFICIENT' })
+      }
+    }
 
-          const normalizedAmountReceived = hasPaymentBreakdown
-            ? totalPaid
-            : normalizedPaymentMethod === 'DINHEIRO' && Number.isFinite(input.amountReceived)
-              ? Math.max(0, Number(input.amountReceived))
-              : null
-
-          if (hasPaymentBreakdown) {
-            if (totalPaid === null || totalPaid < total) {
-              throw new NfeIntegrationError('A soma dos pagamentos é menor que o total da venda.', { code: 'SALE_AMOUNT_INSUFFICIENT' })
-            }
-
-            if (totalPaid > total) {
-              throw new NfeIntegrationError('A soma dos pagamentos é maior que o total da venda.', { code: 'SALE_AMOUNT_EXCESS' })
-            }
-          } else {
-            if (normalizedPaymentMethod === 'DINHEIRO' && normalizedAmountReceived === null) {
-              throw new NfeIntegrationError('Informe o valor recebido para pagamentos em dinheiro.', { code: 'SALE_AMOUNT_REQUIRED' })
-            }
-
-            if (normalizedPaymentMethod === 'DINHEIRO' && normalizedAmountReceived !== null && normalizedAmountReceived < total) {
-              throw new NfeIntegrationError('O valor recebido é menor que o total da venda.', { code: 'SALE_AMOUNT_INSUFFICIENT' })
-            }
-          }
-
-          const change = hasPaymentBreakdown
-            ? 0
-            : normalizedPaymentMethod === 'DINHEIRO' && normalizedAmountReceived !== null
-              ? Number((normalizedAmountReceived - total).toFixed(2))
-              : 0
+    const change = hasPaymentBreakdown
+      ? 0
+      : normalizedPaymentMethod === 'DINHEIRO' && normalizedAmountReceived !== null
+        ? Number((normalizedAmountReceived - total).toFixed(2))
+        : 0
             discount: boundedDiscount,
             total,
             paymentMethod: normalizedPaymentMethod,
@@ -297,7 +289,7 @@ export async function processSaleWithNfe(input: ProcessSaleInput): Promise<Proce
           subtotal,
           discount: boundedDiscount,
           total,
-            paymentMethod: normalizedPaymentMethod,
+          paymentMethod: normalizedPaymentLabel,
           notes: input.notes?.trim() || null,
           companyId,
           customerId: input.customerId ?? null,

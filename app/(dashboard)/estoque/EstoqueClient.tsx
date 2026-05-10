@@ -74,6 +74,19 @@ export function EstoqueClient({ initialProducts, categories, defaultMinStock }: 
 
   const formatCurrency = (v: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v)
 
+  const duplicateEntries = useMemo(() => {
+    const map = new Map<string, number>()
+    initialProducts.forEach((p) => {
+      const sku = (p.sku ?? '').trim()
+      if (!sku) return
+      map.set(sku, (map.get(sku) ?? 0) + 1)
+    })
+    return Array.from(map.entries()).filter(([_, count]) => count > 1)
+  }, [initialProducts])
+
+  const duplicateSkus = duplicateEntries.map(([sku]) => sku)
+  const duplicateCount = duplicateEntries.length
+
   return (
     <>
       {showCreate && (
@@ -96,6 +109,12 @@ export function EstoqueClient({ initialProducts, categories, defaultMinStock }: 
       )}
 
       <div className="flex flex-col gap-6 h-full">
+        {duplicateCount > 0 ? (
+          <div className="mb-2 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3">
+            <p className="text-sm font-semibold text-amber-800">Atenção: foram encontrados {duplicateCount} código(s) duplicado(s) no estoque.</p>
+            <p className="text-sm text-amber-700 mt-1">SKUs duplicados: {duplicateSkus.slice(0, 5).join(', ')}{duplicateSkus.length > 5 ? ` e mais ${duplicateSkus.length - 5}...` : ''}</p>
+          </div>
+        ) : null}
         {/* Cabeçalho */}
         <div className="flex justify-between items-end gap-4 flex-wrap">
           <div>

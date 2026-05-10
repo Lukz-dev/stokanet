@@ -1,4 +1,5 @@
 import prisma from '@/lib/prisma'
+import { Prisma } from '@prisma/client'
 import { getActiveCompanyId } from '@/lib/access'
 import { issueNfeForSale } from '@/lib/nfe/issueFocusNfe'
 import type { NfeAuthorizationResult } from '@/lib/nfe/types'

@@ -221,9 +221,15 @@ export async function processSaleWithNfe(input: ProcessSaleInput): Promise<Proce
       : normalizedPaymentMethod === 'DINHEIRO' && normalizedAmountReceived !== null
         ? Number((normalizedAmountReceived - total).toFixed(2))
         : 0
+    if (!nfeEnabled) {
+      const manualSale = await prisma.$transaction(async (tx) => {
+        const sale = await tx.sale.create({
+          data: {
+            code: saleCode,
+            subtotal,
             discount: boundedDiscount,
             total,
-            paymentMethod: normalizedPaymentMethod,
+            paymentMethod: normalizedPaymentLabel,
             notes: input.notes?.trim() || null,
             companyId,
             customerId: input.customerId ?? null,

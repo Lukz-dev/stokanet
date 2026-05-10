@@ -80,6 +80,7 @@ export function EstoqueClient({ initialProducts, categories, defaultMinStock }: 
         <ProductModal
           categories={categories}
           defaultMinStock={defaultMinStock}
+          existingProducts={initialProducts.map((product) => ({ id: product.id, sku: product.sku }))}
           onClose={() => setShowCreate(false)}
           onSuccess={handleSuccess}
         />
@@ -88,6 +89,7 @@ export function EstoqueClient({ initialProducts, categories, defaultMinStock }: 
         <EditProductModal
           product={editingProduct}
           categories={categories}
+          existingProducts={initialProducts.map((product) => ({ id: product.id, sku: product.sku }))}
           onClose={() => setEditingProduct(null)}
           onSuccess={handleSuccess}
         />

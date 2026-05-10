@@ -12,11 +12,16 @@ interface Category {
 interface Props {
   categories: Category[]
   defaultMinStock: number
+  existingProducts: Array<{ id: string; sku: string }>
   onClose: () => void
   onSuccess: () => void
 }
 
-export function ProductModal({ categories, defaultMinStock, onClose, onSuccess }: Props) {
+function normalizeSku(sku: string) {
+  return sku.trim()
+}
+
+export function ProductModal({ categories, defaultMinStock, existingProducts, onClose, onSuccess }: Props) {
   const [isPending, startTransition] = useTransition()
   const [isCreatingCategory, startCategoryTransition] = useTransition()
   const [error, setError] = useState('')
@@ -42,6 +47,14 @@ export function ProductModal({ categories, defaultMinStock, onClose, onSuccess }
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
+    const normalizedSku = normalizeSku(form.sku)
+    const duplicateExists = existingProducts.some((product) => normalizeSku(product.sku) === normalizedSku)
+
+    if (duplicateExists) {
+      setError(`Não foi possível salvar: o código "${normalizedSku}" já está cadastrado em outro produto. Informe um código diferente.`)
+      return
+    }
+
     startTransition(async () => {
       try {
         await createProduct({
@@ -60,7 +73,12 @@ export function ProductModal({ categories, defaultMinStock, onClose, onSuccess }
         onSuccess()
         onClose()
       } catch (err: any) {
-        setError(err.message || 'Erro ao criar produto.')
+        const message = err?.message || ''
+        if (message.includes('An error occurred in the Server Components render')) {
+          setError(`Não foi possível salvar: o código "${normalizedSku}" já está cadastrado em outro produto. Informe um código diferente.`)
+          return
+        }
+        setError(message || 'Erro ao criar produto.')
       }
     })
   }

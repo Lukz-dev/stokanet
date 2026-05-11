@@ -104,9 +104,9 @@ export function CaixaClient({ products, initialSales }: { products: Product[]; i
   const parsedDiscountPercent = Math.min(100, Math.max(0, Number(discountPercent) || 0))
   const boundedDiscount = Number(((subtotal * parsedDiscountPercent) / 100).toFixed(2))
   const total = Math.max(0, subtotal - boundedDiscount)
+  const isCashPayment = paymentMethod === 'DINHEIRO'
   const effectiveAmountReceived = isCashPayment && !amountReceivedTouched ? total.toFixed(2) : amountReceived
   const parsedAmountReceived = Math.max(0, Number(effectiveAmountReceived) || 0)
-  const isCashPayment = paymentMethod === 'DINHEIRO'
   const change = isCashPayment ? Number(Math.max(0, parsedAmountReceived - total).toFixed(2)) : 0
   const splitPaymentValues = useMemo(
     () => splitPayments.map((item) => ({ ...item, amountValue: Math.max(0, Number(item.amount) || 0) })),

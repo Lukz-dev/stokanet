@@ -85,6 +85,8 @@ export function CaixaClient({ products, initialSales }: { products: Product[]; i
   ])
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
+  const [manualNameMode, setManualNameMode] = useState(false)
+  const [manualName, setManualName] = useState('')
   const [scannerModeEnabled, setScannerModeEnabled] = useState(true)
   const [cart, setCart] = useState<CartItem[]>([])
   const [showOnlyDiscountedSales, setShowOnlyDiscountedSales] = useState(false)
@@ -102,7 +104,8 @@ export function CaixaClient({ products, initialSales }: { products: Product[]; i
   const parsedDiscountPercent = Math.min(100, Math.max(0, Number(discountPercent) || 0))
   const boundedDiscount = Number(((subtotal * parsedDiscountPercent) / 100).toFixed(2))
   const total = Math.max(0, subtotal - boundedDiscount)
-  const parsedAmountReceived = Math.max(0, Number(amountReceived) || 0)
+  const effectiveAmountReceived = isCashPayment && !amountReceivedTouched ? total.toFixed(2) : amountReceived
+  const parsedAmountReceived = Math.max(0, Number(effectiveAmountReceived) || 0)
   const isCashPayment = paymentMethod === 'DINHEIRO'
   const change = isCashPayment ? Number(Math.max(0, parsedAmountReceived - total).toFixed(2)) : 0
   const splitPaymentValues = useMemo(
@@ -120,7 +123,10 @@ export function CaixaClient({ products, initialSales }: { products: Product[]; i
     [initialSales, showOnlyDiscountedSales],
   )
 
-  const formatCurrency = (value: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value)
+  const formatCurrency = useCallback(
+    (value: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value),
+    [],
+  )
 
   const normalizePercentInput = (value: string) => {
     const numeric = Number(value)
@@ -184,11 +190,6 @@ export function CaixaClient({ products, initialSales }: { products: Product[]; i
     setSplitPayments((current) => current.map((item, currentIndex) => (currentIndex === index ? { ...item, [field]: value } : item)))
   }
 
-  useEffect(() => {
-    if (!isCashPayment || amountReceivedTouched) return
-    setAmountReceived(total.toFixed(2))
-  }, [amountReceivedTouched, isCashPayment, total])
-
   const addProductToCart = useCallback((product: Product) => {
     if (product.stockQty <= 0) {
       setError('Este produto está sem estoque.')
@@ -229,8 +230,13 @@ export function CaixaClient({ products, initialSales }: { products: Product[]; i
         const product = await findProductByCode(value)
         addProductToCart(product as Product)
         setCode('')
+        setManualNameMode(false)
+        setManualName('')
       } catch (currentError: any) {
         setError(currentError?.message || 'Não foi possível ler o código.')
+        // Habilita busca manual por nome caso o produto não seja encontrado
+        setManualNameMode(true)
+        setManualName(value)
       }
     })
   }, [addProductToCart])
@@ -242,7 +248,7 @@ export function CaixaClient({ products, initialSales }: { products: Product[]; i
     readCodeAndAddToCart(code)
   }
 
-  const finalizeSale = () => {
+  const finalizeSale = useCallback(() => {
     setError('')
     setSuccess('')
 
@@ -288,12 +294,38 @@ export function CaixaClient({ products, initialSales }: { products: Product[]; i
         setError(currentError?.message || 'Não foi possível finalizar a venda.')
       }
     })
-  }
+  }, [
+    boundedDiscount,
+    cart,
+    formatCurrency,
+    isCashPayment,
+    parsedAmountReceived,
+    paymentMethod,
+    paymentMode,
+    router,
+    splitPaymentMissing,
+    splitPaymentValues,
+    startTransition,
+  ])
 
   useEffect(() => {
     if (!scannerModeEnabled) return
     scannerInputRef.current?.focus()
   }, [scannerModeEnabled])
+
+  const manualSuggestions = useMemo(() => {
+    const q = manualName.trim().toLowerCase()
+    if (!q) return [] as Product[]
+    return products.filter((p) => p.name.toLowerCase().includes(q)).slice(0, 5)
+  }, [manualName, products])
+
+  const handleAddSuggestion = (product: Product) => {
+    addProductToCart(product)
+    setManualName('')
+    setManualNameMode(false)
+    setCode('')
+    setError('')
+  }
 
   useEffect(() => {
     if (!scannerModeEnabled) {
@@ -475,6 +507,58 @@ export function CaixaClient({ products, initialSales }: { products: Product[]; i
               {isPending ? 'Lendo...' : 'Adicionar'}
             </button>
           </form>
+
+          {manualNameMode ? (
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-muted-foreground">Produto não encontrado — buscar por nome</label>
+              <div className="mt-2 flex gap-2">
+                <input
+                  type="text"
+                  value={manualName}
+                  onChange={e => setManualName(e.target.value)}
+                  placeholder="Digite o nome do produto"
+                  className="w-full px-4 py-2.5 bg-background border border-border rounded-lg text-sm outline-none focus:border-primary/60 focus:ring-2 focus:ring-primary/20"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (manualSuggestions.length === 1) {
+                      handleAddSuggestion(manualSuggestions[0])
+                    }
+                  }}
+                  className="px-4 py-2.5 rounded-lg bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors"
+                >
+                  Usar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setManualNameMode(false); setManualName(''); setError('') }}
+                  className="px-4 py-2.5 rounded-lg border border-border text-sm hover:bg-muted"
+                >
+                  Cancelar
+                </button>
+              </div>
+
+              {manualSuggestions.length > 0 ? (
+                <ul className="mt-2 space-y-2 max-h-40 overflow-auto">
+                  {manualSuggestions.map((p) => (
+                    <li key={p.id}>
+                      <button
+                        type="button"
+                        onClick={() => handleAddSuggestion(p)}
+                        className="w-full text-left px-3 py-2 rounded-lg border border-border hover:bg-muted transition-colors"
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="font-medium">{p.name}</span>
+                          <span className="text-xs text-muted-foreground font-mono">{p.sku}</span>
+                        </div>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+            </div>
+          ) : null}
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-5">
             <div className="space-y-3">

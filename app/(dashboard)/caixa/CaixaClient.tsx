@@ -69,6 +69,37 @@ function paymentMethodLabel(method: string) {
   return PAYMENT_METHOD_LABELS[method] ?? method
 }
 
+function rankProductMatches(products: Product[], query: string) {
+  const normalizedQuery = query.trim().toLowerCase()
+  if (!normalizedQuery) return []
+
+  return products
+    .map((product) => {
+      const sku = product.sku.toLowerCase()
+      const name = product.name.toLowerCase()
+
+      const exactSku = sku === normalizedQuery
+      const exactName = name === normalizedQuery
+      const startsSku = sku.startsWith(normalizedQuery)
+      const startsName = name.startsWith(normalizedQuery)
+      const includesSku = sku.includes(normalizedQuery)
+      const includesName = name.includes(normalizedQuery)
+
+      let score = 99
+      if (exactSku) score = 0
+      else if (exactName) score = 1
+      else if (startsSku) score = 2
+      else if (startsName) score = 3
+      else if (includesSku) score = 4
+      else if (includesName) score = 5
+
+      return score === 99 ? null : { product, score, exactSku, exactName }
+    })
+    .filter((item): item is { product: Product; score: number; exactSku: boolean; exactName: boolean } => item !== null)
+    .sort((left, right) => left.score - right.score || left.product.name.localeCompare(right.product.name, 'pt-BR'))
+    .slice(0, 8)
+}
+
 export function CaixaClient({ products, initialSales }: { products: Product[]; initialSales: Sale[] }) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
@@ -85,8 +116,6 @@ export function CaixaClient({ products, initialSales }: { products: Product[]; i
   ])
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
-  const [manualNameMode, setManualNameMode] = useState(false)
-  const [manualName, setManualName] = useState('')
   const [scannerModeEnabled, setScannerModeEnabled] = useState(true)
   const [cart, setCart] = useState<CartItem[]>([])
   const [showOnlyDiscountedSales, setShowOnlyDiscountedSales] = useState(false)
@@ -118,6 +147,8 @@ export function CaixaClient({ products, initialSales }: { products: Product[]; i
   const splitPaymentMethodsValid = new Set(splitPaymentValues.map((item) => item.method)).size === splitPaymentValues.length
   const splitPaymentMissing = paymentMode === 'MISTO' && (!splitPaymentRowsFilled || !splitPaymentMethodsValid || splitPaymentDifference !== 0)
   const paymentMissing = paymentMode === 'UNICO' && isCashPayment && total > 0 && parsedAmountReceived < total
+  const searchResults = useMemo(() => rankProductMatches(products, code), [code, products])
+  const hasSearchResults = searchResults.length > 0
   const recentSales = useMemo(
     () => (showOnlyDiscountedSales ? initialSales.filter((sale) => sale.discount > 0) : initialSales),
     [initialSales, showOnlyDiscountedSales],
@@ -221,7 +252,7 @@ export function CaixaClient({ products, initialSales }: { products: Product[]; i
   const readCodeAndAddToCart = useCallback((rawCode: string) => {
     const value = rawCode.trim()
     if (!value) {
-      setError('Informe um código para leitura.')
+      setError('Digite um SKU ou nome para buscar.')
       return
     }
 
@@ -230,16 +261,28 @@ export function CaixaClient({ products, initialSales }: { products: Product[]; i
         const product = await findProductByCode(value)
         addProductToCart(product as Product)
         setCode('')
-        setManualNameMode(false)
-        setManualName('')
       } catch (currentError: any) {
-        setError(currentError?.message || 'Não foi possível ler o código.')
-        // Habilita busca manual por nome caso o produto não seja encontrado
-        setManualNameMode(true)
-        setManualName(value)
+        const localMatches = rankProductMatches(products, value)
+
+        if (localMatches.length === 0) {
+          setError(currentError?.message || `Nenhum produto encontrado para "${value}".`)
+          setSuccess('')
+          return
+        }
+
+        if (localMatches.length === 1 || localMatches[0].exactSku || localMatches[0].exactName) {
+          addProductToCart(localMatches[0].product)
+          setCode('')
+          setError('')
+          setSuccess('')
+          return
+        }
+
+        setError(`Encontramos ${localMatches.length} produtos para "${value}". Escolha um da lista abaixo.`)
+        setSuccess('')
       }
     })
-  }, [addProductToCart])
+  }, [addProductToCart, products])
 
   const handleReadCode = (event: React.FormEvent) => {
     event.preventDefault()
@@ -312,20 +355,6 @@ export function CaixaClient({ products, initialSales }: { products: Product[]; i
     if (!scannerModeEnabled) return
     scannerInputRef.current?.focus()
   }, [scannerModeEnabled])
-
-  const manualSuggestions = useMemo(() => {
-    const q = manualName.trim().toLowerCase()
-    if (!q) return [] as Product[]
-    return products.filter((p) => p.name.toLowerCase().includes(q)).slice(0, 5)
-  }, [manualName, products])
-
-  const handleAddSuggestion = (product: Product) => {
-    addProductToCart(product)
-    setManualName('')
-    setManualNameMode(false)
-    setCode('')
-    setError('')
-  }
 
   useEffect(() => {
     if (!scannerModeEnabled) {
@@ -494,7 +523,7 @@ export function CaixaClient({ products, initialSales }: { products: Product[]; i
                 type="text"
                 value={code}
                 onChange={e => setCode(e.target.value)}
-                placeholder="Leia ou digite o SKU do produto"
+                placeholder="Leia o SKU ou digite o nome do produto"
                 autoFocus
                 className="w-full pl-10 pr-4 py-2.5 bg-background border border-border rounded-lg text-sm font-mono outline-none focus:border-primary/60 focus:ring-2 focus:ring-primary/20"
               />
@@ -508,55 +537,42 @@ export function CaixaClient({ products, initialSales }: { products: Product[]; i
             </button>
           </form>
 
-          {manualNameMode ? (
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-muted-foreground">Produto não encontrado — buscar por nome</label>
-              <div className="mt-2 flex gap-2">
-                <input
-                  type="text"
-                  value={manualName}
-                  onChange={e => setManualName(e.target.value)}
-                  placeholder="Digite o nome do produto"
-                  className="w-full px-4 py-2.5 bg-background border border-border rounded-lg text-sm outline-none focus:border-primary/60 focus:ring-2 focus:ring-primary/20"
-                />
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (manualSuggestions.length === 1) {
-                      handleAddSuggestion(manualSuggestions[0])
-                    }
-                  }}
-                  className="px-4 py-2.5 rounded-lg bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors"
-                >
-                  Usar
-                </button>
-                <button
-                  type="button"
-                  onClick={() => { setManualNameMode(false); setManualName(''); setError('') }}
-                  className="px-4 py-2.5 rounded-lg border border-border text-sm hover:bg-muted"
-                >
-                  Cancelar
-                </button>
+          {code.trim() && hasSearchResults ? (
+            <div className="mb-4 rounded-lg border border-border bg-muted/20 p-3">
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <div>
+                  <p className="text-sm font-semibold">Resultados encontrados</p>
+                  <p className="text-xs text-muted-foreground">Selecione um produto para adicioná-lo ao carrinho.</p>
+                </div>
+                <span className="text-xs text-muted-foreground">{searchResults.length} opção(ões)</span>
               </div>
-
-              {manualSuggestions.length > 0 ? (
-                <ul className="mt-2 space-y-2 max-h-40 overflow-auto">
-                  {manualSuggestions.map((p) => (
-                    <li key={p.id}>
-                      <button
-                        type="button"
-                        onClick={() => handleAddSuggestion(p)}
-                        className="w-full text-left px-3 py-2 rounded-lg border border-border hover:bg-muted transition-colors"
-                      >
-                        <div className="flex items-center justify-between">
-                          <span className="font-medium">{p.name}</span>
-                          <span className="text-xs text-muted-foreground font-mono">{p.sku}</span>
-                        </div>
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              ) : null}
+              <div className="grid gap-2">
+                {searchResults.map(({ product }) => (
+                  <button
+                    key={product.id}
+                    type="button"
+                    onClick={() => {
+                      addProductToCart(product)
+                      setCode('')
+                      setError('')
+                      setSuccess('')
+                    }}
+                    className="rounded-lg border border-border bg-background px-3 py-2 text-left transition-colors hover:bg-muted"
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="font-medium">{product.name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {product.sku}
+                          {product.size ? ` • ${product.size}` : ''}
+                          {product.color ? ` • ${product.color}` : ''}
+                        </p>
+                      </div>
+                      <span className="text-xs font-semibold text-muted-foreground">{formatCurrency(product.price)}</span>
+                    </div>
+                  </button>
+                ))}
+              </div>
             </div>
           ) : null}
 

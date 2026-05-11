@@ -222,14 +222,17 @@ export function CaixaClient({ products, initialSales }: { products: Product[]; i
   }
 
   const addProductToCart = useCallback((product: Product) => {
+    let added = false
+
     if (product.stockQty <= 0) {
       setError('Este produto está sem estoque.')
-      return
+      return false
     }
 
     setCart((current) => {
       const existing = current.find((item) => item.productId === product.id)
       if (!existing) {
+        added = true
         return [...current, {
           productId: product.id,
           sku: product.sku,
@@ -245,13 +248,20 @@ export function CaixaClient({ products, initialSales }: { products: Product[]; i
         return current
       }
 
+      added = true
       return current.map((item) => item.productId === product.id ? { ...item, quantity: item.quantity + 1 } : item)
     })
+    return added
   }, [])
 
   const handleSelectSearchResult = useCallback((product: Product) => {
-    addProductToCart(product)
+    const added = addProductToCart(product)
     setCode('')
+    if (!added) {
+      setSuccess('')
+      return
+    }
+
     setError('')
     setSuccess(`Produto ${product.name} adicionado ao carrinho.`)
     scannerInputRef.current?.focus()
@@ -267,7 +277,10 @@ export function CaixaClient({ products, initialSales }: { products: Product[]; i
     startTransition(async () => {
       try {
         const product = await findProductByCode(value)
-        addProductToCart(product as Product)
+        const added = addProductToCart(product as Product)
+        if (!added) {
+          return
+        }
         setCode('')
       } catch (currentError: any) {
         const localMatches = rankProductMatches(products, value)
@@ -279,7 +292,11 @@ export function CaixaClient({ products, initialSales }: { products: Product[]; i
         }
 
         if (localMatches.length === 1 || localMatches[0].exactSku || localMatches[0].exactName) {
-          addProductToCart(localMatches[0].product)
+          const added = addProductToCart(localMatches[0].product)
+          if (!added) {
+            setSuccess('')
+            return
+          }
           setCode('')
           setError('')
           setSuccess('')

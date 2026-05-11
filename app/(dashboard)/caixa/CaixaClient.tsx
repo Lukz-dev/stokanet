@@ -249,6 +249,14 @@ export function CaixaClient({ products, initialSales }: { products: Product[]; i
     })
   }, [])
 
+  const handleSelectSearchResult = useCallback((product: Product) => {
+    addProductToCart(product)
+    setCode('')
+    setError('')
+    setSuccess(`Produto ${product.name} adicionado ao carrinho.`)
+    scannerInputRef.current?.focus()
+  }, [addProductToCart])
+
   const readCodeAndAddToCart = useCallback((rawCode: string) => {
     const value = rawCode.trim()
     if (!value) {
@@ -551,24 +559,24 @@ export function CaixaClient({ products, initialSales }: { products: Product[]; i
                   <button
                     key={product.id}
                     type="button"
-                    onClick={() => {
-                      addProductToCart(product)
-                      setCode('')
-                      setError('')
-                      setSuccess('')
-                    }}
-                    className="rounded-lg border border-border bg-background px-3 py-2 text-left transition-colors hover:bg-muted"
+                    onClick={() => handleSelectSearchResult(product)}
+                    className="rounded-lg border border-border bg-background px-3 py-2 text-left transition-colors hover:bg-muted focus:outline-none focus:ring-2 focus:ring-primary/20"
                   >
                     <div className="flex items-center justify-between gap-3">
-                      <div>
-                        <p className="font-medium">{product.name}</p>
+                      <div className="min-w-0">
+                        <p className="truncate font-medium">{product.name}</p>
                         <p className="text-xs text-muted-foreground">
                           {product.sku}
                           {product.size ? ` • ${product.size}` : ''}
                           {product.color ? ` • ${product.color}` : ''}
                         </p>
                       </div>
-                      <span className="text-xs font-semibold text-muted-foreground">{formatCurrency(product.price)}</span>
+                      <div className="shrink-0 text-right">
+                        <span className="block text-xs font-semibold text-muted-foreground">{formatCurrency(product.price)}</span>
+                        <span className="mt-1 inline-flex rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary">
+                          Adicionar
+                        </span>
+                      </div>
                     </div>
                   </button>
                 ))}

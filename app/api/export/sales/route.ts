@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server'
-import prisma from '@/lib/prisma'
-import { getActiveCompanyId } from '@/lib/access'
+import { getSales } from '@/lib/actions'
 
 const csvEscape = (value: string | number | null | undefined) => {
   const normalized = String(value ?? '')
@@ -8,13 +7,7 @@ const csvEscape = (value: string | number | null | undefined) => {
 }
 
 export async function GET() {
-  const companyId = await getActiveCompanyId()
-
-  const sales = await prisma.sale.findMany({
-    where: { companyId },
-    include: { items: true },
-    orderBy: { createdAt: 'desc' },
-  })
+  const sales = await getSales(1000)
 
   const headers = ['venda_codigo', 'criado_em', 'forma_pagamento', 'subtotal', 'desconto', 'total', 'produto', 'sku', 'quantidade', 'preco_unitario', 'custo_unitario', 'custo_total', 'lucro_bruto_item', 'total_item']
   const lines = [headers.map(csvEscape).join(',')]

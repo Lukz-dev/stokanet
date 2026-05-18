@@ -81,7 +81,7 @@ export function EstoqueClient({ initialProducts, categories, defaultMinStock }: 
       if (!sku) return
       map.set(sku, (map.get(sku) ?? 0) + 1)
     })
-    return Array.from(map.entries()).filter(([_, count]) => count > 1)
+    return Array.from(map.entries()).filter(([, count]) => count > 1)
   }, [initialProducts])
 
   const duplicateSkus = duplicateEntries.map(([sku]) => sku)

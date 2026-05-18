@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { createElement } from 'react'
 import { getDashboardStats } from '@/lib/actions'
 import { PackageSearch, TrendingUp, AlertTriangle, Package, ArrowUpRight, ArrowDownRight, BadgePercent } from "lucide-react"
 
@@ -6,9 +7,7 @@ function formatCurrency(value: number) {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value)
 }
 
-export default async function Dashboard() {
-  try {
-    const stats = await getDashboardStats()
+function DashboardContent({ stats }: { stats: Awaited<ReturnType<typeof getDashboardStats>> }) {
   const attentionItems = stats.lowStockProducts + stats.criticalProducts
   const stockHealth = stats.totalProducts === 0
     ? 100
@@ -49,8 +48,8 @@ export default async function Dashboard() {
     },
   ]
 
-    return (
-      <div className="flex flex-col gap-8">
+  return (
+    <div className="flex flex-col gap-8">
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Visão geral da operação</h1>
         <p className="text-muted-foreground mt-1 text-lg">Acompanhe produtos, reposição e giro do seu mix em tempo real. Arquivados não entram no estoque ativo.</p>
@@ -97,7 +96,7 @@ export default async function Dashboard() {
         })}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 bg-card border border-border rounded-xl shadow-sm p-6 min-h-[340px] flex flex-col hover:border-primary/30 transition-colors">
           <div className="flex items-start justify-between gap-4 mb-6">
             <div>
@@ -163,9 +162,15 @@ export default async function Dashboard() {
             </ul>
           )}
         </div>
-      </div>
-      </div>
-    )
+    </div>
+    </div>
+  )
+}
+
+export default async function Dashboard() {
+  try {
+    const stats = await getDashboardStats()
+    return createElement(DashboardContent, { stats })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Não foi possível carregar os dados da conta.'
 

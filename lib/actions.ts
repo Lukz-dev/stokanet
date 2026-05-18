@@ -7,6 +7,7 @@ import bcrypt from 'bcryptjs'
 import { AppRole, getActiveCompanyId, getActiveUser } from '@/lib/access'
 import { THEME_PREFERENCES, type ThemePreference } from '@/lib/theme'
 import { processSaleWithNfe } from '@/lib/sales/processSaleWithNfe'
+import { getLatestProductCosts } from '@/lib/product-costs'
 
 async function getCompanyId(): Promise<string> {
   return getActiveCompanyId()
@@ -801,6 +802,7 @@ export async function getDashboardStats() {
 
   const criticalList = await prisma.product.findMany({
     where: { ...activeProductWhere, OR: [{ status: 'Crítico' }, { status: 'Esgotado' }, { status: 'Baixo' }] },
+    select: { id: true, name: true, sku: true, size: true, color: true, stockQty: true, status: true },
     orderBy: { stockQty: 'asc' },
     take: 6,
   })
@@ -1654,12 +1656,13 @@ export async function cancelSale(input: { saleId: string; reason?: string }) {
 export async function getSales(limit = 50) {
   const companyId = await getCompanyId()
 
-  return prisma.sale.findMany({
+  const sales = await prisma.sale.findMany({
     where: { companyId },
     include: {
       items: {
         select: {
           id: true,
+          productId: true,
           productName: true,
           sku: true,
           quantity: true,
@@ -1671,6 +1674,17 @@ export async function getSales(limit = 50) {
     orderBy: { createdAt: 'desc' },
     take: Math.max(1, Math.min(limit, 200)),
   })
+
+  const productIds = [...new Set(sales.flatMap((sale) => sale.items.map((item) => item.productId)))]
+  const costs = await getLatestProductCosts(companyId, productIds)
+
+  return sales.map((sale) => ({
+    ...sale,
+    items: sale.items.map((item) => ({
+      ...item,
+      unitCost: costs.get(item.productId) ?? 0,
+    })),
+  }))
 }
 
 export async function createSupplier(data: {
@@ -1841,17 +1855,12 @@ export async function receivePurchaseOrder(id: string) {
     for (const item of order.items) {
       const product = await tx.product.findFirst({
         where: { id: item.productId, companyId },
-        select: { id: true, stockQty: true, minStock: true, costPrice: true },
+        select: { id: true, stockQty: true, minStock: true },
       })
 
       if (!product) continue
 
       const newStock = product.stockQty + item.quantity
-      const currentStockValue = product.stockQty * product.costPrice
-      const receivedStockValue = item.quantity * item.unitCost
-      const newCostPrice = newStock > 0
-        ? Number(((currentStockValue + receivedStockValue) / newStock).toFixed(2))
-        : Number(item.unitCost.toFixed(2))
       const status =
         newStock <= 0
           ? 'Esgotado'
@@ -1863,7 +1872,7 @@ export async function receivePurchaseOrder(id: string) {
 
       await tx.product.update({
         where: { id: product.id },
-        data: { stockQty: newStock, costPrice: newCostPrice, status },
+        data: { stockQty: newStock, status },
       })
 
       await tx.movement.create({
@@ -2314,8 +2323,8 @@ export async function getDashboardReport() {
         createdAt: true,
         items: {
           select: {
+            productId: true,
             quantity: true,
-            unitCost: true,
           },
         },
       },
@@ -2323,6 +2332,8 @@ export async function getDashboardReport() {
   ])
 
   const activeMonthSales = monthSales.filter((sale) => !sale.notes?.includes('[CANCELADA]'))
+  const monthProductIds = [...new Set(activeMonthSales.flatMap((sale) => sale.items.map((item) => item.productId)))]
+  const monthProductCosts = await getLatestProductCosts(companyId, monthProductIds)
   const salesMonth = Number(activeMonthSales.reduce((acc, sale) => acc + sale.total, 0).toFixed(2))
   const salesToday = Number(
     activeMonthSales
@@ -2332,7 +2343,7 @@ export async function getDashboardReport() {
   )
   const goodsCostMonth = Number(
     activeMonthSales
-      .reduce((acc, sale) => acc + sale.items.reduce((saleAcc, item) => saleAcc + item.quantity * item.unitCost, 0), 0)
+      .reduce((acc, sale) => acc + sale.items.reduce((saleAcc, item) => saleAcc + item.quantity * (monthProductCosts.get(item.productId) ?? 0), 0), 0)
       .toFixed(2),
   )
   const grossProfitMonth = Number((salesMonth - goodsCostMonth).toFixed(2))

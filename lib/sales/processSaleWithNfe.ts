@@ -4,6 +4,7 @@ import { getActiveCompanyId } from '@/lib/access'
 import { issueNfeForSale } from '@/lib/nfe/issueFocusNfe'
 import type { NfeAuthorizationResult } from '@/lib/nfe/types'
 import { NfeIntegrationError } from '@/lib/nfe/types'
+import { getLatestProductCosts } from '@/lib/product-costs'
 
 export type ProcessSaleInput = {
   items: Array<{ productId: string; quantity: number }>
@@ -140,7 +141,7 @@ export async function processSaleWithNfe(input: ProcessSaleInput): Promise<Proce
     const productIds = [...new Set(sanitizedItems.map((item) => item.productId))]
     const products = await prisma.product.findMany({
       where: { companyId, id: { in: productIds } },
-      select: { id: true, name: true, sku: true, price: true, costPrice: true, stockQty: true, minStock: true },
+      select: { id: true, name: true, sku: true, price: true, stockQty: true, minStock: true },
     })
 
     if (products.length !== productIds.length) {
@@ -148,6 +149,7 @@ export async function processSaleWithNfe(input: ProcessSaleInput): Promise<Proce
     }
 
     const productMap = new Map(products.map((product) => [product.id, product]))
+    const productCosts = await getLatestProductCosts(companyId, productIds)
 
     let subtotal = 0
     const resolvedItems = sanitizedItems.map((item) => {
@@ -170,6 +172,7 @@ export async function processSaleWithNfe(input: ProcessSaleInput): Promise<Proce
         ...item,
         product,
         unitPrice: product.price,
+        unitCost: productCosts.get(product.id) ?? 0,
         total: lineTotal,
       }
     })
@@ -251,7 +254,6 @@ export async function processSaleWithNfe(input: ProcessSaleInput): Promise<Proce
             sku: item.product.sku,
             quantity: item.quantity,
             unitPrice: item.unitPrice,
-            unitCost: Number(item.product.costPrice.toFixed(2)),
             total: item.total,
           })),
         })
@@ -327,7 +329,6 @@ export async function processSaleWithNfe(input: ProcessSaleInput): Promise<Proce
           sku: item.product.sku,
           quantity: item.quantity,
           unitPrice: item.unitPrice,
-          unitCost: Number(item.product.costPrice.toFixed(2)),
           total: item.total,
         })),
       })

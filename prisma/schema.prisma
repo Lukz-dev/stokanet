@@ -107,7 +107,6 @@ model Product {
   size        String?
   color       String?
   price       Float       @default(0.0)
-  costPrice   Float       @default(0.0)
   stockQty    Int         @default(0)
   minStock    Int         @default(5)
   status      String      @default("Normal")
@@ -214,7 +213,6 @@ model SaleItem {
   sku         String
   quantity    Int
   unitPrice   Float
-  unitCost    Float    @default(0.0)
   total       Float
   createdAt   DateTime @default(now())
 

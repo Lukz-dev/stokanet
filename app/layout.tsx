@@ -27,7 +27,6 @@ export default async function RootLayout({
     const session = await getServerSession(authOptions)
     const sessionUser = session?.user as { id?: string; authExpiresAt?: number | null } | undefined
     // Date.now is intentionally used to check session expiration on server render.
-    // eslint-disable-next-line react-hooks/purity
     const userId = sessionUser?.id && (!sessionUser.authExpiresAt || Date.now() <= sessionUser.authExpiresAt) ? sessionUser.id : undefined
 
     const userThemePreference = userId

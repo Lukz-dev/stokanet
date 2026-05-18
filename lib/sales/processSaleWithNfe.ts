@@ -175,8 +175,11 @@ export async function processSaleWithNfe(input: ProcessSaleInput): Promise<Proce
     })
 
     const discount = Number.isFinite(input.discount) ? Math.max(0, Number(input.discount)) : 0
+    // Normalize monetary values to 2 decimal places to avoid floating point
+    // precision issues when comparing sums (e.g. 25 + 4.99 vs 29.99).
+    subtotal = Number(subtotal.toFixed(2))
     const boundedDiscount = Math.min(discount, subtotal)
-    const total = Math.max(0, subtotal - boundedDiscount)
+    const total = Number(Math.max(0, subtotal - boundedDiscount).toFixed(2))
     const saleCode = `VD-${Date.now().toString().slice(-8)}`
     const normalizedPaymentMethod = input.paymentMethod?.trim() || null
     const normalizedBreakdown = (input.paymentBreakdown ?? [])

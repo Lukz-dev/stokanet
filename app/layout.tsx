@@ -21,20 +21,26 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const session = await getServerSession(authOptions)
-  const sessionUser = session?.user as { id?: string; authExpiresAt?: number | null } | undefined
-  // Date.now is intentionally used to check session expiration on server render.
-  // eslint-disable-next-line react-hooks/purity
-  const userId = sessionUser?.id && (!sessionUser.authExpiresAt || Date.now() <= sessionUser.authExpiresAt) ? sessionUser.id : undefined
+  let themeAttribute = toThemeAttribute(null)
 
-  const userThemePreference = userId
-    ? await prisma.user.findUnique({
-        where: { id: userId },
-        select: { themePreference: true },
-      })
-    : null
+  try {
+    const session = await getServerSession(authOptions)
+    const sessionUser = session?.user as { id?: string; authExpiresAt?: number | null } | undefined
+    // Date.now is intentionally used to check session expiration on server render.
+    // eslint-disable-next-line react-hooks/purity
+    const userId = sessionUser?.id && (!sessionUser.authExpiresAt || Date.now() <= sessionUser.authExpiresAt) ? sessionUser.id : undefined
 
-  const themeAttribute = toThemeAttribute(userThemePreference?.themePreference)
+    const userThemePreference = userId
+      ? await prisma.user.findUnique({
+          where: { id: userId },
+          select: { themePreference: true },
+        })
+      : null
+
+    themeAttribute = toThemeAttribute(userThemePreference?.themePreference)
+  } catch {
+    themeAttribute = toThemeAttribute(null)
+  }
 
   return (
     <html lang="pt-BR" className="dark h-full antialiased" data-theme-color={themeAttribute}>

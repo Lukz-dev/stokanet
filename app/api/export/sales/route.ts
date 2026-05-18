@@ -16,11 +16,13 @@ export async function GET() {
     orderBy: { createdAt: 'desc' },
   })
 
-  const headers = ['venda_codigo', 'criado_em', 'forma_pagamento', 'subtotal', 'desconto', 'total', 'produto', 'sku', 'quantidade', 'preco_unitario', 'total_item']
+  const headers = ['venda_codigo', 'criado_em', 'forma_pagamento', 'subtotal', 'desconto', 'total', 'produto', 'sku', 'quantidade', 'preco_unitario', 'custo_unitario', 'custo_total', 'lucro_bruto_item', 'total_item']
   const lines = [headers.map(csvEscape).join(',')]
 
   for (const sale of sales) {
     for (const item of sale.items) {
+      const itemCost = Number((item.quantity * item.unitCost).toFixed(2))
+      const itemProfit = Number((item.total - itemCost).toFixed(2))
       lines.push([
         sale.code,
         sale.createdAt.toISOString(),
@@ -32,6 +34,9 @@ export async function GET() {
         item.sku,
         item.quantity,
         item.unitPrice.toFixed(2),
+        item.unitCost.toFixed(2),
+        itemCost.toFixed(2),
+        itemProfit.toFixed(2),
         item.total.toFixed(2),
       ].map(csvEscape).join(','))
     }

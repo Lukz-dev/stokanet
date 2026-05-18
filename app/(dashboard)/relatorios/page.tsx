@@ -4,6 +4,9 @@ import { BarChart3, AlertTriangle, Package2, ShoppingBag, ReceiptText, Clock3 } 
 export default async function RelatoriosPage() {
   const report = await getDashboardReport()
 
+  const marginColor = report.grossProfitMonth >= 0 ? 'text-emerald-600' : 'text-destructive'
+  const marginBadge = `${report.grossMarginMonth.toFixed(1)}%`
+
   const cards = [
     { label: 'Produtos cadastrados', value: report.productsCount, icon: Package2 },
     { label: 'Estoque baixo/critico', value: report.lowStockCount, icon: AlertTriangle },
@@ -45,6 +48,26 @@ export default async function RelatoriosPage() {
           <div className="flex items-center gap-2 text-sm text-muted-foreground"><BarChart3 className="w-4 h-4" /> Vendas de hoje</div>
           <div className="mt-3 text-3xl font-bold">R$ {report.salesToday.toFixed(2)}</div>
           <p className="text-sm text-muted-foreground mt-1">Atualizado em tempo real</p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="border border-border rounded-xl bg-card p-5">
+          <div className="text-sm text-muted-foreground">Custo das mercadorias vendidas</div>
+          <div className="mt-3 text-3xl font-bold">R$ {report.goodsCostMonth.toFixed(2)}</div>
+          <p className="text-sm text-muted-foreground mt-1">Gasto estimado nas vendas do mes</p>
+        </div>
+
+        <div className="border border-border rounded-xl bg-card p-5">
+          <div className="text-sm text-muted-foreground">Lucro bruto</div>
+          <div className={`mt-3 text-3xl font-bold ${marginColor}`}>R$ {report.grossProfitMonth.toFixed(2)}</div>
+          <p className="text-sm text-muted-foreground mt-1">Margem bruta {marginBadge}</p>
+        </div>
+
+        <div className="border border-border rounded-xl bg-card p-5">
+          <div className="text-sm text-muted-foreground">Leitura rápida</div>
+          <div className="mt-3 text-2xl font-bold">{report.grossProfitMonth >= 0 ? 'Venda gerando caixa' : 'Atenção ao custo'}</div>
+          <p className="text-sm text-muted-foreground mt-1">Use este bloco para decidir reposição e precificação.</p>
         </div>
       </div>
     </div>

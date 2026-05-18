@@ -140,7 +140,7 @@ export async function processSaleWithNfe(input: ProcessSaleInput): Promise<Proce
     const productIds = [...new Set(sanitizedItems.map((item) => item.productId))]
     const products = await prisma.product.findMany({
       where: { companyId, id: { in: productIds } },
-      select: { id: true, name: true, sku: true, price: true, stockQty: true, minStock: true },
+      select: { id: true, name: true, sku: true, price: true, costPrice: true, stockQty: true, minStock: true },
     })
 
     if (products.length !== productIds.length) {
@@ -251,6 +251,7 @@ export async function processSaleWithNfe(input: ProcessSaleInput): Promise<Proce
             sku: item.product.sku,
             quantity: item.quantity,
             unitPrice: item.unitPrice,
+            unitCost: Number(item.product.costPrice.toFixed(2)),
             total: item.total,
           })),
         })
@@ -326,6 +327,7 @@ export async function processSaleWithNfe(input: ProcessSaleInput): Promise<Proce
           sku: item.product.sku,
           quantity: item.quantity,
           unitPrice: item.unitPrice,
+          unitCost: Number(item.product.costPrice.toFixed(2)),
           total: item.total,
         })),
       })

@@ -1841,11 +1841,17 @@ export async function receivePurchaseOrder(id: string) {
     for (const item of order.items) {
       const product = await tx.product.findFirst({
         where: { id: item.productId, companyId },
+        select: { id: true, stockQty: true, minStock: true, costPrice: true },
       })
 
       if (!product) continue
 
       const newStock = product.stockQty + item.quantity
+      const currentStockValue = product.stockQty * product.costPrice
+      const receivedStockValue = item.quantity * item.unitCost
+      const newCostPrice = newStock > 0
+        ? Number(((currentStockValue + receivedStockValue) / newStock).toFixed(2))
+        : Number(item.unitCost.toFixed(2))
       const status =
         newStock <= 0
           ? 'Esgotado'
@@ -1857,7 +1863,7 @@ export async function receivePurchaseOrder(id: string) {
 
       await tx.product.update({
         where: { id: product.id },
-        data: { stockQty: newStock, status },
+        data: { stockQty: newStock, costPrice: newCostPrice, status },
       })
 
       await tx.movement.create({
@@ -2280,31 +2286,19 @@ export async function getDashboardReport() {
   const next30Days = new Date()
   next30Days.setDate(next30Days.getDate() + 30)
 
+  const monthStart = new Date(today.getFullYear(), today.getMonth(), 1)
+
   const [
     productsCount,
     lowStockCount,
     outOfStockCount,
-    salesToday,
-    salesMonth,
     pendingPurchaseOrders,
     expiringBatches,
+    monthSales,
   ] = await Promise.all([
     prisma.product.count({ where: { companyId } }),
     prisma.product.count({ where: { companyId, status: { in: ['Crítico', 'Baixo'] } } }),
     prisma.product.count({ where: { companyId, status: 'Esgotado' } }),
-    prisma.sale.aggregate({
-      _sum: { total: true },
-      where: { companyId, createdAt: { gte: today } },
-    }),
-    prisma.sale.aggregate({
-      _sum: { total: true },
-      where: {
-        companyId,
-        createdAt: {
-          gte: new Date(today.getFullYear(), today.getMonth(), 1),
-        },
-      },
-    }),
     prisma.purchaseOrder.count({ where: { companyId, status: 'PENDENTE' } }),
     prisma.batch.count({
       where: {
@@ -2312,7 +2306,37 @@ export async function getDashboardReport() {
         expiresAt: { gte: today, lte: next30Days },
       },
     }),
+    prisma.sale.findMany({
+      where: { companyId, createdAt: { gte: monthStart } },
+      select: {
+        total: true,
+        notes: true,
+        createdAt: true,
+        items: {
+          select: {
+            quantity: true,
+            unitCost: true,
+          },
+        },
+      },
+    }),
   ])
+
+  const activeMonthSales = monthSales.filter((sale) => !sale.notes?.includes('[CANCELADA]'))
+  const salesMonth = Number(activeMonthSales.reduce((acc, sale) => acc + sale.total, 0).toFixed(2))
+  const salesToday = Number(
+    activeMonthSales
+      .filter((sale) => sale.createdAt >= today)
+      .reduce((acc, sale) => acc + sale.total, 0)
+      .toFixed(2),
+  )
+  const goodsCostMonth = Number(
+    activeMonthSales
+      .reduce((acc, sale) => acc + sale.items.reduce((saleAcc, item) => saleAcc + item.quantity * item.unitCost, 0), 0)
+      .toFixed(2),
+  )
+  const grossProfitMonth = Number((salesMonth - goodsCostMonth).toFixed(2))
+  const grossMarginMonth = salesMonth > 0 ? Number(((grossProfitMonth / salesMonth) * 100).toFixed(1)) : 0
 
   return {
     productsCount,
@@ -2320,8 +2344,11 @@ export async function getDashboardReport() {
     outOfStockCount,
     pendingPurchaseOrders,
     expiringBatches,
-    salesToday: Number((salesToday._sum.total ?? 0).toFixed(2)),
-    salesMonth: Number((salesMonth._sum.total ?? 0).toFixed(2)),
+    salesToday,
+    salesMonth,
+    goodsCostMonth,
+    grossProfitMonth,
+    grossMarginMonth,
   }
 }
 

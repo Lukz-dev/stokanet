@@ -4,14 +4,14 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "prisma generate && next build",
-    "db:push": "prisma db push",
-    "db:push:reset": "prisma db push --force-reset",
+    "build": "npm exec prisma -- generate && npm exec next -- build",
+    "db:push": "npm exec prisma -- db push",
+    "db:push:reset": "npm exec prisma -- db push --force-reset",
     "start": "next start",
     "lint": "eslint",
     "test:e2e": "playwright test",
-    "seed": "ts-node --esm prisma/seed.ts",
-    "postinstall": "prisma generate"
+    "seed": "npm exec ts-node -- --esm prisma/seed.ts",
+    "postinstall": "npm exec prisma -- generate"
   },
   "dependencies": {
     "@libsql/client": "^0.17.2",

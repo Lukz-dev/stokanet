@@ -11,6 +11,7 @@ type SaleItem = {
   sku: string
   quantity: number
   unitPrice: number
+  unitCost: number
   total: number
 }
 
@@ -73,6 +74,10 @@ export function VendasClient({ initialSales }: { initialSales: Sale[] }) {
       )
     })
   }, [initialSales, search])
+
+  const saleCost = (sale: Sale) => sale.items.reduce((acc, item) => acc + item.quantity * item.unitCost, 0)
+  const saleGrossProfit = (sale: Sale) => sale.total - saleCost(sale)
+  const saleGrossMargin = (sale: Sale) => (sale.total > 0 ? (saleGrossProfit(sale) / sale.total) * 100 : 0)
 
   const handleCancel = (sale: Sale) => {
     setError('')
@@ -164,6 +169,23 @@ export function VendasClient({ initialSales }: { initialSales: Sale[] }) {
                   </div>
                 </div>
 
+                {!cancelled ? (
+                  <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
+                    <div className="rounded-lg border border-border/70 bg-muted/20 px-3 py-2">
+                      <p className="text-muted-foreground text-xs">Custo</p>
+                      <p className="font-semibold">{formatCurrency(saleCost(sale))}</p>
+                    </div>
+                    <div className="rounded-lg border border-border/70 bg-muted/20 px-3 py-2">
+                      <p className="text-muted-foreground text-xs">Lucro bruto</p>
+                      <p className="font-semibold">{formatCurrency(saleGrossProfit(sale))}</p>
+                    </div>
+                    <div className="rounded-lg border border-border/70 bg-muted/20 px-3 py-2">
+                      <p className="text-muted-foreground text-xs">Margem bruta</p>
+                      <p className="font-semibold">{saleGrossMargin(sale).toFixed(1)}%</p>
+                    </div>
+                  </div>
+                ) : null}
+
                 <details className="mt-3 rounded-lg border border-border/70 bg-muted/20">
                   <summary className="cursor-pointer select-none px-3 py-2 text-sm font-medium">Ver detalhes dos itens ({sale.items.length})</summary>
                   <div className="px-3 pb-3">
@@ -175,6 +197,7 @@ export function VendasClient({ initialSales }: { initialSales: Sale[] }) {
                             <th className="text-left py-2 font-medium">SKU</th>
                             <th className="text-right py-2 font-medium">Qtd</th>
                             <th className="text-right py-2 font-medium">Unitário</th>
+                            <th className="text-right py-2 font-medium">Custo</th>
                             <th className="text-right py-2 font-medium">Total</th>
                           </tr>
                         </thead>
@@ -185,6 +208,7 @@ export function VendasClient({ initialSales }: { initialSales: Sale[] }) {
                               <td className="py-2 pr-2 text-muted-foreground font-mono text-xs">{item.sku}</td>
                               <td className="py-2 text-right">{item.quantity}</td>
                               <td className="py-2 text-right">{formatCurrency(item.unitPrice)}</td>
+                              <td className="py-2 text-right">{formatCurrency(item.unitCost)}</td>
                               <td className="py-2 text-right font-medium">{formatCurrency(item.total)}</td>
                             </tr>
                           ))}

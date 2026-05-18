@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import { getDashboardStats } from '@/lib/actions'
 import { PackageSearch, TrendingUp, AlertTriangle, Package, ArrowUpRight, ArrowDownRight, BadgePercent } from "lucide-react"
 
@@ -6,7 +7,8 @@ function formatCurrency(value: number) {
 }
 
 export default async function Dashboard() {
-  const stats = await getDashboardStats()
+  try {
+    const stats = await getDashboardStats()
   const attentionItems = stats.lowStockProducts + stats.criticalProducts
   const stockHealth = stats.totalProducts === 0
     ? 100
@@ -47,8 +49,8 @@ export default async function Dashboard() {
     },
   ]
 
-  return (
-    <div className="flex flex-col gap-8">
+    return (
+      <div className="flex flex-col gap-8">
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Visão geral da operação</h1>
         <p className="text-muted-foreground mt-1 text-lg">Acompanhe produtos, reposição e giro do seu mix em tempo real. Arquivados não entram no estoque ativo.</p>
@@ -162,6 +164,30 @@ export default async function Dashboard() {
           )}
         </div>
       </div>
-    </div>
-  )
+      </div>
+    )
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Não foi possível carregar os dados da conta.'
+
+    return (
+      <div className="max-w-2xl rounded-3xl border border-border bg-card p-8 shadow-sm">
+        <p className="text-xs font-semibold uppercase tracking-[0.24em] text-destructive">Conta com problema</p>
+        <h1 className="mt-2 text-3xl font-bold tracking-tight">Não foi possível abrir o painel</h1>
+        <p className="mt-3 text-sm leading-6 text-muted-foreground">
+          {message}
+        </p>
+        <p className="mt-3 text-sm text-muted-foreground">
+          Se a conta foi criada antes da última atualização, ela pode estar sem empresa vinculada ou o banco pode estar fora de sincronia.
+        </p>
+        <div className="mt-6 flex flex-wrap gap-3">
+          <Link href="/login" className="rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground hover:bg-primary/90">
+            Voltar ao login
+          </Link>
+          <Link href="/perfil" className="rounded-xl border border-border px-4 py-3 text-sm font-semibold text-foreground hover:bg-muted">
+            Ver perfil
+          </Link>
+        </div>
+      </div>
+    )
+  }
 }

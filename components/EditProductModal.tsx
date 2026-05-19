@@ -55,11 +55,15 @@ export function EditProductModal({ product, categories, existingProducts, onClos
     e.preventDefault()
     setError('')
     const normalizedSku = normalizeSku(form.sku)
-    const duplicateExists = existingProducts.some((current) => current.id !== product.id && normalizeSku(current.sku) === normalizedSku)
-
-    if (duplicateExists) {
-      setError(`Não foi possível salvar: o código "${normalizedSku}" já está cadastrado em outro produto. Informe um código diferente.`)
-      return
+    const originalSku = normalizeSku(product.sku)
+    
+    // Só valida duplicata se o SKU foi alterado
+    if (normalizedSku !== originalSku) {
+      const duplicateExists = existingProducts.some((current) => current.id !== product.id && normalizeSku(current.sku) === normalizedSku)
+      if (duplicateExists) {
+        setError(`Não foi possível salvar: o código "${normalizedSku}" já está cadastrado em outro produto. Informe um código diferente.`)
+        return
+      }
     }
 
     startTransition(async () => {

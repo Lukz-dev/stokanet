@@ -35,6 +35,7 @@ export function ProductModal({ categories, defaultMinStock, existingProducts, on
     size: '',
     color: '',
     price: '',
+    cost: '',
     stockQty: '',
     minStock: String(defaultMinStock ?? 5),
     categoryId: '',
@@ -66,6 +67,7 @@ export function ProductModal({ categories, defaultMinStock, existingProducts, on
           size: form.size || undefined,
           color: form.color || undefined,
           price: parseFloat(form.price),
+          cost: form.cost ? parseFloat(form.cost) : undefined,
           stockQty: parseInt(form.stockQty),
           minStock: parseInt(form.minStock),
           categoryId: form.categoryId || undefined,
@@ -165,7 +167,7 @@ export function ProductModal({ categories, defaultMinStock, existingProducts, on
               </div>
             </div>
             <div className="flex flex-col gap-2">
-              <label className="text-sm font-medium">Preço (R$)</label>
+              <label className="text-sm font-medium">Preço de venda (R$)</label>
               <div className="relative">
                 <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <input
@@ -176,6 +178,23 @@ export function ProductModal({ categories, defaultMinStock, existingProducts, on
                   min="0"
                   required
                   value={form.price}
+                  onChange={handleChange}
+                  placeholder="0,00"
+                  className="w-full pl-10 pr-4 py-2.5 bg-background border border-border rounded-lg text-sm outline-none focus:border-primary/60 focus:ring-2 focus:ring-primary/20 transition-all"
+                />
+              </div>
+            </div>
+            <div className="flex flex-col gap-2">
+              <label className="text-sm font-medium">Valor de compra (R$) - Opcional</label>
+              <div className="relative">
+                <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <input
+                  id="prod-cost"
+                  name="cost"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={form.cost}
                   onChange={handleChange}
                   placeholder="0,00"
                   className="w-full pl-10 pr-4 py-2.5 bg-background border border-border rounded-lg text-sm outline-none focus:border-primary/60 focus:ring-2 focus:ring-primary/20 transition-all"

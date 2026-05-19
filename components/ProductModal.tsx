@@ -279,23 +279,6 @@ export function ProductModal({ categories, defaultMinStock, existingProducts, on
                 />
               </div>
             </div>
-            <div className="flex flex-col gap-2">
-              <label className="text-sm font-medium">Ponto de reposição</label>
-              <div className="relative">
-                <Layers className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <input
-                  id="prod-minstock"
-                  name="minStock"
-                  type="number"
-                  min="0"
-                  required
-                  value={form.minStock}
-                  onChange={handleChange}
-                  placeholder="5"
-                  className="w-full pl-10 pr-4 py-2.5 bg-background border border-border rounded-lg text-sm outline-none focus:border-primary/60 focus:ring-2 focus:ring-primary/20 transition-all"
-                />
-              </div>
-            </div>
           </div>
 
           <div className="flex flex-col gap-2">

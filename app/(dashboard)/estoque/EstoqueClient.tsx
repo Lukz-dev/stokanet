@@ -11,7 +11,7 @@ const EditProductModal = dynamic(() => import('@/components/EditProductModal').t
 
 interface Category { id: string; name: string }
 interface Product {
-  id: string; name: string; sku: string; size: string | null; color: string | null; price: number; cost?: number
+  id: string; name: string; sku: string; size: string | null; color: string | null; price: number
   stockQty: number; minStock: number; status: string
   categoryId: string | null; category: Category | null
 }
@@ -210,9 +210,7 @@ export function EstoqueClient({ initialProducts, categories, defaultMinStock }: 
                     <th className="px-6 py-4 font-semibold tracking-wider">Variação</th>
                     <th className="px-6 py-4 font-semibold tracking-wider">Cor</th>
                     <th className="px-6 py-4 font-semibold tracking-wider">Categoria</th>
-                    <th className="px-6 py-4 font-semibold tracking-wider">Valor de compra</th>
                     <th className="px-6 py-4 font-semibold tracking-wider">Preço de venda</th>
-                    <th className="px-6 py-4 font-semibold tracking-wider">Lucro/peça</th>
                     <th className="px-6 py-4 font-semibold tracking-wider">Qtd. em estoque</th>
                     <th className="px-6 py-4 font-semibold tracking-wider">Situação</th>
                     <th className="px-6 py-4 font-semibold tracking-wider text-center">Ações</th>
@@ -244,19 +242,7 @@ export function EstoqueClient({ initialProducts, categories, defaultMinStock }: 
                           <span className="text-muted-foreground text-xs">—</span>
                         )}
                       </td>
-                      <td className="px-6 py-4 font-medium text-muted-foreground">{formatCurrency(p.cost ?? 0)}</td>
                       <td className="px-6 py-4 font-medium text-muted-foreground">{formatCurrency(p.price)}</td>
-                      <td className="px-6 py-4">
-                        <span className={`font-bold text-sm ${
-                          (p.price ?? 0) - (p.cost ?? 0) > 0
-                            ? 'text-emerald-500'
-                            : (p.price ?? 0) - (p.cost ?? 0) === 0
-                            ? 'text-muted-foreground'
-                            : 'text-destructive'
-                        }`}>
-                          {formatCurrency((p.price ?? 0) - (p.cost ?? 0))}
-                        </span>
-                      </td>
                       <td className="px-6 py-4">
                         <span className={`font-bold text-base ${p.stockQty === 0 ? 'text-destructive' : p.stockQty <= p.minStock ? 'text-amber-500' : 'text-foreground'}`}>
                           {p.stockQty}

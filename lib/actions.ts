@@ -879,6 +879,7 @@ export async function createProduct(data: {
   size?: string
   color?: string
   price: number
+  cost?: number
   stockQty: number
   minStock: number
   categoryId?: string
@@ -933,6 +934,7 @@ export async function updateProduct(id: string, data: {
   size?: string
   color?: string
   price?: number
+  cost?: number
   stockQty?: number
   minStock?: number
   categoryId?: string

@@ -11,7 +11,7 @@ const EditProductModal = dynamic(() => import('@/components/EditProductModal').t
 
 interface Category { id: string; name: string }
 interface Product {
-  id: string; name: string; sku: string; size: string | null; color: string | null; price: number; cost?: number | null
+  id: string; name: string; sku: string; size: string | null; color: string | null; price: number; purchaseCost?: number | null
   stockQty: number; minStock: number; status: string
   categoryId: string | null; category: Category | null
 }
@@ -244,18 +244,18 @@ export function EstoqueClient({ initialProducts, categories, defaultMinStock }: 
                           <span className="text-muted-foreground text-xs">—</span>
                         )}
                       </td>
-                      <td className="px-6 py-4 font-medium text-muted-foreground">{p.cost ? formatCurrency(p.cost) : '—'}</td>
+                      <td className="px-6 py-4 font-medium text-muted-foreground">{p.purchaseCost ? formatCurrency(p.purchaseCost) : '—'}</td>
                       <td className="px-6 py-4 font-medium text-muted-foreground">{formatCurrency(p.price)}</td>
                       <td className="px-6 py-4">
-                        {p.cost ? (
+                        {p.purchaseCost ? (
                           <span className={`font-bold text-sm ${
-                            p.price - p.cost > 0
+                            p.price - p.purchaseCost > 0
                               ? 'text-emerald-500'
-                              : p.price - p.cost === 0
+                              : p.price - p.purchaseCost === 0
                               ? 'text-muted-foreground'
                               : 'text-destructive'
                           }`}>
-                            {formatCurrency(p.price - p.cost)}
+                            {formatCurrency(p.price - p.purchaseCost)}
                           </span>
                         ) : (
                           <span className="text-muted-foreground text-xs">—</span>

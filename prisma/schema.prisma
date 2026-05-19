@@ -107,6 +107,7 @@ model Product {
   size        String?
   color       String?
   price       Float       @default(0.0)
+  purchaseCost Float?      @default(0.0)
   stockQty    Int         @default(0)
   minStock    Int         @default(5)
   status      String      @default("Normal")

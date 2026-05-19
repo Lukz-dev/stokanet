@@ -35,6 +35,7 @@ export function ProductModal({ categories, defaultMinStock, existingProducts, on
     size: '',
     color: '',
     price: '',
+    purchaseCost: '',
     stockQty: '',
     minStock: String(defaultMinStock ?? 5),
     categoryId: '',
@@ -66,6 +67,7 @@ export function ProductModal({ categories, defaultMinStock, existingProducts, on
           size: form.size || undefined,
           color: form.color || undefined,
           price: parseFloat(form.price),
+          purchaseCost: form.purchaseCost ? parseFloat(form.purchaseCost) : undefined,
           stockQty: parseInt(form.stockQty),
           minStock: parseInt(form.minStock),
           categoryId: form.categoryId || undefined,
@@ -178,6 +180,41 @@ export function ProductModal({ categories, defaultMinStock, existingProducts, on
                   value={form.price}
                   onChange={handleChange}
                   placeholder="0,00"
+                  className="w-full pl-10 pr-4 py-2.5 bg-background border border-border rounded-lg text-sm outline-none focus:border-primary/60 focus:ring-2 focus:ring-primary/20 transition-all"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="flex flex-col gap-2">
+              <label className="text-sm font-medium">Preço de compra (R$) - opcional</label>
+              <div className="relative">
+                <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <input
+                  name="purchaseCost"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={form.purchaseCost}
+                  onChange={handleChange}
+                  placeholder="0,00"
+                  className="w-full pl-10 pr-4 py-2.5 bg-background border border-border rounded-lg text-sm outline-none focus:border-primary/60 focus:ring-2 focus:ring-primary/20 transition-all"
+                />
+              </div>
+            </div>
+            <div className="flex flex-col gap-2">
+              <label className="text-sm font-medium">Estoque mínimo</label>
+              <div className="relative">
+                <Layers className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <input
+                  name="minStock"
+                  type="number"
+                  min="0"
+                  required
+                  value={form.minStock}
+                  onChange={handleChange}
+                  placeholder="0"
                   className="w-full pl-10 pr-4 py-2.5 bg-background border border-border rounded-lg text-sm outline-none focus:border-primary/60 focus:ring-2 focus:ring-primary/20 transition-all"
                 />
               </div>

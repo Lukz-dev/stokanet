@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { getSession, signIn } from 'next-auth/react'
+import { signIn } from 'next-auth/react'
 import Image from 'next/image'
 import { Lock, Mail, Eye, EyeOff, AlertCircle } from 'lucide-react'
 
@@ -65,11 +65,6 @@ export default function Login() {
       const res = await Promise.race([loginRequest, timeout])
 
       if (res?.ok) {
-        const session = await getSession()
-        if (!session?.user) {
-          setError('Login confirmado, mas a sessao nao foi criada no navegador. Isso quase sempre e configuracao do deploy (NEXTAUTH_URL / NEXTAUTH_SECRET) ou bloqueio de cookies. Verifique as env vars no Vercel e tente novamente.')
-          return
-        }
         // If user just signed up and was redirected to plans, keep sending them to plans
         const hasCheckoutCookie = typeof document !== 'undefined' && document.cookie.includes('stokanet.checkout_after_signup=1')
         if (hasCheckoutCookie) {
@@ -77,13 +72,12 @@ export default function Login() {
           try {
             document.cookie = 'stokanet.checkout_after_signup=; Path=/; Max-Age=0; SameSite=Lax'
           } catch {}
-          router.push('/plans?source=signup')
+          router.replace('/plans?source=signup')
           router.refresh()
           return
         }
 
-        const isApproved = session?.user?.isApproved === true || session?.user?.isSystemAdmin === true
-        router.push(isApproved ? '/' : '/pending')
+        router.replace('/')
         router.refresh()
         return
       }

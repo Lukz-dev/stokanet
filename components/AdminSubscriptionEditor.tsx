@@ -17,9 +17,10 @@ type Props = {
   userId: string
   userEmail: string
   subscription: SubscriptionData
+  userActivePlan?: 'MONTHLY' | 'ANNUAL' | null
 }
 
-export function AdminSubscriptionEditor({ userId, userEmail, subscription }: Props) {
+export function AdminSubscriptionEditor({ userId, userEmail, subscription, userActivePlan: initialUserActivePlan }: Props) {
   const router = useRouter()
   const [isEditing, setIsEditing] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -44,6 +45,10 @@ export function AdminSubscriptionEditor({ userId, userEmail, subscription }: Pro
     amount: subscription?.amount || 100,
     autoRenew: subscription?.autoRenew || false,
   })
+
+  const [userActivePlan, setUserActivePlan] = useState((initialUserActivePlan ?? (subscription as any)?.planType) || null)
+  const [settingActivePlan, setSettingActivePlan] = useState(false)
+  const [activePlanMessage, setActivePlanMessage] = useState('')
 
   const handleSave = async () => {
     setLoading(true)
@@ -83,9 +88,35 @@ export function AdminSubscriptionEditor({ userId, userEmail, subscription }: Pro
     }
   }
 
+  const handleSetUserActivePlan = async () => {
+    setSettingActivePlan(true)
+    setActivePlanMessage('')
+    try {
+      const { setUserActivePlan } = await import('@/lib/admin')
+      await setUserActivePlan(userId, userActivePlan ?? null)
+      setActivePlanMessage('Plano do usuário atualizado')
+      try { router.refresh() } catch {}
+      setTimeout(() => setActivePlanMessage(''), 3000)
+    } catch (err) {
+      setActivePlanMessage(err instanceof Error ? err.message : 'Erro ao definir plano do usuário')
+    } finally {
+      setSettingActivePlan(false)
+    }
+  }
+
   if (!subscription) {
     content = (
       <div className="space-y-2">
+        <div className="flex items-center gap-2">
+          <label className="text-xs text-muted-foreground">Plano do usuário</label>
+          <select value={userActivePlan ?? ''} onChange={(e) => setUserActivePlan(e.target.value as any)} className="px-2 py-1 rounded border border-border bg-background text-sm">
+            <option value="">Nenhum</option>
+            <option value="MONTHLY">Mensal</option>
+            <option value="ANNUAL">Anual</option>
+          </select>
+          <button onClick={handleSetUserActivePlan} disabled={settingActivePlan} className="text-xs rounded px-2 py-1 bg-primary text-primary-foreground">{settingActivePlan ? 'Salvando...' : 'Definir'}</button>
+          {activePlanMessage && <p className="text-xs text-foreground">{activePlanMessage}</p>}
+        </div>
         <div className="grid grid-cols-2 gap-2 text-xs">
           <div>
             <label className="block text-muted-foreground mb-1">Plano</label>
@@ -273,5 +304,20 @@ export function AdminSubscriptionEditor({ userId, userEmail, subscription }: Pro
     )
   }
 
-  return content
+  return (
+    <div>
+      <div className="mb-2 flex items-center gap-2">
+        <label className="text-xs text-muted-foreground">Plano do usuário</label>
+        <select value={userActivePlan ?? ''} onChange={(e) => setUserActivePlan(e.target.value as any)} className="px-2 py-1 rounded border border-border bg-background text-sm">
+          <option value="">Nenhum</option>
+          <option value="MONTHLY">Mensal</option>
+          <option value="ANNUAL">Anual</option>
+        </select>
+        <button onClick={handleSetUserActivePlan} disabled={settingActivePlan} className="text-xs rounded px-2 py-1 bg-primary text-primary-foreground">{settingActivePlan ? 'Salvando...' : 'Definir'}</button>
+        {activePlanMessage && <p className="text-xs text-foreground ml-2">{activePlanMessage}</p>}
+      </div>
+
+      {content}
+    </div>
+  )
 }

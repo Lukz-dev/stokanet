@@ -93,6 +93,7 @@ export default async function AdminPage() {
                     userId={user.id}
                     userEmail={user.email}
                     subscription={user.subscription}
+                    userActivePlan={(user as any).activePlan ?? null}
                   />
                 </div>
 

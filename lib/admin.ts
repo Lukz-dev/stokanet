@@ -122,3 +122,14 @@ export async function createUserSubscription(
 
   revalidatePath('/admin')
 }
+
+export async function setUserActivePlan(userId: string, planType: 'MONTHLY' | 'ANNUAL' | null) {
+  await getApprovalAdminUser()
+
+  const target = await prisma.user.findUnique({ where: { id: userId }, select: { id: true, isSystemAdmin: true } })
+  if (!target) throw new Error('Usuário não encontrado')
+  if (target.isSystemAdmin) throw new Error('Não é possível alterar o plano do administrador do sistema')
+
+  await prisma.user.update({ where: { id: userId }, data: { activePlan: planType } })
+  revalidatePath('/admin')
+}

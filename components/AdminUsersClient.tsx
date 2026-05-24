@@ -89,7 +89,7 @@ export default function AdminUsersClient({ users }: { users: UserItem[] }) {
               </div>
 
               <div>
-                <AdminSubscriptionEditor userId={user.id} userEmail={user.email} subscription={user.subscription as any} />
+                <AdminSubscriptionEditor userId={user.id} userEmail={user.email} subscription={user.subscription as any} userActivePlan={(user as any).activePlan ?? null} />
               </div>
 
               <div className="flex justify-start md:justify-end">

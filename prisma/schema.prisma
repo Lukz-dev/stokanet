@@ -65,6 +65,7 @@ model User {
   avatarUrl String?
   themePreference ThemePreference @default(SUNSET)
   role      String   @default("OPERATOR") // ADMIN, MANAGER, OPERATOR
+  activePlan PlanType?
   isApproved Boolean  @default(false)
   isSystemAdmin Boolean @default(false)
   companyId String?

@@ -112,7 +112,7 @@ export default async function SubscriptionPage() {
           </Link>
           {subscription.status === 'ACTIVE' && (
             <Link
-              href="/dashboard"
+              href="/"
               className="rounded-lg border border-border px-4 py-2 text-sm font-semibold text-foreground transition-colors hover:bg-muted"
             >
               Voltar ao sistema

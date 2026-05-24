@@ -11,7 +11,7 @@ export default async function DashboardLayout({
   children: React.ReactNode;
 }>) {
   const session = await getServerSession(authOptions);
-  const sessionUser = session?.user as { companyId?: string; role?: string; isSystemAdmin?: boolean } | undefined;
+  const sessionUser = session?.user as { companyId?: string; role?: string; isSystemAdmin?: boolean; isApproved?: boolean } | undefined;
   const companyId = sessionUser?.companyId;
   const isSystemAdmin = sessionUser?.isSystemAdmin === true;
   const isApprovalAdmin = isSystemAdmin || sessionUser?.role === 'ADMIN';
@@ -20,10 +20,13 @@ export default async function DashboardLayout({
     redirect('/login');
   }
 
-  if (!isApprovalAdmin && companyId) {
+  if (companyId && !isApprovalAdmin) {
     const subscription = await getSubscriptionStatus(companyId);
 
-    if (!subscription.isActive) {
+    // Allow access if the user was explicitly approved by an admin
+    const sessionUserApproved = sessionUser?.isApproved === true;
+
+    if (!subscription.isActive && !sessionUserApproved) {
       redirect('/plans');
     }
   }

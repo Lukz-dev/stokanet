@@ -53,7 +53,7 @@ export default function Signup() {
       document.cookie = 'stokanet.checkout_after_signup=1; Path=/; Max-Age=600; SameSite=Lax'
 
       setSuccess(true)
-      setTimeout(() => router.push('/plans?source=signup'), 1200)
+      setTimeout(() => router.push('/subscription?source=signup'), 1200)
     } catch {
       setError('Erro de conexão. Tente novamente.')
       setIsLoading(false)

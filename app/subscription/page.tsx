@@ -103,12 +103,22 @@ export default async function SubscriptionPage() {
             Acompanhe o ciclo do plano, o status atual e as próximas cobranças.
           </p>
         </div>
-         <Link
-           href="/plans?source=manage"
-          className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
-        >
-          Trocar plano
-        </Link>
+        <div className="flex items-center gap-3">
+          <Link
+            href="/plans?source=manage"
+            className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
+          >
+            Trocar plano
+          </Link>
+          {subscription.status === 'ACTIVE' && (
+            <Link
+              href="/dashboard"
+              className="rounded-lg border border-border px-4 py-2 text-sm font-semibold text-foreground transition-colors hover:bg-muted"
+            >
+              Voltar ao sistema
+            </Link>
+          )}
+        </div>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">

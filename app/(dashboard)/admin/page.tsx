@@ -1,4 +1,5 @@
 import { getAdminUsers, setUserApproval } from '@/lib/admin'
+import AdminUsersClient from '@/components/AdminUsersClient'
 import { AdminResetPasswordButton } from '@/components/AdminResetPasswordButton'
 import { AdminSubscriptionEditor } from '@/components/AdminSubscriptionEditor'
 import prisma from '@/lib/prisma'
@@ -61,66 +62,31 @@ export default async function AdminPage() {
           <h2 className="text-lg font-semibold">Contas cadastradas</h2>
         </div>
 
-        <div className="divide-y divide-border">
-          {usersWithSubscriptions.map((user) => {
-            const statusLabel = user.isSystemAdmin ? 'Administrador do sistema' : user.isApproved ? 'Aprovado' : 'Pendente'
-            const statusClass = user.isSystemAdmin
-              ? 'bg-primary/10 text-primary border-primary/20'
-              : user.isApproved
-                ? 'bg-emerald-500/10 text-emerald-700 border-emerald-500/20'
-                : 'bg-amber-500/10 text-amber-700 border-amber-500/20'
-
-            return (
-              <div key={user.id} data-testid={`admin-user-row-${user.email}`} className="grid gap-4 px-6 py-5 md:grid-cols-[1fr_0.9fr_0.8fr_0.9fr_auto] md:items-start">
-                <div>
-                  <p className="font-semibold text-foreground">{user.name ?? 'Sem nome'}</p>
-                  <p className="text-sm text-muted-foreground">{user.email}</p>
-                </div>
-
-                <div className="text-sm text-muted-foreground">
-                  <p className="font-medium text-foreground">{user.company?.name ?? 'Sem empresa'}</p>
-                  <p>{formatDate.format(user.createdAt)}</p>
-                </div>
-
-                <div>
-                  <span className={`inline-flex rounded-full border px-3 py-1 text-xs font-medium ${statusClass}`}>
-                    {statusLabel}
-                  </span>
-                </div>
-
-                <div>
-                  <AdminSubscriptionEditor
-                    userId={user.id}
-                    userEmail={user.email}
-                    subscription={user.subscription}
-                    userActivePlan={(user as any).activePlan ?? null}
-                  />
-                </div>
-
-                <div className="flex justify-start md:justify-end">
-                  <div className="flex flex-col gap-2">
-                    {user.isSystemAdmin ? (
-                      <span className="text-xs text-muted-foreground">Protegido</span>
-                    ) : (
-                      <form action={setUserApproval.bind(null, user.id, !user.isApproved)}>
-                        <button
-                          type="submit"
-                          className={`rounded-lg px-4 py-2 text-sm font-semibold transition-colors ${user.isApproved ? 'bg-rose-500/10 text-rose-700 hover:bg-rose-500/20' : 'bg-primary text-primary-foreground hover:bg-primary/90'}`}
-                        >
-                          {user.isApproved ? 'Revogar acesso' : 'Liberar acesso'}
-                        </button>
-                      </form>
-                    )}
-
-                    {!user.isSystemAdmin && (
-                      <AdminResetPasswordButton userId={user.id} userEmail={user.email} />
-                    )}
-                  </div>
-                </div>
-              </div>
-            )
-          })}
-        </div>
+          <div>
+            {/* Client-side users list with search */}
+            <AdminUsersClient
+              users={usersWithSubscriptions.map((u) => ({
+                id: u.id,
+                name: u.name ?? null,
+                email: u.email,
+                companyName: u.company?.name ?? null,
+                createdAt: u.createdAt.toISOString(),
+                isApproved: u.isApproved,
+                isSystemAdmin: u.isSystemAdmin,
+                role: u.role,
+                subscription: u.subscription
+                  ? {
+                      id: u.subscription.id,
+                      status: u.subscription.status,
+                      planType: u.subscription.planType,
+                      amount: u.subscription.amount,
+                      autoRenew: u.subscription.autoRenew,
+                    }
+                  : null,
+                activePlan: (u as any).activePlan ?? null,
+              }))}
+            />
+          </div>
       </div>
     </div>
   )

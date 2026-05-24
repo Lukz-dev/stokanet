@@ -10,6 +10,8 @@ interface Product {
   stockQty: number; minStock: number; status: string
   ncm?: string | null; cfop?: string | null; cest?: string | null
   categoryId: string | null; category: Category | null
+  isBox?: boolean
+  unitsPerBox?: number | null
 }
 
 interface Props {
@@ -45,10 +47,17 @@ export function EditProductModal({ product, categories, existingProducts, onClos
     stockQty: product.stockQty.toString(),
     minStock: product.minStock.toString(),
     categoryId: product.categoryId ?? '',
+    isBox: (product as any).isBox ?? false,
+    unitsPerBox: (product as any).unitsPerBox ? String((product as any).unitsPerBox) : '',
   })
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    setForm({ ...form, [e.target.name]: e.target.value })
+    const { name, value, type } = e.target as HTMLInputElement
+    if (type === 'checkbox') {
+      setForm({ ...form, [name]: (e.target as HTMLInputElement).checked })
+      return
+    }
+    setForm({ ...form, [name]: value })
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -79,6 +88,8 @@ export function EditProductModal({ product, categories, existingProducts, onClos
           purchaseCost: form.purchaseCost ? parseFloat(form.purchaseCost) : undefined,
           price: parseFloat(form.price),
           stockQty: parseInt(form.stockQty),
+          isBox: Boolean(form.isBox),
+          unitsPerBox: form.unitsPerBox ? parseInt(form.unitsPerBox) : undefined,
           minStock: parseInt(form.minStock),
           categoryId: form.categoryId || undefined,
         })

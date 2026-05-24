@@ -8,7 +8,6 @@ import type { AppRole } from '@/lib/roles'
 import { getActiveCompanyId, getActiveUser } from '@/lib/access'
 import { THEME_PREFERENCES, type ThemePreference } from '@/lib/theme'
 import { processSaleWithNfe } from '@/lib/sales/processSaleWithNfe'
-import { getLatestProductCosts } from '@/lib/product-costs'
 
 async function getCompanyId(): Promise<string> {
   return getActiveCompanyId()
@@ -803,7 +802,6 @@ export async function getDashboardStats() {
 
   const criticalList = await prisma.product.findMany({
     where: { ...activeProductWhere, OR: [{ status: 'Crítico' }, { status: 'Esgotado' }, { status: 'Baixo' }] },
-    select: { id: true, name: true, sku: true, size: true, color: true, stockQty: true, status: true },
     orderBy: { stockQty: 'asc' },
     take: 6,
   })
@@ -1000,6 +998,8 @@ export async function createProduct(data: {
   purchaseCost: number
   price: number
   stockQty: number
+  isBox?: boolean
+  unitsPerBox?: number | null
   minStock: number
   categoryId?: string
   ncm?: string
@@ -1032,6 +1032,8 @@ export async function createProduct(data: {
       cfop: data.cfop?.trim() || null,
       taxProfile: (data.taxProfile ?? null) as any,
       purchaseCost: Number.isFinite(data.purchaseCost) ? data.purchaseCost : 0,
+      isBox: data.isBox ?? false,
+      unitsPerBox: data.unitsPerBox ?? null,
       status,
       companyId,
     },
@@ -1056,6 +1058,8 @@ export async function updateProduct(id: string, data: {
   purchaseCost?: number
   price?: number
   stockQty?: number
+  isBox?: boolean
+  unitsPerBox?: number | null
   minStock?: number
   categoryId?: string
   ncm?: string
@@ -1100,6 +1104,8 @@ export async function updateProduct(id: string, data: {
       cfop: data.cfop === undefined ? undefined : data.cfop?.trim() || null,
       taxProfile: data.taxProfile === undefined ? undefined : (data.taxProfile ?? null) as any,
       purchaseCost: data.purchaseCost === undefined ? undefined : data.purchaseCost,
+      isBox: data.isBox === undefined ? undefined : data.isBox,
+      unitsPerBox: data.unitsPerBox === undefined ? undefined : data.unitsPerBox,
       status,
     },
   })
@@ -1783,29 +1789,27 @@ export async function getSales(limit = 50) {
     where: { companyId },
     include: {
       items: {
-        select: {
-          id: true,
-          productId: true,
-          productName: true,
-          sku: true,
-          quantity: true,
-          unitPrice: true,
-          total: true,
+        include: {
+          product: { select: { purchaseCost: true } },
         },
+        orderBy: { id: 'asc' },
       },
     },
     orderBy: { createdAt: 'desc' },
     take: Math.max(1, Math.min(limit, 200)),
   })
 
-  const productIds = [...new Set(sales.flatMap((sale) => sale.items.map((item) => item.productId)))]
-  const costs = await getLatestProductCosts(companyId, productIds)
-
-  return sales.map((sale) => ({
-    ...sale,
-    items: sale.items.map((item) => ({
-      ...item,
-      unitCost: costs.get(item.productId) ?? 0,
+  // Map to include unitCost directly on item for export convenience
+  return sales.map((s) => ({
+    ...s,
+    items: s.items.map((it: any) => ({
+      id: it.id,
+      productName: it.productName,
+      sku: it.sku,
+      quantity: it.quantity,
+      unitPrice: it.unitPrice,
+      total: it.total,
+      unitCost: it.product?.purchaseCost ?? 0,
     })),
   }))
 }
@@ -1978,7 +1982,6 @@ export async function receivePurchaseOrder(id: string) {
     for (const item of order.items) {
       const product = await tx.product.findFirst({
         where: { id: item.productId, companyId },
-        select: { id: true, stockQty: true, minStock: true },
       })
 
       if (!product) continue
@@ -2418,19 +2421,31 @@ export async function getDashboardReport() {
   const next30Days = new Date()
   next30Days.setDate(next30Days.getDate() + 30)
 
-  const monthStart = new Date(today.getFullYear(), today.getMonth(), 1)
-
   const [
     productsCount,
     lowStockCount,
     outOfStockCount,
+    salesToday,
+    salesMonth,
     pendingPurchaseOrders,
     expiringBatches,
-    monthSales,
   ] = await Promise.all([
     prisma.product.count({ where: { companyId } }),
     prisma.product.count({ where: { companyId, status: { in: ['Crítico', 'Baixo'] } } }),
     prisma.product.count({ where: { companyId, status: 'Esgotado' } }),
+    prisma.sale.aggregate({
+      _sum: { total: true },
+      where: { companyId, createdAt: { gte: today } },
+    }),
+    prisma.sale.aggregate({
+      _sum: { total: true },
+      where: {
+        companyId,
+        createdAt: {
+          gte: new Date(today.getFullYear(), today.getMonth(), 1),
+        },
+      },
+    }),
     prisma.purchaseOrder.count({ where: { companyId, status: 'PENDENTE' } }),
     prisma.batch.count({
       where: {
@@ -2438,39 +2453,24 @@ export async function getDashboardReport() {
         expiresAt: { gte: today, lte: next30Days },
       },
     }),
-    prisma.sale.findMany({
-      where: { companyId, createdAt: { gte: monthStart } },
-      select: {
-        total: true,
-        notes: true,
-        createdAt: true,
-        items: {
-          select: {
-            productId: true,
-            quantity: true,
-          },
-        },
-      },
-    }),
   ])
 
-  const activeMonthSales = monthSales.filter((sale) => !sale.notes?.includes('[CANCELADA]'))
-  const monthProductIds = [...new Set(activeMonthSales.flatMap((sale) => sale.items.map((item) => item.productId)))]
-  const monthProductCosts = await getLatestProductCosts(companyId, monthProductIds)
-  const salesMonth = Number(activeMonthSales.reduce((acc, sale) => acc + sale.total, 0).toFixed(2))
-  const salesToday = Number(
-    activeMonthSales
-      .filter((sale) => sale.createdAt >= today)
-      .reduce((acc, sale) => acc + sale.total, 0)
-      .toFixed(2),
-  )
-  const goodsCostMonth = Number(
-    activeMonthSales
-      .reduce((acc, sale) => acc + sale.items.reduce((saleAcc, item) => saleAcc + item.quantity * (monthProductCosts.get(item.productId) ?? 0), 0), 0)
-      .toFixed(2),
-  )
-  const grossProfitMonth = Number((salesMonth - goodsCostMonth).toFixed(2))
-  const grossMarginMonth = salesMonth > 0 ? Number(((grossProfitMonth / salesMonth) * 100).toFixed(1)) : 0
+  // Calculate estimated cost of goods sold for the month using current product purchaseCost
+  const firstOfMonth = new Date(today.getFullYear(), today.getMonth(), 1)
+  const saleItems = await prisma.saleItem.findMany({
+    where: { sale: { companyId, createdAt: { gte: firstOfMonth } } },
+    include: { product: { select: { purchaseCost: true } } },
+  })
+
+  const goodsCostMonth = saleItems.reduce((acc, item) => {
+    const cost = item.product?.purchaseCost ?? 0
+    return acc + cost * item.quantity
+  }, 0)
+
+  const salesMonthValue = Number((salesMonth._sum.total ?? 0).toFixed(2))
+  const salesTodayValue = Number((salesToday._sum.total ?? 0).toFixed(2))
+  const grossProfitMonth = Number((salesMonthValue - goodsCostMonth).toFixed(2))
+  const grossMarginMonth = salesMonthValue ? Number(((grossProfitMonth / salesMonthValue) * 100).toFixed(2)) : 0
 
   return {
     productsCount,
@@ -2478,9 +2478,9 @@ export async function getDashboardReport() {
     outOfStockCount,
     pendingPurchaseOrders,
     expiringBatches,
-    salesToday,
-    salesMonth,
-    goodsCostMonth,
+    salesToday: salesTodayValue,
+    salesMonth: salesMonthValue,
+    goodsCostMonth: Number(goodsCostMonth.toFixed(2)),
     grossProfitMonth,
     grossMarginMonth,
   }

@@ -148,6 +148,8 @@ model Product {
   price       Float       @default(0.0)
   purchaseCost Float      @default(0.0)
   stockQty    Int         @default(0)
+  isBox       Boolean     @default(false)
+  unitsPerBox Int?
   minStock    Int         @default(5)
   status      String      @default("Normal")
   categoryId  String?

@@ -39,10 +39,17 @@ export function ProductModal({ categories, defaultMinStock, existingProducts, on
     stockQty: '',
     minStock: String(defaultMinStock ?? 5),
     categoryId: '',
+    isBox: false,
+    unitsPerBox: '',
   })
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    setForm({ ...form, [e.target.name]: e.target.value })
+    const { name, value, type } = e.target as HTMLInputElement
+    if (type === 'checkbox') {
+      setForm({ ...form, [name]: (e.target as HTMLInputElement).checked })
+      return
+    }
+    setForm({ ...form, [name]: value })
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -69,6 +76,8 @@ export function ProductModal({ categories, defaultMinStock, existingProducts, on
           purchaseCost: parseFloat(form.purchaseCost) || 0,
           price: parseFloat(form.price),
           stockQty: parseInt(form.stockQty),
+          isBox: Boolean(form.isBox),
+          unitsPerBox: form.unitsPerBox ? parseInt(form.unitsPerBox) : null,
           minStock: parseInt(form.minStock),
           categoryId: form.categoryId || undefined,
         })
@@ -317,6 +326,22 @@ export function ProductModal({ categories, defaultMinStock, existingProducts, on
                   onChange={handleChange}
                   placeholder="0"
                   className="w-full pl-10 pr-4 py-2.5 bg-background border border-border rounded-lg text-sm outline-none focus:border-primary/60 focus:ring-2 focus:ring-primary/20 transition-all"
+                />
+              </div>
+            </div>
+            <div className="flex flex-col gap-2">
+              <label className="text-sm font-medium">Produto é caixa?</label>
+              <div className="flex items-center gap-3">
+                <input type="checkbox" name="isBox" checked={Boolean(form.isBox)} onChange={handleChange} className="h-4 w-4" />
+                <input
+                  name="unitsPerBox"
+                  type="number"
+                  min="1"
+                  disabled={!form.isBox}
+                  value={form.unitsPerBox}
+                  onChange={handleChange}
+                  placeholder="Quantidade por caixa"
+                  className="w-full px-4 py-2.5 bg-background border border-border rounded-lg text-sm outline-none focus:border-primary/60 focus:ring-2 focus:ring-primary/20 transition-all"
                 />
               </div>
             </div>

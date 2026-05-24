@@ -1,9 +1,11 @@
 import { getServerSession } from 'next-auth'
 import type { Company, User } from '@prisma/client'
 import prisma from '@/lib/prisma'
+import { isBossRole } from '@/lib/roles'
 import { authOptions } from '@/app/api/auth/[...nextauth]/route'
 
 export type AppRole = 'ADMIN' | 'MANAGER' | 'OPERATOR'
+export { isBossRole } from '@/lib/roles'
 
 type SessionUser = {
   id?: string
@@ -39,8 +41,22 @@ async function getSessionUser(options?: { allowPending?: boolean; requireSystemA
   return user
 }
 
+async function getAdminPanelUser() {
+  const sessionUser = await getSessionUser({ allowPending: true })
+
+  if (!sessionUser.isSystemAdmin && sessionUser.role !== 'ADMIN') {
+    throw new Error('Acesso restrito ao administrador')
+  }
+
+  return sessionUser
+}
+
 export async function getSystemAdminUser() {
   return getSessionUser({ allowPending: true, requireSystemAdmin: true })
+}
+
+export async function getApprovalAdminUser() {
+  return getAdminPanelUser()
 }
 
 export async function getOrCreateDefaultCompany() {

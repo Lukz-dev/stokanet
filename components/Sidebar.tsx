@@ -5,7 +5,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import { useSession, signOut } from 'next-auth/react'
-import { Package, LayoutDashboard, ArrowRightLeft, Box, Building2, UserRound, Settings, ScanLine, Truck, ClipboardList, BarChart3, ShieldCheck, LogOut, CalendarCheck2, Receipt } from 'lucide-react'
+import { Package, LayoutDashboard, ArrowRightLeft, Box, Building2, UserRound, Settings, ScanLine, Truck, ClipboardList, BarChart3, ShieldCheck, LogOut, CalendarCheck2, Receipt, BadgeDollarSign } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { loadAvatarCached } from '@/lib/client-avatar'
 
@@ -21,6 +21,7 @@ const navItems = [
   { name: 'Auditoria', href: '/auditoria', icon: ShieldCheck },
   { name: 'Reposições', href: '/movimentacoes', icon: ArrowRightLeft },
   { name: 'Perfil', href: '/perfil', icon: UserRound },
+  { name: 'Assinatura', href: '/subscription', icon: BadgeDollarSign },
   { name: 'Configurações', href: '/configuracoes', icon: Settings, adminOnly: true },
   { name: 'Painel Admin', href: '/admin', icon: ShieldCheck, systemAdminOnly: true },
 ]

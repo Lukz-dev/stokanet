@@ -6,7 +6,7 @@ import { updateProduct, deleteProduct, createCategory, archiveProduct } from '@/
 
 interface Category { id: string; name: string }
 interface Product {
-  id: string; name: string; sku: string; size: string | null; color: string | null; price: number; purchaseCost?: number | null
+  id: string; name: string; sku: string; size: string | null; color: string | null; purchaseCost: number; price: number
   stockQty: number; minStock: number; status: string
   ncm?: string | null; cfop?: string | null; cest?: string | null
   categoryId: string | null; category: Category | null
@@ -40,8 +40,8 @@ export function EditProductModal({ product, categories, existingProducts, onClos
     cest: product.cest ?? '',
     size: product.size ?? '',
     color: product.color ?? '',
-    price: product.price.toString(),
     purchaseCost: (product.purchaseCost ?? '').toString(),
+    price: product.price.toString(),
     stockQty: product.stockQty.toString(),
     minStock: product.minStock.toString(),
     categoryId: product.categoryId ?? '',
@@ -76,8 +76,8 @@ export function EditProductModal({ product, categories, existingProducts, onClos
           cest: form.cest || undefined,
           size: form.size || undefined,
           color: form.color || undefined,
-          price: parseFloat(form.price),
           purchaseCost: form.purchaseCost ? parseFloat(form.purchaseCost) : undefined,
+          price: parseFloat(form.price),
           stockQty: parseInt(form.stockQty),
           minStock: parseInt(form.minStock),
           categoryId: form.categoryId || undefined,
@@ -185,7 +185,18 @@ export function EditProductModal({ product, categories, existingProducts, onClos
               </div>
             </div>
             <div className="flex flex-col gap-2">
-              <label className="text-sm font-medium">Preço de venda (R$)</label>
+              <label className="text-sm font-medium">Valor de compra (R$)</label>
+              <div className="relative">
+                <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <input name="purchaseCost" type="number" step="0.01" min="0" required value={form.purchaseCost} onChange={handleChange}
+                  className="w-full pl-10 pr-4 py-2.5 bg-background border border-border rounded-lg text-sm outline-none focus:border-primary/60 focus:ring-2 focus:ring-primary/20 transition-all" />
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="flex flex-col gap-2">
+              <label className="text-sm font-medium">Preço (R$)</label>
               <div className="relative">
                 <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <input name="price" type="number" step="0.01" min="0" required value={form.price} onChange={handleChange}

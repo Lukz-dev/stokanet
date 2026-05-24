@@ -27,12 +27,30 @@ type CompanyData = {
   createdAt: string
 }
 
+type SubscriptionData = {
+  planType: 'MONTHLY' | 'ANNUAL'
+  billingMode: 'ONE_TIME' | 'RECURRING'
+  status: string
+  nextBillingDate: string | null
+  expiresAt: string | null
+  autoRenew: boolean
+} | null
+
 interface Props {
   user: UserData
   company: CompanyData
+  subscription: SubscriptionData
 }
 
-export function PerfilClient({ user, company }: Props) {
+function formatDate(value: string | null) {
+  if (!value) return '—'
+  return new Intl.DateTimeFormat('pt-BR', {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  }).format(new Date(value))
+}
+
+export function PerfilClient({ user, company, subscription }: Props) {
   const router = useRouter()
   const { update: updateSession } = useSession()
   const [profilePending, startProfileTransition] = useTransition()
@@ -436,6 +454,71 @@ export function PerfilClient({ user, company }: Props) {
         </div>
 
         <aside className="space-y-6">
+          <section className="bg-card border border-border rounded-2xl shadow-sm p-6">
+            <div className="flex items-center justify-between gap-4 mb-4">
+              <div>
+                <h2 className="text-lg font-semibold">Plano atual</h2>
+                <p className="text-sm text-muted-foreground">Resumo da assinatura da empresa.</p>
+              </div>
+              <div className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
+                {subscription?.status ?? 'SEM PLANO'}
+              </div>
+            </div>
+
+            {subscription ? (
+              <div className="space-y-4">
+                <div className="rounded-lg border border-border bg-muted/20 p-4">
+                  <p className="text-xs uppercase tracking-wider text-muted-foreground">Plano</p>
+                  <p className="mt-1 text-lg font-semibold">
+                    {subscription.planType === 'MONTHLY' ? 'Mensal' : 'Anual'}
+                  </p>
+                </div>
+                <div className="grid grid-cols-1 gap-3 text-sm">
+                  <div className="flex items-center justify-between gap-3 rounded-lg bg-muted/20 border border-border/50 p-3">
+                    <span className="text-muted-foreground">Cobrança</span>
+                    <span className="font-medium">
+                      {subscription.billingMode === 'RECURRING' ? 'Recorrente' : 'Única'}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between gap-3 rounded-lg bg-muted/20 border border-border/50 p-3">
+                    <span className="text-muted-foreground">Próxima cobrança</span>
+                    <span className="font-medium">{formatDate(subscription.nextBillingDate)}</span>
+                  </div>
+                  <div className="flex items-center justify-between gap-3 rounded-lg bg-muted/20 border border-border/50 p-3">
+                    <span className="text-muted-foreground">Expira em</span>
+                    <span className="font-medium">{formatDate(subscription.expiresAt)}</span>
+                  </div>
+                </div>
+
+                <Link
+                  href="/plans?source=manage"
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground hover:bg-primary/90 transition-colors"
+                >
+                  Trocar plano
+                </Link>
+
+                <Link
+                  href="/subscription"
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-border px-4 py-2.5 text-sm font-semibold hover:bg-muted transition-colors"
+                >
+                  Gerenciar assinatura
+                </Link>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <p className="text-sm text-muted-foreground">
+                  Nenhum plano ativo encontrado para esta empresa.
+                </p>
+                <Link
+                  href="/plans?source=manage"
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground hover:bg-primary/90 transition-colors"
+                >
+                  Ver planos
+                </Link>
+              </div>
+            )}
+          </section>
+
           <section className="bg-card border border-border rounded-2xl shadow-sm p-6">
             <h2 className="text-lg font-semibold mb-4">Resumo</h2>
             <div className="space-y-4 text-sm">

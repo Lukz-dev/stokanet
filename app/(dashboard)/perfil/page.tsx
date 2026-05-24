@@ -1,5 +1,6 @@
 import prisma from '@/lib/prisma'
 import { getActiveUser } from '@/lib/access'
+import { getSubscriptionInfo } from '@/lib/subscription'
 import { PerfilClient } from './PerfilClient'
 
 export default async function PerfilPage() {
@@ -13,6 +14,8 @@ export default async function PerfilPage() {
   if (!user || !user.company) {
     throw new Error('Perfil indisponível')
   }
+
+  const subscription = user.companyId ? await getSubscriptionInfo(user.companyId) : null
 
   return (
     <PerfilClient
@@ -32,6 +35,16 @@ export default async function PerfilPage() {
         defaultMinStock: user.company.defaultMinStock,
         createdAt: user.company.createdAt.toISOString(),
       }}
+      subscription={subscription
+        ? {
+            planType: subscription.planType,
+            billingMode: subscription.billingMode,
+            status: subscription.status,
+            nextBillingDate: subscription.nextBillingDate?.toISOString() ?? null,
+            expiresAt: subscription.expiresAt?.toISOString() ?? null,
+            autoRenew: subscription.autoRenew,
+          }
+        : null}
     />
   )
 }

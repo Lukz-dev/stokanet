@@ -15,12 +15,13 @@ export default async function proxy(req: NextRequest) {
 
   const isApproved = token.isApproved === true || token.isSystemAdmin === true
   const isSystemAdmin = token.isSystemAdmin === true
+  const isAdmin = isSystemAdmin || String(token.role ?? 'OPERATOR') === 'ADMIN'
 
   if (!isApproved && pathname !== '/pending') {
     return NextResponse.redirect(new URL('/pending', req.url))
   }
 
-  if (pathname.startsWith('/admin') && !isSystemAdmin) {
+  if (pathname.startsWith('/admin') && !isAdmin) {
     return NextResponse.redirect(new URL('/pending', req.url))
   }
 

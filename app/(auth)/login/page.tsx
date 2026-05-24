@@ -4,7 +4,8 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { getSession, signIn } from 'next-auth/react'
-import { Box, Lock, Mail, Eye, EyeOff, AlertCircle } from 'lucide-react'
+import Image from 'next/image'
+import { Lock, Mail, Eye, EyeOff, AlertCircle } from 'lucide-react'
 
 function loginErrorMessage(code?: string | null) {
   if (!code || code === 'CredentialsSignin') {
@@ -69,6 +70,18 @@ export default function Login() {
           setError('Login confirmado, mas a sessao nao foi criada no navegador. Isso quase sempre e configuracao do deploy (NEXTAUTH_URL / NEXTAUTH_SECRET) ou bloqueio de cookies. Verifique as env vars no Vercel e tente novamente.')
           return
         }
+        // If user just signed up and was redirected to plans, keep sending them to plans
+        const hasCheckoutCookie = typeof document !== 'undefined' && document.cookie.includes('stokanet.checkout_after_signup=1')
+        if (hasCheckoutCookie) {
+          // remove cookie and redirect to plans flow
+          try {
+            document.cookie = 'stokanet.checkout_after_signup=; Path=/; Max-Age=0; SameSite=Lax'
+          } catch {}
+          router.push('/plans?source=signup')
+          router.refresh()
+          return
+        }
+
         const isApproved = session?.user?.isApproved === true || session?.user?.isSystemAdmin === true
         router.push(isApproved ? '/' : '/pending')
         router.refresh()
@@ -94,10 +107,9 @@ export default function Login() {
 
       <div className="relative z-10 w-full max-w-md px-6">
         <div className="bg-card/70 backdrop-blur-xl border border-border/60 shadow-2xl rounded-2xl p-10 flex flex-col items-center">
-          <div className="w-14 h-14 bg-primary/10 text-primary rounded-2xl flex items-center justify-center mb-6 border border-primary/30 shadow-lg shadow-primary/10">
-            <Box className="w-7 h-7" />
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight">Bem-vindo ao StokaNet</h1>
           </div>
-          <h1 className="text-2xl font-bold tracking-tight text-foreground">Bem-vindo ao StokaNet</h1>
           <p className="text-muted-foreground text-sm mt-2 mb-8 text-center">Faça login para controlar produtos, variações e reposições da sua loja.</p>
 
           {error && (

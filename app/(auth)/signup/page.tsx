@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { signIn } from 'next-auth/react'
 import Link from 'next/link'
 import { Box, Building2, User, Mail, Lock, Eye, EyeOff, AlertCircle, CheckCircle2 } from 'lucide-react'
 
@@ -36,8 +37,23 @@ export default function Signup() {
         return
       }
 
+      const loginResult = await signIn('credentials', {
+        email: form.email,
+        password: form.password,
+        rememberLogin: 'false',
+        redirect: false,
+      })
+
+      if (loginResult?.error) {
+        setSuccess(true)
+        setTimeout(() => router.push('/login'), 1800)
+        return
+      }
+
+      document.cookie = 'stokanet.checkout_after_signup=1; Path=/; Max-Age=600; SameSite=Lax'
+
       setSuccess(true)
-      setTimeout(() => router.push('/login'), 2500)
+      setTimeout(() => router.push('/plans?source=signup'), 1200)
     } catch {
       setError('Erro de conexão. Tente novamente.')
       setIsLoading(false)
@@ -61,7 +77,7 @@ export default function Signup() {
             <div className="flex flex-col items-center gap-4 py-6">
               <CheckCircle2 className="w-16 h-16 text-emerald-500" />
               <p className="text-lg font-semibold text-emerald-500">Conta criada com sucesso!</p>
-              <p className="text-sm text-muted-foreground text-center">Redirecionando para o login...</p>
+              <p className="text-sm text-muted-foreground text-center">Redirecionando para os planos...</p>
             </div>
           ) : (
             <>

@@ -5,7 +5,7 @@ import { Prisma } from '@prisma/client'
 
 export async function POST(req: NextRequest) {
   try {
-    const { companyName, name, email, password } = await req.json()
+    const { companyName, name, email, password, role } = await req.json()
 
     if (!companyName || !name || !email || !password) {
       return NextResponse.json({ error: 'Todos os campos são obrigatórios.' }, { status: 400 })
@@ -22,6 +22,8 @@ export async function POST(req: NextRequest) {
     }
 
     const hashedPassword = await bcrypt.hash(password, 12)
+    const allowedRoles = new Set(['OPERATOR', 'MANAGER'])
+    const requestedRole = typeof role === 'string' && allowedRoles.has(role) ? role : 'OPERATOR'
 
     // Keep company + user creation atomic to avoid orphan companies on failures.
     await prisma.$transaction(async (tx) => {
@@ -38,7 +40,7 @@ export async function POST(req: NextRequest) {
           name,
           email,
           password: hashedPassword,
-          role: 'ADMIN',
+          role: isFirstUser ? 'ADMIN' : requestedRole,
           isApproved: isFirstUser,
           isSystemAdmin: isFirstUser,
           companyId: company.id,

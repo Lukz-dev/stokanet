@@ -4,7 +4,8 @@ import prisma from '@/lib/prisma'
 import { Prisma } from '@prisma/client'
 import { revalidatePath } from 'next/cache'
 import bcrypt from 'bcryptjs'
-import { AppRole, getActiveCompanyId, getActiveUser } from '@/lib/access'
+import type { AppRole } from '@/lib/roles'
+import { getActiveCompanyId, getActiveUser } from '@/lib/access'
 import { THEME_PREFERENCES, type ThemePreference } from '@/lib/theme'
 import { processSaleWithNfe } from '@/lib/sales/processSaleWithNfe'
 import { getLatestProductCosts } from '@/lib/product-costs'
@@ -810,6 +811,123 @@ export async function getDashboardStats() {
   return { totalProducts, lowStockProducts, criticalProducts, totalValue, totalQty, criticalList }
 }
 
+type BossProductStat = {
+  productId: string
+  productName: string
+  sku: string
+  soldQty: number
+  soldValue: number
+  investedValue: number
+  profit: number
+  averagePrice: number
+}
+
+export async function getBossProfileStats() {
+  const now = new Date()
+  const from = new Date(now)
+  from.setDate(from.getDate() - 29)
+  from.setHours(0, 0, 0, 0)
+  const to = new Date(now)
+  to.setHours(23, 59, 59, 999)
+
+  return getBossProfileStatsForRange(from, to)
+}
+
+export async function getBossProfileStatsForRange(from: Date, to: Date) {
+  const companyId = await getCompanyId()
+  const toExclusive = new Date(to)
+  toExclusive.setMilliseconds(toExclusive.getMilliseconds() + 1)
+
+  const [saleItems, purchaseItems] = await Promise.all([
+    prisma.saleItem.findMany({
+      where: { sale: { companyId, createdAt: { gte: from, lt: toExclusive } } },
+      select: {
+        productId: true,
+        productName: true,
+        product: { select: { sku: true } },
+        quantity: true,
+        total: true,
+      },
+    }),
+    prisma.purchaseOrderItem.findMany({
+      where: { purchaseOrder: { companyId, status: 'RECEBIDO', createdAt: { gte: from, lt: toExclusive } } },
+      select: {
+        productId: true,
+        productName: true,
+        product: { select: { sku: true } },
+        quantity: true,
+        total: true,
+      },
+    }),
+  ])
+
+  const products = new Map<string, BossProductStat>()
+
+  const ensureProduct = (productId: string, productName: string, sku = '') => {
+    const current = products.get(productId)
+    if (current) return current
+
+    const created = {
+      productId,
+      productName,
+      sku,
+      soldQty: 0,
+      soldValue: 0,
+      investedValue: 0,
+      profit: 0,
+      averagePrice: 0,
+    }
+
+    products.set(productId, created)
+    return created
+  }
+
+  for (const item of saleItems) {
+    const aggregate = ensureProduct(item.productId, item.productName, item.product.sku)
+    aggregate.soldQty += item.quantity
+    aggregate.soldValue += item.total
+  }
+
+  for (const item of purchaseItems) {
+    const aggregate = ensureProduct(item.productId, item.productName, item.product.sku)
+    aggregate.investedValue += item.total
+  }
+
+  const items = Array.from(products.values()).map((item) => {
+    const soldValue = Number(item.soldValue.toFixed(2))
+    const investedValue = Number(item.investedValue.toFixed(2))
+    const profit = Number((soldValue - investedValue).toFixed(2))
+    const averagePrice = item.soldQty > 0 ? Number((soldValue / item.soldQty).toFixed(2)) : 0
+
+    return {
+      ...item,
+      soldValue,
+      investedValue,
+      profit,
+      averagePrice,
+    }
+  })
+
+  items.sort((a, b) => b.soldValue - a.soldValue)
+
+  const totalSoldValue = Number(items.reduce((acc, item) => acc + item.soldValue, 0).toFixed(2))
+  const totalInvestedValue = Number(items.reduce((acc, item) => acc + item.investedValue, 0).toFixed(2))
+  const totalProfit = Number((totalSoldValue - totalInvestedValue).toFixed(2))
+  const totalSoldQty = items.reduce((acc, item) => acc + item.soldQty, 0)
+  const averagePricePerUnit = totalSoldQty > 0 ? Number((totalSoldValue / totalSoldQty).toFixed(2)) : 0
+
+  return {
+    from,
+    to,
+    totalSoldValue,
+    totalInvestedValue,
+    totalProfit,
+    totalSoldQty,
+    averagePricePerUnit,
+    products: items.slice(0, 12),
+  }
+}
+
 // =====================
 // PRODUTOS
 // =====================
@@ -852,6 +970,7 @@ export async function getQuickProducts(limit = 5) {
       id: true,
       name: true,
       sku: true,
+      purchaseCost: true,
       price: true,
       stockQty: true,
       size: true,
@@ -878,8 +997,8 @@ export async function createProduct(data: {
   sku: string
   size?: string
   color?: string
+  purchaseCost: number
   price: number
-  purchaseCost?: number
   stockQty: number
   minStock: number
   categoryId?: string
@@ -912,6 +1031,7 @@ export async function createProduct(data: {
       cest: data.cest?.trim() || null,
       cfop: data.cfop?.trim() || null,
       taxProfile: (data.taxProfile ?? null) as any,
+      purchaseCost: Number.isFinite(data.purchaseCost) ? data.purchaseCost : 0,
       status,
       companyId,
     },
@@ -933,8 +1053,8 @@ export async function updateProduct(id: string, data: {
   sku?: string
   size?: string
   color?: string
-  price?: number
   purchaseCost?: number
+  price?: number
   stockQty?: number
   minStock?: number
   categoryId?: string
@@ -979,6 +1099,7 @@ export async function updateProduct(id: string, data: {
       cest: data.cest === undefined ? undefined : data.cest?.trim() || null,
       cfop: data.cfop === undefined ? undefined : data.cfop?.trim() || null,
       taxProfile: data.taxProfile === undefined ? undefined : (data.taxProfile ?? null) as any,
+      purchaseCost: data.purchaseCost === undefined ? undefined : data.purchaseCost,
       status,
     },
   })

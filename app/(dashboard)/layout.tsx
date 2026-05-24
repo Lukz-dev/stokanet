@@ -1,11 +1,33 @@
 import { Sidebar } from "@/components/Sidebar";
 import { Header } from "@/components/Header";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import { redirect } from "next/navigation";
+import { getSubscriptionStatus } from "@/lib/subscription";
 
-export default function DashboardLayout({
+export default async function DashboardLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const session = await getServerSession(authOptions);
+  const sessionUser = session?.user as { companyId?: string; role?: string; isSystemAdmin?: boolean } | undefined;
+  const companyId = sessionUser?.companyId;
+  const isSystemAdmin = sessionUser?.isSystemAdmin === true;
+  const isApprovalAdmin = isSystemAdmin || sessionUser?.role === 'ADMIN';
+
+  if (!companyId && !isSystemAdmin) {
+    redirect('/login');
+  }
+
+  if (!isApprovalAdmin && companyId) {
+    const subscription = await getSubscriptionStatus(companyId);
+
+    if (!subscription.isActive) {
+      redirect('/plans');
+    }
+  }
+
   return (
     <div className="flex w-full min-h-full flex-row">
       <Sidebar />

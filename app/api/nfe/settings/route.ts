@@ -2,10 +2,10 @@ import { NextResponse } from 'next/server'
 import { Prisma } from '@prisma/client'
 import prisma from '@/lib/prisma'
 import { getActiveUser, getActiveCompanyId } from '@/lib/access'
+import { isBossRole } from '@/lib/roles'
 
 function assertCanManage(userRole?: string) {
-  const role = userRole ?? 'OPERATOR'
-  if (!['ADMIN', 'MANAGER'].includes(role)) {
+  if (!isBossRole(userRole)) {
     throw new Error('Você não tem permissão para alterar configurações fiscais.')
   }
 }

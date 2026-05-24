@@ -1,4 +1,7 @@
 import { getAdminUsers, setUserApproval } from '@/lib/admin'
+import { AdminResetPasswordButton } from '@/components/AdminResetPasswordButton'
+import { AdminSubscriptionEditor } from '@/components/AdminSubscriptionEditor'
+import prisma from '@/lib/prisma'
 
 type AdminUser = Awaited<ReturnType<typeof getAdminUsers>>[number]
 
@@ -10,6 +13,21 @@ const formatDate = new Intl.DateTimeFormat('pt-BR', {
 export default async function AdminPage() {
   const users: AdminUser[] = await getAdminUsers()
 
+  const usersWithSubscriptions = await Promise.all(
+    users.map(async (user) => {
+      if (!user.companyId) {
+        return { ...user, subscription: null }
+      }
+      const subscription = await prisma.subscription.findUnique({
+        where: { companyId: user.companyId },
+      })
+      return {
+        ...user,
+        subscription: subscription || null,
+      }
+    })
+  )
+
   return (
     <div className="space-y-8">
       <div className="space-y-2">
@@ -17,6 +35,9 @@ export default async function AdminPage() {
         <h1 className="text-3xl font-bold tracking-tight text-foreground">Aprovação de contas</h1>
         <p className="text-sm text-muted-foreground max-w-2xl">
           Libere ou revogue o acesso dos cadastros que chegam pelo site. Contas sem aprovação ficam bloqueadas fora do painel de espera.
+        </p>
+        <p className="text-xs text-muted-foreground max-w-2xl">
+          Por segurança, a senha armazenada não pode ser exibida. Quando necessário, o administrador pode redefinir a senha e receber uma senha temporária.
         </p>
       </div>
 
@@ -41,7 +62,7 @@ export default async function AdminPage() {
         </div>
 
         <div className="divide-y divide-border">
-          {users.map((user: AdminUser) => {
+          {usersWithSubscriptions.map((user) => {
             const statusLabel = user.isSystemAdmin ? 'Administrador do sistema' : user.isApproved ? 'Aprovado' : 'Pendente'
             const statusClass = user.isSystemAdmin
               ? 'bg-primary/10 text-primary border-primary/20'
@@ -50,7 +71,7 @@ export default async function AdminPage() {
                 : 'bg-amber-500/10 text-amber-700 border-amber-500/20'
 
             return (
-              <div key={user.id} className="grid gap-4 px-6 py-5 md:grid-cols-[1.4fr_1.2fr_0.8fr_auto] md:items-center">
+              <div key={user.id} data-testid={`admin-user-row-${user.email}`} className="grid gap-4 px-6 py-5 md:grid-cols-[1fr_0.9fr_0.8fr_0.9fr_auto] md:items-start">
                 <div>
                   <p className="font-semibold text-foreground">{user.name ?? 'Sem nome'}</p>
                   <p className="text-sm text-muted-foreground">{user.email}</p>
@@ -67,19 +88,33 @@ export default async function AdminPage() {
                   </span>
                 </div>
 
+                <div>
+                  <AdminSubscriptionEditor
+                    userId={user.id}
+                    userEmail={user.email}
+                    subscription={user.subscription}
+                  />
+                </div>
+
                 <div className="flex justify-start md:justify-end">
-                  {user.isSystemAdmin ? (
-                    <span className="text-xs text-muted-foreground">Protegido</span>
-                  ) : (
-                    <form action={setUserApproval.bind(null, user.id, !user.isApproved)}>
-                      <button
-                        type="submit"
-                        className={`rounded-lg px-4 py-2 text-sm font-semibold transition-colors ${user.isApproved ? 'bg-rose-500/10 text-rose-700 hover:bg-rose-500/20' : 'bg-primary text-primary-foreground hover:bg-primary/90'}`}
-                      >
-                        {user.isApproved ? 'Revogar acesso' : 'Liberar acesso'}
-                      </button>
-                    </form>
-                  )}
+                  <div className="flex flex-col gap-2">
+                    {user.isSystemAdmin ? (
+                      <span className="text-xs text-muted-foreground">Protegido</span>
+                    ) : (
+                      <form action={setUserApproval.bind(null, user.id, !user.isApproved)}>
+                        <button
+                          type="submit"
+                          className={`rounded-lg px-4 py-2 text-sm font-semibold transition-colors ${user.isApproved ? 'bg-rose-500/10 text-rose-700 hover:bg-rose-500/20' : 'bg-primary text-primary-foreground hover:bg-primary/90'}`}
+                        >
+                          {user.isApproved ? 'Revogar acesso' : 'Liberar acesso'}
+                        </button>
+                      </form>
+                    )}
+
+                    {!user.isSystemAdmin && (
+                      <AdminResetPasswordButton userId={user.id} userEmail={user.email} />
+                    )}
+                  </div>
                 </div>
               </div>
             )

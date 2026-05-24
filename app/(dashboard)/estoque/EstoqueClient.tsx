@@ -11,7 +11,7 @@ const EditProductModal = dynamic(() => import('@/components/EditProductModal').t
 
 interface Category { id: string; name: string }
 interface Product {
-  id: string; name: string; sku: string; size: string | null; color: string | null; price: number; purchaseCost?: number | null
+  id: string; name: string; sku: string; size: string | null; color: string | null; purchaseCost: number; price: number
   stockQty: number; minStock: number; status: string
   categoryId: string | null; category: Category | null
 }
@@ -209,8 +209,7 @@ export function EstoqueClient({ initialProducts, categories, defaultMinStock }: 
                     <th className="px-6 py-4 font-semibold tracking-wider">SKU interno</th>
                     <th className="px-6 py-4 font-semibold tracking-wider">Variação</th>
                     <th className="px-6 py-4 font-semibold tracking-wider">Cor</th>
-                    <th className="px-6 py-4 font-semibold tracking-wider">Categoria</th>
-                    <th className="px-6 py-4 font-semibold tracking-wider">Valor de compra</th>
+                    <th className="px-6 py-4 font-semibold tracking-wider">Custo de compra</th>
                     <th className="px-6 py-4 font-semibold tracking-wider">Preço de venda</th>
                     <th className="px-6 py-4 font-semibold tracking-wider">Lucro/peça</th>
                     <th className="px-6 py-4 font-semibold tracking-wider">Qtd. em estoque</th>
@@ -244,7 +243,7 @@ export function EstoqueClient({ initialProducts, categories, defaultMinStock }: 
                           <span className="text-muted-foreground text-xs">—</span>
                         )}
                       </td>
-                      <td className="px-6 py-4 font-medium text-muted-foreground">{p.purchaseCost ? formatCurrency(p.purchaseCost) : '—'}</td>
+                      <td className="px-6 py-4 font-medium text-muted-foreground">{formatCurrency(p.purchaseCost)}</td>
                       <td className="px-6 py-4 font-medium text-muted-foreground">{formatCurrency(p.price)}</td>
                       <td className="px-6 py-4">
                         {p.purchaseCost ? (

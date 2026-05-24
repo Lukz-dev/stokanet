@@ -4,6 +4,38 @@ import { getActiveCompanyId } from '@/lib/access'
 
 const formatCurrency = (value: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value)
 
+const formatDocument = (value: string | null | undefined) => {
+  const digits = String(value ?? '').replace(/\D+/g, '')
+  if (digits.length === 14) {
+    return digits.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5')
+  }
+  if (digits.length === 11) {
+    return digits.replace(/^(\d{3})(\d{3})(\d{3})(\d{2})$/, '$1.$2.$3-$4')
+  }
+  return value ?? 'Não informado'
+}
+
+const formatAddress = (address: unknown) => {
+  if (!address || typeof address !== 'object') return 'Não informado'
+
+  const data = address as Record<string, unknown>
+  const street = String(data.street ?? data.logradouro ?? '').trim()
+  const number = String(data.number ?? data.numero ?? '').trim()
+  const district = String(data.district ?? data.bairro ?? '').trim()
+  const city = String(data.city ?? data.municipio ?? '').trim()
+  const state = String(data.state ?? data.uf ?? '').trim()
+  const zip = String(data.zip ?? data.cep ?? '').trim()
+
+  const parts = [
+    street && number ? `${street}, ${number}` : street || number,
+    district,
+    city && state ? `${city} - ${state}` : city || state,
+    zip,
+  ].filter(Boolean)
+
+  return parts.length ? parts.join(' | ') : 'Não informado'
+}
+
 const escapeHtml = (value: string | null | undefined) =>
   String(value ?? '')
     .replaceAll('&', '&amp;')
@@ -24,6 +56,7 @@ export async function GET(_: Request, context: RouteContext) {
     where: { id: saleId, companyId },
     include: {
       company: true,
+      customer: true,
       items: {
         select: {
           productName: true,
@@ -45,12 +78,20 @@ export async function GET(_: Request, context: RouteContext) {
     timeStyle: 'short',
   })
 
+  const companyAddress = formatAddress(sale.company.fiscalAddress)
+  const customerAddress = formatAddress(sale.customer?.address)
+  const customerDocument = sale.customer ? formatDocument(sale.customer.cpfCnpj) : 'Não informado'
+  const companyDocument = formatDocument(sale.company.cnpj)
+  const serviceDescription = sale.items
+    .map((item) => `${item.productName} (${item.quantity} x ${formatCurrency(item.unitPrice)})`)
+    .join(' | ')
+
   const html = `<!doctype html>
   <html lang="pt-BR">
     <head>
       <meta charset="utf-8" />
       <meta name="viewport" content="width=device-width, initial-scale=1" />
-      <title>NFS-e ${escapeHtml(sale.code)}</title>
+      <title>NFS-e Padrão Nacional ${escapeHtml(sale.code)}</title>
       <style>
         :root { color-scheme: light; }
         * { box-sizing: border-box; }
@@ -151,6 +192,30 @@ export async function GET(_: Request, context: RouteContext) {
         }
         .summary-card .label { margin-bottom: 8px; }
         .summary-card .value { font-size: 20px; }
+        .info-grid {
+          padding: 0 28px 24px;
+          display: grid;
+          gap: 12px;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+        .info-block {
+          border: 1px solid #e6ebf5;
+          border-radius: 16px;
+          padding: 16px;
+          background: #f8faff;
+        }
+        .info-block h2 {
+          margin: 0 0 10px;
+          font-size: 14px;
+          text-transform: uppercase;
+          letter-spacing: 0.1em;
+          color: #475467;
+        }
+        .info-line {
+          margin: 0;
+          font-size: 14px;
+          line-height: 1.6;
+        }
         .footer {
           padding: 0 28px 28px;
           color: #667085;
@@ -190,9 +255,9 @@ export async function GET(_: Request, context: RouteContext) {
           <header class="header">
             <div class="header-top">
               <div>
-                <p class="eyebrow">NFS-e gerada pelo StokaNet</p>
+                <p class="eyebrow">NFS-e padrão nacional</p>
                 <h1>Nota Fiscal de Serviço eletrônica</h1>
-                <p style="margin:10px 0 0; opacity:.9">Documento interno de conferência e impressão da venda.</p>
+                <p style="margin:10px 0 0; opacity:.9">Modelo de conferência e impressão com layout inspirado no padrão nacional.</p>
               </div>
               <div style="text-align:right">
                 <p class="eyebrow" style="margin-bottom:6px">Número</p>
@@ -203,20 +268,47 @@ export async function GET(_: Request, context: RouteContext) {
 
           <section class="meta-grid">
             <div class="meta">
-              <div class="label">Tomador / Emitente</div>
-              <div class="value">${escapeHtml(sale.company.name)}</div>
+              <div class="label">Prestador de serviço</div>
+              <div class="value">${escapeHtml(sale.company.legalName || sale.company.name)}</div>
             </div>
             <div class="meta">
-              <div class="label">Data de emissão</div>
+              <div class="label">Emissão</div>
               <div class="value">${escapeHtml(issueDate)}</div>
             </div>
             <div class="meta">
-              <div class="label">Forma de pagamento</div>
-              <div class="value">${escapeHtml(sale.paymentMethod ?? 'Não informada')}</div>
+              <div class="label">CNPJ</div>
+              <div class="value">${escapeHtml(companyDocument)}</div>
             </div>
             <div class="meta">
-              <div class="label">Status fiscal</div>
-              <div class="value">Processada internamente</div>
+              <div class="label">Status</div>
+              <div class="value">Documento interno</div>
+            </div>
+          </section>
+
+          <section class="info-grid">
+            <div class="info-block">
+              <h2>Prestador de serviço</h2>
+              <p class="info-line"><strong>Razão social:</strong> ${escapeHtml(sale.company.legalName || sale.company.name)}</p>
+              <p class="info-line"><strong>Inscrição estadual:</strong> ${escapeHtml(sale.company.ie ?? 'Não informado')}</p>
+              <p class="info-line"><strong>Endereço:</strong> ${escapeHtml(companyAddress)}</p>
+            </div>
+            <div class="info-block">
+              <h2>Tomador de serviço</h2>
+              <p class="info-line"><strong>Nome:</strong> ${escapeHtml(sale.customer?.name ?? 'Consumidor final')}</p>
+              <p class="info-line"><strong>CPF/CNPJ:</strong> ${escapeHtml(customerDocument)}</p>
+              <p class="info-line"><strong>Endereço:</strong> ${escapeHtml(customerAddress)}</p>
+            </div>
+          </section>
+
+          <section class="info-grid" style="padding-top: 0;">
+            <div class="info-block">
+              <h2>Discriminação do serviço</h2>
+              <p class="info-line">${escapeHtml(serviceDescription || 'Serviço referente à venda registrada no sistema.')}</p>
+            </div>
+            <div class="info-block">
+              <h2>Dados complementares</h2>
+              <p class="info-line"><strong>Forma de pagamento:</strong> ${escapeHtml(sale.paymentMethod ?? 'Não informada')}</p>
+              <p class="info-line"><strong>Base legal:</strong> Documento gerado para conferência interna em formato compatível com o modelo nacional.</p>
             </div>
           </section>
 
@@ -263,8 +355,8 @@ export async function GET(_: Request, context: RouteContext) {
           </section>
 
           <section class="footer">
-            <p>Este documento é um comprovante fiscal interno gerado automaticamente com base na venda registrada no sistema.</p>
-            <p>Para emissão oficial em prefeitura ou integração com provedor municipal, o projeto ainda precisará dos dados fiscais da empresa e da integração específica do município.</p>
+            <p>Este documento segue um layout de conferência alinhado ao padrão nacional da NFS-e.</p>
+            <p>Para emissão oficial junto ao provedor nacional ou municipal, ainda é necessário integrar a API da prefeitura ou do ambiente nacional correspondente.</p>
           </section>
 
           <div class="actions">

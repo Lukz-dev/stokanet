@@ -131,13 +131,18 @@ export function Header() {
 
   return (
     <header className="h-16 border-b border-border bg-background/80 backdrop-blur-md sticky top-0 z-10 flex items-center justify-between px-8">
-      <div className="flex items-center bg-muted/50 rounded-full px-3 py-1.5 w-80 border border-border/50 focus-within:border-primary/50 focus-within:ring-1 focus-within:ring-primary/20 transition-all">
+      <div className="flex items-center gap-4">
+        <Link href="/" className="flex items-center text-lg font-bold">
+          StokaNet
+        </Link>
+        <div className="flex items-center bg-muted/50 rounded-full px-3 py-1.5 w-80 border border-border/50 focus-within:border-primary/50 focus-within:ring-1 focus-within:ring-primary/20 transition-all">
         <Search className="w-4 h-4 text-muted-foreground mr-2 shrink-0" />
         <input
           type="text"
           placeholder="Busque por SKU, produto, variação ou categoria..."
           className="bg-transparent border-none outline-none text-sm w-full placeholder:text-muted-foreground"
         />
+        </div>
       </div>
 
       <div className="flex items-center gap-4">

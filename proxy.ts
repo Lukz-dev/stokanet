@@ -17,7 +17,10 @@ export default async function proxy(req: NextRequest) {
   const isSystemAdmin = token.isSystemAdmin === true
   const isAdmin = isSystemAdmin || String(token.role ?? 'OPERATOR') === 'ADMIN'
 
-  if (!isApproved && pathname !== '/pending') {
+  // Allow non-approved users to access public subscription and plans pages
+  const allowedForPending = pathname.startsWith('/plans') || pathname.startsWith('/subscription') || pathname.startsWith('/api/subscription')
+
+  if (!isApproved && !allowedForPending && pathname !== '/pending') {
     return NextResponse.redirect(new URL('/pending', req.url))
   }
 

@@ -77,7 +77,18 @@ export default function Login() {
           return
         }
 
-        router.replace('/')
+        // After successful sign in, decide where to send the user.
+        // If they have a checkout cookie we keep the existing behavior.
+        const sessionRes = await fetch('/api/auth/session')
+        const sessionJson = await (sessionRes.ok ? sessionRes.json() : Promise.resolve(null))
+
+        const isApproved = sessionJson?.user?.isApproved === true || sessionJson?.user?.isSystemAdmin === true
+
+        if (isApproved) {
+          router.replace('/')
+        } else {
+          router.replace('/subscription')
+        }
         router.refresh()
         return
       }

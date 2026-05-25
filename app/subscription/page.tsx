@@ -75,7 +75,7 @@ export default async function SubscriptionPage() {
           </p>
           <div className="mt-4 flex flex-wrap gap-3">
             <Link
-              href="/plans"
+              href="/plans?source=manage"
               className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
             >
               Ver planos

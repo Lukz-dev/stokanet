@@ -2,9 +2,9 @@
 
 import { useState, useMemo, useCallback, useTransition } from 'react'
 import dynamic from 'next/dynamic'
-import { Plus, Search, Filter, Edit2, Package, ChevronLeft, ChevronRight, RotateCcw } from 'lucide-react'
+import { Plus, Search, Filter, Edit2, Package, ChevronLeft, ChevronRight, RotateCcw, Trash2 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
-import { unarchiveProduct } from '@/lib/actions'
+import { archiveProduct, deleteProduct, unarchiveProduct } from '@/lib/actions'
 
 const ProductModal = dynamic(() => import('@/components/ProductModal').then((module) => module.ProductModal))
 const EditProductModal = dynamic(() => import('@/components/EditProductModal').then((module) => module.EditProductModal))
@@ -41,7 +41,9 @@ export function EstoqueClient({ initialProducts, categories, defaultMinStock }: 
   const [showCreate, setShowCreate] = useState(false)
   const [editingProduct, setEditingProduct] = useState<Product | null>(null)
   const [page, setPage] = useState(1)
+  const [selectedProductIds, setSelectedProductIds] = useState<Set<string>>(new Set())
   const [isUnarchiving, startUnarchiveTransition] = useTransition()
+  const [isBulkDeleting, startBulkDeleteTransition] = useTransition()
   const [unarchivingId, setUnarchivingId] = useState<string | null>(null)
 
   const filtered = useMemo(() => {
@@ -55,10 +57,148 @@ export function EstoqueClient({ initialProducts, categories, defaultMinStock }: 
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
   const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+  const paginatedIds = paginated.map((product) => product.id)
+  const selectedOnPageCount = paginatedIds.filter((id) => selectedProductIds.has(id)).length
+  const allPageSelected = paginatedIds.length > 0 && selectedOnPageCount === paginatedIds.length
+
+  const clearSelection = useCallback(() => {
+    setSelectedProductIds(new Set())
+  }, [])
+
+  const togglePageSelection = useCallback(() => {
+    setSelectedProductIds((current) => {
+      const next = new Set(current)
+      const shouldSelectAll = !paginatedIds.every((id) => next.has(id))
+
+      for (const id of paginatedIds) {
+        if (shouldSelectAll) {
+          next.add(id)
+        } else {
+          next.delete(id)
+        }
+      }
+
+      return next
+    })
+  }, [paginatedIds])
+
+  const toggleProductSelection = useCallback((productId: string) => {
+    setSelectedProductIds((current) => {
+      const next = new Set(current)
+      if (next.has(productId)) {
+        next.delete(productId)
+      } else {
+        next.add(productId)
+      }
+      return next
+    })
+  }, [])
 
   const handleSuccess = useCallback(() => {
     router.refresh()
   }, [router])
+
+  const handleBulkDelete = useCallback(() => {
+    const selectedIds = [...selectedProductIds].filter((id) => paginatedIds.includes(id))
+
+    if (selectedIds.length === 0) {
+      return
+    }
+
+    const confirmed = window.confirm(
+      `Excluir ${selectedIds.length} produto(s) selecionado(s)? Esta ação não pode ser desfeita.`
+    )
+
+    if (!confirmed) {
+      return
+    }
+
+    startBulkDeleteTransition(async () => {
+      try {
+        let deletedCount = 0
+        const blockedMessages: string[] = []
+
+        for (const productId of selectedIds) {
+          try {
+            const result = await deleteProduct(productId)
+            if (result?.ok) {
+              deletedCount += 1
+            } else if (result?.reason) {
+              blockedMessages.push(result.reason)
+            }
+          } catch (error) {
+            blockedMessages.push(error instanceof Error ? error.message : `Erro ao excluir ${productId}`)
+          }
+        }
+
+        clearSelection()
+        router.refresh()
+
+        if (blockedMessages.length > 0) {
+          window.alert(
+            `Exclusão concluída com restrições. Excluídos: ${deletedCount}. Bloqueados: ${blockedMessages.length}.\n\n${blockedMessages.slice(0, 3).join('\n')}${blockedMessages.length > 3 ? '\n...' : ''}`
+          )
+        } else {
+          window.alert(`Exclusão concluída. ${deletedCount} produto(s) removido(s).`)
+        }
+      } catch (error) {
+        window.alert(error instanceof Error ? error.message : 'Não foi possível excluir os produtos selecionados.')
+      }
+    })
+  }, [clearSelection, paginatedIds, router, selectedProductIds, startBulkDeleteTransition])
+
+  const handleBulkArchive = useCallback(() => {
+    const selectedIds = [...selectedProductIds].filter((id) => paginatedIds.includes(id))
+
+    if (selectedIds.length === 0) {
+      return
+    }
+
+    const actionLabel = view === 'ativos' ? 'arquivar' : 'desarquivar'
+    const confirmed = window.confirm(
+      `${actionLabel === 'arquivar' ? 'Arquivar' : 'Desarquivar'} ${selectedIds.length} produto(s) selecionado(s)?`
+    )
+
+    if (!confirmed) {
+      return
+    }
+
+    startBulkDeleteTransition(async () => {
+      try {
+        let processedCount = 0
+        const blockedMessages: string[] = []
+
+        for (const productId of selectedIds) {
+          try {
+            const result = view === 'ativos'
+              ? await archiveProduct(productId)
+              : await unarchiveProduct(productId)
+
+            if (result?.ok) {
+              processedCount += 1
+            } else {
+              blockedMessages.push(`Não foi possível ${actionLabel} o produto ${productId}.`)
+            }
+          } catch (error) {
+            blockedMessages.push(error instanceof Error ? error.message : `Erro ao processar ${productId}`)
+          }
+        }
+
+        clearSelection()
+        router.refresh()
+
+        if (blockedMessages.length > 0) {
+          window.alert(
+            `${actionLabel === 'arquivar' ? 'Arquivamento' : 'Desarquivamento'} concluído com restrições. Processados: ${processedCount}. Bloqueados: ${blockedMessages.length}.\n\n${blockedMessages.slice(0, 3).join('\n')}${blockedMessages.length > 3 ? '\n...' : ''}`
+          )
+        } else {
+          window.alert(`${actionLabel === 'arquivar' ? 'Arquivamento' : 'Desarquivamento'} concluído. ${processedCount} produto(s) atualizado(s).`)
+        }
+      } catch (error) {
+        window.alert(error instanceof Error ? error.message : 'Não foi possível processar os produtos selecionados.')
+      }
+    })
+  }, [clearSelection, paginatedIds, router, selectedProductIds, startBulkDeleteTransition, view])
 
   const handleUnarchive = useCallback((productId: string) => {
     startUnarchiveTransition(async () => {
@@ -128,7 +268,7 @@ export function EstoqueClient({ initialProducts, categories, defaultMinStock }: 
               {VIEW_OPTIONS.map(option => (
                 <button
                   key={option.value}
-                  onClick={() => { setView(option.value); setStatusFilter('todos'); setPage(1) }}
+                  onClick={() => { setView(option.value); setStatusFilter('todos'); setPage(1); clearSelection() }}
                   className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
                     view === option.value
                       ? 'bg-primary text-primary-foreground shadow-sm'
@@ -147,6 +287,32 @@ export function EstoqueClient({ initialProducts, categories, defaultMinStock }: 
               >
                 <Plus className="w-4 h-4" />
                 Novo Produto
+              </button>
+            )}
+            {selectedOnPageCount > 0 && (
+              <button
+                type="button"
+                onClick={handleBulkArchive}
+                disabled={isBulkDeleting}
+                className="bg-slate-900 hover:bg-slate-800 text-white px-4 py-2.5 rounded-lg flex items-center gap-2 font-medium transition-all shadow-lg shadow-slate-500/15 hover:shadow-slate-500/25 active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                <RotateCcw className="w-4 h-4" />
+                {isBulkDeleting
+                  ? 'Processando...'
+                  : view === 'ativos'
+                    ? `Arquivar selecionados (${selectedOnPageCount})`
+                    : `Desarquivar selecionados (${selectedOnPageCount})`}
+              </button>
+            )}
+            {selectedOnPageCount > 0 && (
+              <button
+                type="button"
+                onClick={handleBulkDelete}
+                disabled={isBulkDeleting}
+                className="bg-rose-500 hover:bg-rose-600 text-white px-4 py-2.5 rounded-lg flex items-center gap-2 font-medium transition-all shadow-lg shadow-rose-500/20 hover:shadow-rose-500/30 active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                <Trash2 className="w-4 h-4" />
+                {isBulkDeleting ? 'Excluindo...' : `Excluir selecionados (${selectedOnPageCount})`}
               </button>
             )}
             <a
@@ -168,7 +334,7 @@ export function EstoqueClient({ initialProducts, categories, defaultMinStock }: 
                 id="search-products"
                 type="text"
                 value={search}
-                onChange={e => { setSearch(e.target.value); setPage(1) }}
+                onChange={e => { setSearch(e.target.value); setPage(1); clearSelection() }}
                 placeholder="Buscar por nome, SKU ou categoria..."
                 className="bg-transparent border-none outline-none text-sm w-full placeholder:text-muted-foreground"
               />
@@ -179,7 +345,7 @@ export function EstoqueClient({ initialProducts, categories, defaultMinStock }: 
                 {STATUS_OPTIONS.map(s => (
                   <button
                     key={s}
-                    onClick={() => { setStatusFilter(s); setPage(1) }}
+                    onClick={() => { setStatusFilter(s); setPage(1); clearSelection() }}
                     className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors capitalize ${
                       statusFilter === s
                         ? 'bg-primary text-primary-foreground shadow-sm'
@@ -205,6 +371,15 @@ export function EstoqueClient({ initialProducts, categories, defaultMinStock }: 
               <table className="w-full text-sm text-left">
                 <thead className="text-xs uppercase bg-muted/30 text-muted-foreground border-b border-border">
                   <tr>
+                    <th className="px-4 py-4 font-semibold tracking-wider w-12">
+                      <input
+                        type="checkbox"
+                        checked={allPageSelected}
+                        onChange={togglePageSelection}
+                        aria-label="Selecionar todos os produtos desta página"
+                        className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
+                      />
+                    </th>
                     <th className="px-6 py-4 font-semibold tracking-wider">Produto</th>
                     <th className="px-6 py-4 font-semibold tracking-wider">SKU interno</th>
                     <th className="px-6 py-4 font-semibold tracking-wider">Variação</th>
@@ -220,6 +395,15 @@ export function EstoqueClient({ initialProducts, categories, defaultMinStock }: 
                 <tbody className="divide-y divide-border">
                   {paginated.map((p) => (
                     <tr key={p.id} className="bg-transparent hover:bg-muted/30 transition-colors group">
+                      <td className="px-4 py-4 align-top">
+                        <input
+                          type="checkbox"
+                          checked={selectedProductIds.has(p.id)}
+                          onChange={() => toggleProductSelection(p.id)}
+                          aria-label={`Selecionar produto ${p.name}`}
+                          className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
+                        />
+                      </td>
                       <td className="px-6 py-4 font-medium text-foreground max-w-[220px] truncate" title={p.name}>{p.name}</td>
                       <td className="px-6 py-4 font-mono text-xs text-muted-foreground">{p.sku}</td>
                       <td className="px-6 py-4">
@@ -308,7 +492,7 @@ export function EstoqueClient({ initialProducts, categories, defaultMinStock }: 
             </span>
             <div className="flex items-center gap-2">
               <button
-                onClick={() => setPage(p => Math.max(1, p - 1))}
+                onClick={() => { setPage(p => Math.max(1, p - 1)); clearSelection() }}
                 disabled={page === 1}
                 className="p-1.5 rounded-md border border-border hover:bg-muted transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
               >
@@ -318,7 +502,7 @@ export function EstoqueClient({ initialProducts, categories, defaultMinStock }: 
                 <span key={n} className="flex items-center gap-2">
                   {i > 0 && arr[i - 1] !== n - 1 && <span className="px-1 text-muted-foreground">…</span>}
                   <button
-                    onClick={() => setPage(n)}
+                    onClick={() => { setPage(n); clearSelection() }}
                     className={`px-3 py-1.5 rounded-md border text-xs font-medium transition-colors ${
                       page === n ? 'border-primary bg-primary/10 text-primary' : 'border-border hover:bg-muted'
                     }`}
@@ -328,7 +512,7 @@ export function EstoqueClient({ initialProducts, categories, defaultMinStock }: 
                 </span>
               ))}
               <button
-                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                onClick={() => { setPage(p => Math.min(totalPages, p + 1)); clearSelection() }}
                 disabled={page === totalPages}
                 className="p-1.5 rounded-md border border-border hover:bg-muted transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
               >

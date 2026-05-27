@@ -291,7 +291,7 @@ export function CaixaClient({ products, initialSales }: { products: Product[]; i
           return
         }
 
-        if (localMatches.length === 1 || localMatches[0].exactSku || localMatches[0].exactName) {
+        if (localMatches.length === 1) {
           const added = addProductToCart(localMatches[0].product)
           if (!added) {
             setSuccess('')

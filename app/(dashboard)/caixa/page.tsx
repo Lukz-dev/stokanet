@@ -1,9 +1,9 @@
-import { getQuickProducts, getSales } from '@/lib/actions'
+import { getProducts, getSales } from '@/lib/actions'
 import { CaixaClient } from './CaixaClient'
 
 export default async function CaixaPage() {
   const [products, sales] = await Promise.all([
-    getQuickProducts(5),
+    getProducts(),
     getSales(30),
   ])
 

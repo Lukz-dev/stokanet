@@ -65,13 +65,25 @@ export async function POST(request: NextRequest) {
       billingMode
     );
 
-    const preferenceId = preference.id?.toString?.() ?? preference.id;
-    const subscriptionId = preference.id?.toString?.() ?? preference.id;
-    const isRecurring = billingMode === "RECURRING";
-    const subscriptionData = {
+    const planType: "MONTHLY" | "ANNUAL" = planId === "MONTHLY" ? "MONTHLY" : "ANNUAL";
+    const billingModeValue: "ONE_TIME" | "RECURRING" = billingMode;
+    const preferenceId = String(preference.id ?? "");
+    const subscriptionId = String(preference.id ?? "");
+    const isRecurring = billingModeValue === "RECURRING";
+    const subscriptionData: {
+      companyId: string;
+      planType: "MONTHLY" | "ANNUAL";
+      billingMode: "ONE_TIME" | "RECURRING";
+      amount: number;
+      status: "PENDING";
+      autoRenew: boolean;
+      mercadopagoPreferenceId: string | null;
+      mercadopagoSubscriptionId: string | null;
+      mercadopagoPaymentId: string | null;
+    } = {
       companyId: user.companyId,
-      planType: planId === "MONTHLY" ? "MONTHLY" : "ANNUAL",
-      billingMode,
+      planType,
+      billingMode: billingModeValue,
       amount: PLANS[planId as keyof typeof PLANS].price,
       status: "PENDING" as const,
       autoRenew: isRecurring,

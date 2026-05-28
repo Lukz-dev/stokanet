@@ -25,13 +25,13 @@ export async function createPreference(
   planId: keyof typeof PLANS,
   companyId: string,
   companyName: string,
+  payerEmail: string,
   appUrl?: string,
   billingMode: "ONE_TIME" | "RECURRING" = "ONE_TIME"
 ) {
   const plan = PLANS[planId];
 
   const accessToken = getMercadoPagoAccessToken();
-  const payerEmail = process.env.DEFAULT_PAYER_EMAIL;
   const baseUrl = appUrl || process.env.NEXTAUTH_URL || "http://localhost:3000";
 
   if (!accessToken) {
@@ -39,7 +39,7 @@ export async function createPreference(
   }
 
   if (!payerEmail) {
-    throw new Error("DEFAULT_PAYER_EMAIL não configurado");
+    throw new Error("E-mail do pagador não informado");
   }
 
   if (billingMode === "RECURRING") {

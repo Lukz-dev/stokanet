@@ -61,6 +61,7 @@ export async function POST(request: NextRequest) {
       planId as keyof typeof PLANS,
       user.companyId,
       user.company.name,
+      session.user.email,
       requestOrigin,
       billingMode
     );

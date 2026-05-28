@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo, useState, useTransition } from 'react'
-import { Ban, Receipt, Search } from 'lucide-react'
+import { Ban, Receipt, Search, RefreshCw, ExternalLink, FileDigit, TriangleAlert } from 'lucide-react'
 import { cancelSale } from '@/lib/actions'
 import { useRouter } from 'next/navigation'
 
@@ -24,6 +24,12 @@ type Sale = {
   paymentMethod: string | null
   notes: string | null
   nfeStatus: string
+  nfeAccessKey: string | null
+  nfeProtocol: string | null
+  nfeDanfeUrl: string | null
+  nfeErrorCode: string | null
+  nfeErrorMessage: string | null
+  nfeLastAttemptAt: string | null
   createdAt: string
   items: SaleItem[]
 }
@@ -61,6 +67,7 @@ export function VendasClient({ initialSales }: { initialSales: Sale[] }) {
   const [feedback, setFeedback] = useState('')
   const [error, setError] = useState('')
   const [isPending, startTransition] = useTransition()
+  const [fiscalBusyId, setFiscalBusyId] = useState('')
 
   const filteredSales = useMemo(() => {
     const q = search.trim().toLowerCase()
@@ -92,6 +99,37 @@ export function VendasClient({ initialSales }: { initialSales: Sale[] }) {
         setError(currentError?.message || 'Não foi possível cancelar a venda.')
       }
     })
+  }
+
+  const handleFiscalAction = async (sale: Sale, action: 'sync' | 'issue') => {
+    setError('')
+    setFeedback('')
+    setFiscalBusyId(`${sale.id}:${action}`)
+
+    try {
+      const response = await fetch(action === 'sync' ? `/api/nfe/${sale.id}` : `/api/nfe/${sale.id}/issue`, {
+        method: 'POST',
+      })
+      const payload = await response.json().catch(() => ({}))
+
+      if (!response.ok && response.status !== 202) {
+        throw new Error(payload?.error?.message || payload?.error || 'Não foi possível processar a nota fiscal.')
+      }
+
+      if (response.status === 202) {
+        setFeedback(`NF-e de ${sale.code} continua em processamento.`)
+      } else if (action === 'issue') {
+        setFeedback(`NF-e de ${sale.code} foi reemitida com sucesso.`)
+      } else {
+        setFeedback(`NF-e de ${sale.code} foi sincronizada com sucesso.`)
+      }
+
+      router.refresh()
+    } catch (currentError: any) {
+      setError(currentError?.message || 'Não foi possível processar a NF-e.')
+    } finally {
+      setFiscalBusyId('')
+    }
   }
 
   return (
@@ -145,6 +183,10 @@ export function VendasClient({ initialSales }: { initialSales: Sale[] }) {
           ) : filteredSales.map((sale) => {
             const cancelled = isCancelled(sale.notes)
             const canCancel = !cancelled && sale.nfeStatus !== 'AUTORIZADO'
+            const canIssue = sale.nfeStatus === 'REJEITADO' || sale.nfeStatus === 'ERRO'
+            const canSync = sale.nfeStatus === 'PROCESSANDO' || sale.nfeStatus === 'AUTORIZADO' || sale.nfeStatus === 'REJEITADO'
+            const busySync = fiscalBusyId === `${sale.id}:sync`
+            const busyIssue = fiscalBusyId === `${sale.id}:issue`
 
             return (
               <article key={sale.id} className="p-4">
@@ -158,6 +200,12 @@ export function VendasClient({ initialSales }: { initialSales: Sale[] }) {
                       Pagamento: {paymentLabel(sale.paymentMethod)}
                     </p>
                     <p className="text-xs text-muted-foreground mt-1">NF-e: {sale.nfeStatus}</p>
+                    {sale.nfeErrorMessage ? (
+                      <p className="text-xs text-destructive mt-1 flex gap-1 items-start">
+                        <TriangleAlert className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                        <span>{sale.nfeErrorMessage}</span>
+                      </p>
+                    ) : null}
                   </div>
 
                   <div className="text-right">
@@ -231,6 +279,42 @@ export function VendasClient({ initialSales }: { initialSales: Sale[] }) {
                     <span className="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold bg-muted text-muted-foreground">
                       NF-e autorizada: cancelamento bloqueado
                     </span>
+                  ) : null}
+
+                  {sale.nfeDanfeUrl ? (
+                    <a
+                      href={sale.nfeDanfeUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-1 px-3 py-2 rounded-lg border border-border text-sm font-semibold hover:bg-muted transition-colors"
+                    >
+                      <ExternalLink className="w-4 h-4" />
+                      Abrir DANFE
+                    </a>
+                  ) : null}
+
+                  {canSync ? (
+                    <button
+                      type="button"
+                      onClick={() => handleFiscalAction(sale, 'sync')}
+                      disabled={isPending || busySync || busyIssue}
+                      className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-border text-sm font-semibold hover:bg-muted transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <RefreshCw className={`w-4 h-4 ${busySync ? 'animate-spin' : ''}`} />
+                      Sincronizar NF-e
+                    </button>
+                  ) : null}
+
+                  {canIssue ? (
+                    <button
+                      type="button"
+                      onClick={() => handleFiscalAction(sale, 'issue')}
+                      disabled={isPending || busySync || busyIssue}
+                      className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-primary/30 text-primary text-sm font-semibold hover:bg-primary/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <FileDigit className={`w-4 h-4 ${busyIssue ? 'animate-pulse' : ''}`} />
+                      {busyIssue ? 'Reemitindo...' : 'Reemitir NF-e'}
+                    </button>
                   ) : null}
 
                   <button

@@ -8,7 +8,20 @@ export default async function ConfiguracoesPage() {
 
   const currentCompany = await prisma.company.findUnique({
     where: { id: company.id },
-    select: { name: true, defaultMinStock: true, notificationWebhookUrl: true },
+    select: { name: true, defaultMinStock: true, notificationWebhookUrl: true, nfeSettings: {
+      select: {
+        enabled: true,
+        environment: true,
+        model: true,
+        series: true,
+        nextNumber: true,
+        defaultCfop: true,
+        naturezaOperacao: true,
+        taxRegime: true,
+        defaultTaxProfile: true,
+        updatedAt: true,
+      },
+    } },
   })
 
   if (!currentCompany) {
@@ -20,6 +33,7 @@ export default async function ConfiguracoesPage() {
       companyName={currentCompany.name}
       defaultMinStock={currentCompany.defaultMinStock}
       notificationWebhookUrl={currentCompany.notificationWebhookUrl ?? ''}
+      nfeSettings={currentCompany.nfeSettings ? { ...currentCompany.nfeSettings, updatedAt: currentCompany.nfeSettings.updatedAt.toISOString() } : null}
       currentThemePreference={user.themePreference as 'SUNSET' | 'OCEAN' | 'FOREST' | 'ROSE'}
     />
   )

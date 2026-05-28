@@ -106,6 +106,17 @@ function getMercadoPagoAccessToken() {
   );
 }
 
+export function getMercadoPagoPayerEmail(sessionEmail: string) {
+  const isSandbox = process.env.NEXT_PUBLIC_MERCADOPAGO_ENV === "sandbox";
+  const testBuyerEmail = process.env.MERCADOPAGO_TEST_BUYER_EMAIL?.trim();
+
+  if (isSandbox && testBuyerEmail) {
+    return testBuyerEmail;
+  }
+
+  return sessionEmail;
+}
+
 async function createRecurringPreference(
   plan: (typeof PLANS)[keyof typeof PLANS],
   companyId: string,

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import prisma from "@/lib/prisma";
-import { createPreference, formatMercadoPagoError, PLANS } from "@/lib/mercadopago";
+import { createPreference, formatMercadoPagoError, getMercadoPagoPayerEmail, PLANS } from "@/lib/mercadopago";
 
 export async function POST(request: NextRequest) {
   try {
@@ -61,7 +61,7 @@ export async function POST(request: NextRequest) {
       planId as keyof typeof PLANS,
       user.companyId,
       user.company.name,
-      session.user.email,
+      getMercadoPagoPayerEmail(session.user.email),
       requestOrigin,
       billingMode
     );

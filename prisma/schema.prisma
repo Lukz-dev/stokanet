@@ -33,6 +33,44 @@ enum NfeModel {
   NFCE_65
 }
 
+enum DocumentKind {
+  FISCAL
+  NON_FISCAL
+}
+
+enum DocumentModel {
+  NFE_55
+  NFCE_65
+  NFSE
+  ORCAMENTO
+  PEDIDO_VENDA
+  RECIBO_PAGAMENTO
+}
+
+enum DocumentStatus {
+  DRAFT
+  PENDING_TRANSMISSION
+  PROCESSING
+  AUTHORIZED
+  REJECTED
+  PRINT_READY
+  CANCELLED
+  VOIDED
+  ERROR
+}
+
+enum DocumentProvider {
+  FOCUS_NFE
+  TECNOSPEED
+  ENOTAS
+  INTERNAL
+}
+
+enum DocumentPrintFormat {
+  A4
+  THERMAL_80MM
+}
+
 enum NfeTaxRegime {
   SIMPLES_NACIONAL
   SIMPLES_EXCESSO_SUBLIMITE
@@ -91,6 +129,7 @@ model Company {
   categories  Category[]
   movements   Movement[]
   sales       Sale[]
+  documents   Document[]
   nfeSettings NfeSettings?
   suppliers   Supplier[]
   purchaseOrders PurchaseOrder[]
@@ -205,6 +244,7 @@ model Sale {
   companyId     String
   company       Company    @relation(fields: [companyId], references: [id])
   items         SaleItem[]
+  documents     Document[]
   createdAt     DateTime   @default(now())
   updatedAt     DateTime   @default(now()) @updatedAt
 
@@ -239,6 +279,7 @@ model Customer {
   companyId String
   company   Company  @relation(fields: [companyId], references: [id])
   sales     Sale[]
+  documents Document[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -290,6 +331,7 @@ model PurchaseOrder {
   companyId   String
   company     Company  @relation(fields: [companyId], references: [id])
   items       PurchaseOrderItem[]
+  documents   Document[]
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -309,6 +351,65 @@ model PurchaseOrderItem {
   createdAt       DateTime @default(now())
 
   @@index([purchaseOrderId])
+  @@index([productId])
+}
+
+model Document {
+  id               String              @id @default(cuid())
+  code             String              @unique
+  kind             DocumentKind
+  model            DocumentModel
+  status           DocumentStatus      @default(DRAFT)
+  provider         DocumentProvider?
+  printFormat      DocumentPrintFormat @default(A4)
+  series           String?
+  number           Int?
+  externalId       String?
+  accessKey        String?
+  protocol         String?
+  providerResponse Json?
+  payload          Json?
+  notes            String?
+  subtotal         Float               @default(0.0)
+  discount         Float               @default(0.0)
+  total            Float               @default(0.0)
+  issuedAt         DateTime?
+  authorizedAt     DateTime?
+  rejectedAt       DateTime?
+  printedAt        DateTime?
+  saleId           String?
+  sale             Sale?               @relation(fields: [saleId], references: [id], onDelete: SetNull)
+  purchaseOrderId  String?
+  purchaseOrder    PurchaseOrder?      @relation(fields: [purchaseOrderId], references: [id], onDelete: SetNull)
+  customerId       String?
+  customer         Customer?           @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  companyId        String
+  company          Company             @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  items            DocumentItem[]
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+
+  @@index([companyId, createdAt])
+  @@index([companyId, kind, status])
+  @@index([saleId])
+  @@index([purchaseOrderId])
+  @@index([customerId])
+}
+
+model DocumentItem {
+  id          String   @id @default(cuid())
+  documentId  String
+  document    Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  productId   String?
+  description String
+  sku         String?
+  quantity    Float    @default(1)
+  unitPrice   Float    @default(0.0)
+  total       Float    @default(0.0)
+  metadata    Json?
+  createdAt   DateTime @default(now())
+
+  @@index([documentId])
   @@index([productId])
 }
 

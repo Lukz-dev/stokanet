@@ -61,39 +61,40 @@ export async function POST(request: NextRequest) {
       planId as keyof typeof PLANS,
       user.companyId,
       user.company.name,
-      requestOrigin
+      requestOrigin,
+      billingMode
     );
+
+    const preferenceId = preference.id?.toString?.() ?? preference.id;
+    const subscriptionId = preference.id?.toString?.() ?? preference.id;
+    const isRecurring = billingMode === "RECURRING";
+    const subscriptionData = {
+      companyId: user.companyId,
+      planType: planId === "MONTHLY" ? "MONTHLY" : "ANNUAL",
+      billingMode,
+      amount: PLANS[planId as keyof typeof PLANS].price,
+      status: "PENDING" as const,
+      autoRenew: isRecurring,
+      mercadopagoPreferenceId: isRecurring ? null : preferenceId,
+      mercadopagoSubscriptionId: isRecurring ? subscriptionId : null,
+      mercadopagoPaymentId: null,
+    };
 
     // Salvar referência da preferência no BD
     if (!existingSubscription) {
       await prisma.subscription.create({
-        data: {
-          companyId: user.companyId,
-          planType: planId === "MONTHLY" ? "MONTHLY" : "ANNUAL",
-          billingMode,
-          amount: PLANS[planId as keyof typeof PLANS].price,
-          status: "PENDING",
-          autoRenew: billingMode === "RECURRING",
-          mercadopagoPreferenceId: preference.id,
-        },
+        data: subscriptionData,
       });
     } else {
       await prisma.subscription.update({
         where: { companyId: user.companyId },
-        data: {
-          planType: planId === "MONTHLY" ? "MONTHLY" : "ANNUAL",
-          billingMode,
-          amount: PLANS[planId as keyof typeof PLANS].price,
-          status: "PENDING",
-          autoRenew: billingMode === "RECURRING",
-          mercadopagoPreferenceId: preference.id,
-        },
+        data: subscriptionData,
       });
     }
 
     return NextResponse.json({
       initPoint: preference.init_point,
-      sandboxInitPoint: preference.sandbox_init_point,
+      sandboxInitPoint: preference.sandbox_init_point ?? preference.init_point,
     });
   } catch (error) {
     console.error("Erro ao criar preferência:", formatMercadoPagoError(error));

@@ -69,7 +69,7 @@ export function PlansClient({ hasActiveSubscription }: PlansClientProps) {
       const { initPoint, sandboxInitPoint } = await response.json();
       const checkoutUrl = process.env.NEXT_PUBLIC_MERCADOPAGO_ENV === "production"
         ? initPoint
-        : sandboxInitPoint;
+        : sandboxInitPoint || initPoint;
 
       if (checkoutUrl) {
         window.location.href = checkoutUrl;
@@ -120,7 +120,7 @@ export function PlansClient({ hasActiveSubscription }: PlansClientProps) {
 
           <p className="mt-3 text-sm text-gray-500">
             {billingMode === "RECURRING"
-              ? "A cobrança recorrente fica preparada para renovação automática. A etapa final de cartão salvo com a API de pagamentos automáticos do MercadoPago pode ser conectada depois."
+              ? "Cobrança recorrente via assinatura MercadoPago, com renovação acompanhada pelo webhook."
               : "Pagamento único com validade no período escolhido."}
           </p>
         </div>

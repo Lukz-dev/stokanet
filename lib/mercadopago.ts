@@ -25,14 +25,12 @@ export async function createPreference(
   planId: keyof typeof PLANS,
   companyId: string,
   companyName: string,
-  appUrl?: string
+  appUrl?: string,
+  billingMode: "ONE_TIME" | "RECURRING" = "ONE_TIME"
 ) {
   const plan = PLANS[planId];
 
-  const accessToken =
-    process.env.MERCADOPAGO_ACCESS_TOKEN ||
-    process.env.MERCADO_PAGO_ACCESS_TOKEN ||
-    process.env.MP_ACCESS_TOKEN;
+  const accessToken = getMercadoPagoAccessToken();
   const payerEmail = process.env.DEFAULT_PAYER_EMAIL;
   const baseUrl = appUrl || process.env.NEXTAUTH_URL || "http://localhost:3000";
 
@@ -42,6 +40,10 @@ export async function createPreference(
 
   if (!payerEmail) {
     throw new Error("DEFAULT_PAYER_EMAIL não configurado");
+  }
+
+  if (billingMode === "RECURRING") {
+    return createRecurringPreference(plan, companyId, companyName, baseUrl, payerEmail, accessToken);
   }
 
   const response = await fetch("https://api.mercadopago.com/checkout/preferences", {
@@ -79,6 +81,60 @@ export async function createPreference(
       expires: true,
       expiration_date_from: new Date().toISOString(),
       expiration_date_to: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+    }),
+  });
+
+  const responseBody = await response.json().catch(async () => ({
+    raw: await response.text(),
+  }));
+
+  if (!response.ok) {
+    throw new Error(
+      `MercadoPago API error (${response.status}): ${JSON.stringify(responseBody)}`
+    );
+  }
+
+  return responseBody;
+}
+
+function getMercadoPagoAccessToken() {
+  return (
+    process.env.MERCADOPAGO_ACCESS_TOKEN ||
+    process.env.MERCADO_PAGO_ACCESS_TOKEN ||
+    process.env.MP_ACCESS_TOKEN ||
+    ""
+  );
+}
+
+async function createRecurringPreference(
+  plan: (typeof PLANS)[keyof typeof PLANS],
+  companyId: string,
+  companyName: string,
+  baseUrl: string,
+  payerEmail: string,
+  accessToken: string
+) {
+  const frequency = plan.billingCycle === "month" ? 1 : 12;
+
+  const response = await fetch("https://api.mercadopago.com/preapproval", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      reason: `${companyName} - ${plan.name}`,
+      external_reference: companyId,
+      payer_email: payerEmail,
+      back_url: new URL("/plans/success", baseUrl).toString(),
+      notification_url: `${baseUrl}/api/webhook/mercadopago`,
+      status: "pending",
+      auto_recurring: {
+        frequency,
+        frequency_type: "months",
+        transaction_amount: plan.price,
+        currency_id: plan.currency,
+      },
     }),
   });
 

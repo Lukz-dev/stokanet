@@ -48,7 +48,7 @@ Isso criará a tabela `Subscription` com os campos necessários.
 2. Escolhe Mensal ou Anual
 3. Clica em "Começar Agora"
 4. API cria preferência no MercadoPago
-5. Redireciona para checkout do MercadoPago
+5. Redireciona para checkout do MercadoPago ou preapproval de recorrência
 6. Após aprovação, vai para /plans/success
 7. Se recusado, vai para /plans/failure
 ```
@@ -120,14 +120,10 @@ O MercadoPago enviará notificações para:
 
 ## Renovação Automática
 
-O sistema calcula `nextBillingDate` automaticamente:
+O sistema calcula `nextBillingDate` automaticamente e o webhook sincroniza os eventos do MercadoPago:
 - Mensal: +1 mês
 - Anual: +1 ano
-
-Para implementar renovação automática, você pode:
-1. Usar WebHooks para processar renovações
-2. Criar um cron job que verifica assinaturas vencidas
-3. Integrar com a API de assinaturas do MercadoPago
+O fluxo recorrente usa a API de pré-aprovação da MercadoPago e atualiza a assinatura via webhook.
 
 ## Próximos Passos
 

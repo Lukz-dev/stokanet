@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client'
 import prisma from '@/lib/prisma'
 import { getActiveCompanyId } from '@/lib/access'
 import {
@@ -141,7 +142,7 @@ function resolveProvider(kind: DocumentKind, provider?: DocumentProvider) {
   return provider ?? DOCUMENT_PROVIDERS.FOCUS_NFE
 }
 
-function mapSourceItems(items: Array<{ productId?: string | null; description: string; sku?: string | null; quantity?: number; unitPrice?: number; total?: number; metadata?: Record<string, unknown> | null }>) {
+function mapSourceItems(items: Array<{ productId?: string | null; description: string; sku?: string | null; quantity?: number; unitPrice?: number; total?: number; metadata?: Record<string, unknown> | null }>): Prisma.DocumentItemCreateWithoutDocumentInput[] {
   return items.map((item) => ({
     productId: item.productId ?? null,
     description: item.description,
@@ -149,7 +150,7 @@ function mapSourceItems(items: Array<{ productId?: string | null; description: s
     quantity: Number.isFinite(item.quantity) ? Number(item.quantity) : 1,
     unitPrice: Number.isFinite(item.unitPrice) ? Number(item.unitPrice) : 0,
     total: Number.isFinite(item.total) ? Number(item.total) : 0,
-    metadata: item.metadata ?? null,
+    ...(item.metadata ? { metadata: item.metadata as Prisma.InputJsonValue } : {}),
   }))
 }
 
@@ -426,13 +427,19 @@ function buildDocumentPrintHtml(params: {
   const issuedAt = params.document.issuedAt ?? new Date()
   const rows = params.source.items
     .map(
-      (item) => `
+      (item) => {
+        const quantity = Number.isFinite(item.quantity) ? Number(item.quantity) : 1
+        const unitPrice = Number.isFinite(item.unitPrice) ? Number(item.unitPrice) : 0
+        const total = Number.isFinite(item.total) ? Number(item.total) : quantity * unitPrice
+
+        return `
         <tr>
           <td>${escapeHtml(item.description)}</td>
-          <td class="right">${item.quantity.toFixed(2)}</td>
-          <td class="right">${formatCurrency(item.unitPrice)}</td>
-          <td class="right">${formatCurrency(item.total ?? item.quantity * item.unitPrice)}</td>
-        </tr>`,
+          <td class="right">${quantity.toFixed(2)}</td>
+          <td class="right">${formatCurrency(unitPrice)}</td>
+          <td class="right">${formatCurrency(total)}</td>
+        </tr>`
+      },
     )
     .join('')
 

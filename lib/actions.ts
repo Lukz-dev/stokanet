@@ -1668,6 +1668,11 @@ export async function completeSale(data: {
     total: processed.sale.total,
     amountReceived: processed.sale.amountReceived,
     change: processed.sale.change,
+<<<<<<< HEAD
+=======
+    nfeStatus: processed.sale.nfe.status,
+    nfeDanfeUrl: processed.sale.nfe.danfeUrl ?? null,
+>>>>>>> cb05f27 (feat: print NFC-e immediately and fix TypeScript build)
   }
 }
 
@@ -1814,6 +1819,36 @@ export async function getSales(limit = 50) {
   }))
 }
 
+<<<<<<< HEAD
+=======
+export async function getSaleById(id: string) {
+  const companyId = await getCompanyId()
+
+  const sale = await prisma.sale.findFirst({
+    where: { id, companyId },
+    include: {
+      items: { orderBy: { id: 'asc' } },
+      customer: true,
+      company: true,
+    },
+  })
+
+  if (!sale) throw new Error('Venda não encontrada')
+
+  return {
+    ...sale,
+    items: sale.items.map((it: any) => ({
+      id: it.id,
+      productName: it.productName,
+      sku: it.sku,
+      quantity: it.quantity,
+      unitPrice: it.unitPrice,
+      total: it.total,
+    })),
+  }
+}
+
+>>>>>>> cb05f27 (feat: print NFC-e immediately and fix TypeScript build)
 export async function createSupplier(data: {
   name: string
   email?: string

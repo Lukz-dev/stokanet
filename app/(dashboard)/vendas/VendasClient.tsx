@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo, useState, useTransition } from 'react'
-import { Ban, Receipt, Search, RefreshCw, ExternalLink, FileDigit, TriangleAlert } from 'lucide-react'
+import { Ban, Receipt, Search, RefreshCw, ExternalLink, FileDigit, TriangleAlert, Printer } from 'lucide-react'
 import { cancelSale } from '@/lib/actions'
 import { useRouter } from 'next/navigation'
 
@@ -60,7 +60,19 @@ function isCancelled(notes: string | null) {
   return notes.includes('[CANCELADA]')
 }
 
-export function VendasClient({ initialSales }: { initialSales: Sale[] }) {
+function printDanfe(url: string) {
+  const popup = window.open(url, '_blank', 'noopener,noreferrer,width=900,height=700')
+  if (!popup) return
+
+  window.setTimeout(() => {
+    try {
+      popup.focus()
+      popup.print()
+    } catch {
+      // If the browser blocks printing, the DANFE tab remains open.
+    }
+  }, 1500)
+}
   const router = useRouter()
   const [search, setSearch] = useState('')
   const [cancelReason, setCancelReason] = useState('')
@@ -211,6 +223,16 @@ export function VendasClient({ initialSales }: { initialSales: Sale[] }) {
                   <div className="text-right">
                     <p className="text-sm text-muted-foreground">Total</p>
                     <p className="text-xl font-bold">{formatCurrency(sale.total)}</p>
+                    {sale.nfeStatus === 'AUTORIZADO' && sale.nfeDanfeUrl ? (
+                      <button
+                        type="button"
+                        onClick={() => sale.nfeDanfeUrl && printDanfe(sale.nfeDanfeUrl)}
+                        className="inline-flex items-center gap-1 px-3 py-2 rounded-lg border border-emerald-500/30 text-emerald-700 text-sm font-semibold hover:bg-emerald-500/10 transition-colors"
+                      >
+                        <Printer className="w-4 h-4" />
+                        Imprimir NFC-e
+                      </button>
+                    ) : null}
                     {sale.discount > 0 ? (
                       <p className="text-xs text-muted-foreground">Desconto: {formatCurrency(sale.discount)}</p>
                     ) : null}

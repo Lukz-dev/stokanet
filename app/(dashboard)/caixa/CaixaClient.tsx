@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react'
-import { CreditCard, Plus, ScanLine, Trash2 } from 'lucide-react'
+import { CreditCard, Plus, Printer, ScanLine, Trash2 } from 'lucide-react'
 import { completeSale, findProductByCode } from '@/lib/actions'
 import { useRouter } from 'next/navigation'
 
@@ -23,6 +23,8 @@ type Sale = {
   discount: number
   total: number
   paymentMethod: string | null
+  nfeStatus: string
+  nfeDanfeUrl: string | null
   createdAt: string
   items: Array<{
     id: string
@@ -69,6 +71,34 @@ function paymentMethodLabel(method: string) {
   return PAYMENT_METHOD_LABELS[method] ?? method
 }
 
+function printDanfe(url: string) {
+  const popup = window.open('', '_blank', 'width=900,height=700')
+  if (!popup) {
+    window.open(url, '_blank', 'noopener,noreferrer')
+    return null
+  }
+
+  try {
+    popup.location.href = url
+    window.setTimeout(() => {
+      try {
+        popup.focus()
+        popup.print()
+      } catch {
+        // If the browser blocks printing, the DANFE tab still stays open.
+      }
+    }, 1500)
+    return popup
+  } catch {
+    try {
+      popup.close()
+    } catch {
+      // Ignore cleanup failures.
+    }
+    window.open(url, '_blank', 'noopener,noreferrer')
+    return null
+  }
+}
 function rankProductMatches(products: Product[], query: string) {
   const normalizedQuery = query.trim().toLowerCase()
   if (!normalizedQuery) return []
@@ -331,6 +361,7 @@ export function CaixaClient({ products, initialSales }: { products: Product[]; i
     }
 
     startTransition(async () => {
+      const printWindow = window.open('', '_blank', 'width=900,height=700')
       try {
         const result = await completeSale({
           items: cart.map((item) => ({ productId: item.productId, quantity: item.quantity })),
@@ -347,6 +378,28 @@ export function CaixaClient({ products, initialSales }: { products: Product[]; i
         setSuccess(`Venda ${result.code} finalizada com sucesso.${changeMessage}`)
         setLastSaleId(result.id)
         setLastSaleCode(result.code)
+
+        // Open immediate customer receipt print (local page) to avoid pending printing.
+        const receiptUrl = `/print/sale/${result.id}?autoPrint=1`
+        if (printWindow) {
+          try {
+            printWindow.location.href = receiptUrl
+          } catch {
+            // Fallback: open in new tab if assignment fails.
+            window.open(receiptUrl, '_blank', 'noopener,noreferrer')
+          }
+        } else {
+          window.open(receiptUrl, '_blank', 'noopener,noreferrer')
+        }
+
+        // Separately, open DANFE (fiscal document) if available, but do not block receipt printing.
+        if (result.nfeStatus === 'AUTORIZADO' && result.nfeDanfeUrl) {
+          try {
+            window.open(result.nfeDanfeUrl, '_blank', 'noopener,noreferrer')
+          } catch {
+            // ignore
+          }
+        }
         setCart([])
         setDiscountPercent('0')
         setDiscountPreset('0')
@@ -359,6 +412,11 @@ export function CaixaClient({ products, initialSales }: { products: Product[]; i
         ])
         router.refresh()
       } catch (currentError: any) {
+        try {
+          printWindow?.close()
+        } catch {
+          // Ignore cleanup failures.
+        }
         setError(currentError?.message || 'Não foi possível finalizar a venda.')
       }
     })
@@ -837,6 +895,19 @@ export function CaixaClient({ products, initialSales }: { products: Product[]; i
                   <div className="flex items-center justify-between">
                     <p className="font-semibold text-sm">{sale.code}</p>
                     <div className="flex items-center gap-2">
+<<<<<<< HEAD
+=======
+                      {sale.nfeStatus === 'AUTORIZADO' && sale.nfeDanfeUrl ? (
+                        <button
+                          type="button"
+                          onClick={() => printDanfe(sale.nfeDanfeUrl as string)}
+                          className="text-xs font-semibold rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-1 text-emerald-700 hover:bg-emerald-500/15 transition-colors inline-flex items-center gap-1"
+                        >
+                          <Printer className="w-3.5 h-3.5" />
+                          Imprimir NFC-e
+                        </button>
+                      ) : null}
+>>>>>>> cb05f27 (feat: print NFC-e immediately and fix TypeScript build)
                       <Link
                         href={`/api/export/nfse/${sale.id}`}
                         target="_blank"

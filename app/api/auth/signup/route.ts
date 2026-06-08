@@ -26,7 +26,7 @@ export async function POST(req: NextRequest) {
     const requestedRole = typeof role === 'string' && allowedRoles.has(role) ? role : 'OPERATOR'
 
     // Keep company + user creation atomic to avoid orphan companies on failures.
-    await prisma.$transaction(async (tx) => {
+    await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       // Bootstrap: if this is the first user ever, promote them so the system isn't locked
       // behind the approval gate in a fresh production database.
       const isFirstUser = (await tx.user.count()) === 0

@@ -7,6 +7,16 @@ function formatCurrency(value: number) {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value)
 }
 
+type CriticalProduct = {
+  id: string
+  name: string
+  sku: string
+  size: string | null
+  color: string | null
+  stockQty: number
+  status: string
+}
+
 function DashboardContent({ stats }: { stats: Awaited<ReturnType<typeof getDashboardStats>> }) {
   const attentionItems = stats.lowStockProducts + stats.criticalProducts
   const stockHealth = stats.totalProducts === 0
@@ -136,7 +146,7 @@ function DashboardContent({ stats }: { stats: Awaited<ReturnType<typeof getDashb
             </div>
           ) : (
             <ul className="space-y-3">
-              {stats.criticalList.map((p) => (
+              {stats.criticalList.map((p: CriticalProduct) => (
                 <li key={p.id} className="flex justify-between items-center p-3 hover:bg-muted/50 rounded-lg transition-colors border border-transparent hover:border-border group cursor-pointer">
                   <div className="flex items-center gap-3">
                     <div className="w-9 h-9 rounded-md bg-secondary flex items-center justify-center group-hover:scale-105 transition-transform shrink-0">

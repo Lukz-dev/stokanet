@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "npm exec prisma -- generate && npm exec next -- build",
+    "build": "node scripts/prisma-generate-if-env.js && npm exec next -- build",
     "db:push": "npm exec prisma -- db push",
     "db:push:reset": "npm exec prisma -- db push --force-reset",
     "start": "next start",

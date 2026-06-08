@@ -1,7 +1,9 @@
 import { getAuditLogs } from '@/lib/actions'
 
+type AuditLog = Awaited<ReturnType<typeof getAuditLogs>>[number]
+
 export default async function AuditoriaPage() {
-  const logs = await getAuditLogs(300)
+  const logs: AuditLog[] = await getAuditLogs(300)
 
   return (
     <div className="space-y-6">

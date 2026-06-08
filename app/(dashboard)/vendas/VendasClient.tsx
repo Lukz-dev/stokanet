@@ -73,6 +73,7 @@ function printDanfe(url: string) {
     }
   }, 1500)
 }
+export function VendasClient({ initialSales }: { initialSales: Sale[] }) {
   const router = useRouter()
   const [search, setSearch] = useState('')
   const [cancelReason, setCancelReason] = useState('')
@@ -356,3 +357,4 @@ function printDanfe(url: string) {
     </div>
   )
 }
+export default VendasClient

@@ -1668,11 +1668,8 @@ export async function completeSale(data: {
     total: processed.sale.total,
     amountReceived: processed.sale.amountReceived,
     change: processed.sale.change,
-<<<<<<< HEAD
-=======
     nfeStatus: processed.sale.nfe.status,
     nfeDanfeUrl: processed.sale.nfe.danfeUrl ?? null,
->>>>>>> cb05f27 (feat: print NFC-e immediately and fix TypeScript build)
   }
 }
 
@@ -1818,9 +1815,6 @@ export async function getSales(limit = 50) {
     })),
   }))
 }
-
-<<<<<<< HEAD
-=======
 export async function getSaleById(id: string) {
   const companyId = await getCompanyId()
 
@@ -1847,8 +1841,6 @@ export async function getSaleById(id: string) {
     })),
   }
 }
-
->>>>>>> cb05f27 (feat: print NFC-e immediately and fix TypeScript build)
 export async function createSupplier(data: {
   name: string
   email?: string

@@ -895,8 +895,6 @@ export function CaixaClient({ products, initialSales }: { products: Product[]; i
                   <div className="flex items-center justify-between">
                     <p className="font-semibold text-sm">{sale.code}</p>
                     <div className="flex items-center gap-2">
-<<<<<<< HEAD
-=======
                       {sale.nfeStatus === 'AUTORIZADO' && sale.nfeDanfeUrl ? (
                         <button
                           type="button"
@@ -907,7 +905,6 @@ export function CaixaClient({ products, initialSales }: { products: Product[]; i
                           Imprimir NFC-e
                         </button>
                       ) : null}
->>>>>>> cb05f27 (feat: print NFC-e immediately and fix TypeScript build)
                       <Link
                         href={`/api/export/nfse/${sale.id}`}
                         target="_blank"

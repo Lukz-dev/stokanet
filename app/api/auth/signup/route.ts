@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import bcrypt from 'bcryptjs'
 import prisma from '@/lib/prisma'
 import { Prisma } from '@prisma/client'
+import { PrismaClientInitializationError, PrismaClientKnownRequestError } from '@prisma/client/runtime/library'
 
 export async function POST(req: NextRequest) {
   try {
@@ -52,7 +53,7 @@ export async function POST(req: NextRequest) {
   } catch (error) {
     console.error('[SIGNUP ERROR]', error)
 
-    if (error instanceof Prisma.PrismaClientKnownRequestError) {
+    if (error instanceof PrismaClientKnownRequestError) {
       if (error.code === 'P2002') {
         return NextResponse.json({ error: 'Este e-mail já está cadastrado.' }, { status: 409 })
       }
@@ -62,7 +63,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    if (error instanceof Prisma.PrismaClientInitializationError) {
+    if (error instanceof PrismaClientInitializationError) {
       return NextResponse.json({ error: 'Falha de conexão com o banco de dados no ambiente de produção.' }, { status: 500 })
     }
 

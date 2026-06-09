@@ -1,7 +1,9 @@
 import { NextResponse } from 'next/server'
-import { db as prisma } from '@/lib/db'
-import { Prisma } from '@prisma/client'
+import { PrismaClient, Prisma } from '@prisma/client'
 import { getActiveUser, isBossRole } from '@/lib/access'
+
+// Inicializa o Prisma direto do pacote gerado no node_modules
+const prisma = new PrismaClient()
 
 type Params = { userId: string }
 

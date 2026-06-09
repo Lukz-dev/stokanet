@@ -1,6 +1,9 @@
 import type { DefaultSession } from 'next-auth'
 
 declare module 'next-auth' {
+  // Isso força o TypeScript a aceitar o import do getServerSession direto de 'next-auth'
+  export function getServerSession(...args: any[]): Promise<any>;
+
   interface Session {
     user: {
       id?: string
@@ -40,7 +43,6 @@ declare module 'next-auth/jwt' {
   }
 }
 
-// ADICIONE ESSA PARTE AQUI EMBAIXO:
 declare module 'next-auth/next' {
   export function getServerSession(...args: any[]): Promise<any>;
 }

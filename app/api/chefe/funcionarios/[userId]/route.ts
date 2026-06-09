@@ -76,8 +76,12 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<Para
   }
 
   return NextResponse.json({ error: 'Erro interno do servidor.' }, { status: 500 })
+<<<<<<< HEAD
 }
   
+=======
+
+>>>>>>> b3235c1 (Fix: ajustando imports do prisma)
 }
 
 export async function DELETE(_req: NextRequest, { params }: { params: Promise<Params> }) {

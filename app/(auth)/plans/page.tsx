@@ -10,9 +10,8 @@ export default async function PlansPage({
 }: {
   searchParams?: Promise<{ source?: string }>;
 }) {
-  const session = await getServerSession(authOptions);
-  const sessionUser = session?.user as { isSystemAdmin?: boolean } | undefined;
-
+  const session = await getServerSession(authOptions) as any;
+  const sessionUser = session?.user;
   if (!session?.user?.email) {
     redirect("/login");
   }

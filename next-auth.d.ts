@@ -40,4 +40,9 @@ declare module 'next-auth/jwt' {
   }
 }
 
+// ADICIONE ESSA PARTE AQUI EMBAIXO:
+declare module 'next-auth/next' {
+  export function getServerSession(...args: any[]): Promise<any>;
+}
+
 export {}

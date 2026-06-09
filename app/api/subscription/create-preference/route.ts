@@ -7,7 +7,7 @@ import { createPreference, formatMercadoPagoError, getMercadoPagoPayerEmail, PLA
 export async function POST(request: NextRequest) {
   try {
     const requestOrigin = new URL(request.url).origin;
-    const session = await getServerSession(authOptions);
+    const session = await getServerSession(authOptions) as any;
     if (!session?.user?.email) {
       return NextResponse.json(
         { error: "Não autorizado" },

@@ -1,8 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server'
-import prisma from '@/lib/prisma'
+import { NextResponse } from 'next/server'
+import { db } from '@/lib/db' // ou como você importa seu banco
 import { Prisma } from '@prisma/client'
 import { getActiveUser, isBossRole } from '@/lib/access'
-import { PrismaClientKnownRequestError } from '@prisma/client'
 
 type Params = { userId: string }
 

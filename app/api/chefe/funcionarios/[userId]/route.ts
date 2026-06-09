@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 import { Prisma } from '@prisma/client'
 import { getActiveUser, isBossRole } from '@/lib/access'
+import { PrismaClientKnownRequestError } from '@prisma/client'
 
 type Params = { userId: string }
 
@@ -67,9 +68,9 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<Para
   } catch (error) {
     console.error('[CHEFE EMPLOYEE PATCH ERROR]', error)
 
-    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
-      return NextResponse.json({ error: 'Este e-mail já está cadastrado.' }, { status: 409 })
-    }
+    if (error instanceof PrismaClientKnownRequestError && error.code === 'P2002') {
+  return NextResponse.json({ error: 'Este e-mail já está cadastrado.' }, { status: 409 })
+  }
 
     return NextResponse.json({ error: 'Erro ao editar funcionário.' }, { status: 500 })
   }

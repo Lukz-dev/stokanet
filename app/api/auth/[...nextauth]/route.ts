@@ -1,7 +1,10 @@
-import NextAuth from 'next-auth'
+import nextAuthImport from 'next-auth'
 import CredentialsProvider from 'next-auth/providers/credentials'
 import prisma from '@/lib/prisma'
 import bcrypt from 'bcryptjs'
+
+// Força o inicializador do NextAuth a ser tratado como 'any' para burlar o erro de call signature no build
+const NextAuth = nextAuthImport as any;
 
 export const authOptions = {
   providers: [
@@ -87,6 +90,5 @@ export const authOptions = {
   secret: process.env.NEXTAUTH_SECRET,
 }
 
-// Voltando para o padrão v4 clássico, mas forçando o any no objeto para aceitar a assinatura de chamada
-const handler = NextAuth(authOptions as any)
+const handler = NextAuth(authOptions)
 export { handler as GET, handler as POST }

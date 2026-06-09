@@ -1,4 +1,4 @@
-import { NextAuth } from 'next-auth'
+import NextAuth from 'next-auth'
 import CredentialsProvider from 'next-auth/providers/credentials'
 import prisma from '@/lib/prisma'
 import bcrypt from 'bcryptjs'
@@ -87,6 +87,6 @@ export const authOptions = {
   secret: process.env.NEXTAUTH_SECRET,
 }
 
-// No NextAuth v5, a inicialização retorna os handlers desestruturados
-const { handlers } = NextAuth(authOptions)
-export const { GET, POST } = handlers
+// Voltando para o padrão v4 clássico, mas forçando o any no objeto para aceitar a assinatura de chamada
+const handler = NextAuth(authOptions as any)
+export { handler as GET, handler as POST }

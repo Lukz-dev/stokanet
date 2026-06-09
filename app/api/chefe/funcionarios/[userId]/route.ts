@@ -1,5 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server'
-import prisma from '@/lib/prisma'
+import { NextResponse } from 'next/server'
+import { db } from '@/lib/db' // ou como você importa seu banco
 import { Prisma } from '@prisma/client'
 import { getActiveUser, isBossRole } from '@/lib/access'
 
@@ -65,14 +65,17 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<Para
 
     return NextResponse.json({ success: true, employee: updated })
   } catch (error) {
-    console.error('[CHEFE EMPLOYEE PATCH ERROR]', error)
+  console.error('[CHEFE EMPLOYEE PATCH ERROR]', error)
 
-    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
-      return NextResponse.json({ error: 'Este e-mail já está cadastrado.' }, { status: 409 })
-    }
-
-    return NextResponse.json({ error: 'Erro ao editar funcionário.' }, { status: 500 })
+  if (
+    error instanceof Prisma.PrismaClientKnownRequestError && 
+    (error as Prisma.PrismaClientKnownRequestError).code === 'P2002'
+  ) {
+    return NextResponse.json({ error: 'Este e-mail já está cadastrado.' }, { status: 409 })
   }
+
+  return NextResponse.json({ error: 'Erro interno do servidor.' }, { status: 500 })
+
 }
 
 export async function DELETE(_req: NextRequest, { params }: { params: Promise<Params> }) {

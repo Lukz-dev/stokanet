@@ -47,7 +47,7 @@ export const authOptions = {
     signIn: '/login',
   },
   callbacks: {
-    async jwt({ token, user, trigger, session }) {
+    async jwt({ token, user, trigger, session }: any) {
       if (user) {
         token.id = (user as any).id
         token.role = (user as any).role
@@ -69,7 +69,7 @@ export const authOptions = {
 
       return token
     },
-    async session({ session, token }) {
+    async session({ session, token }: any) {
       if (session.user) {
         ;(session.user as any).id = (token as any).id
         ;(session.user as any).role = (token as any).role

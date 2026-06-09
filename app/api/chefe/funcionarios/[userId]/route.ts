@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { db as prisma } from '@/lib/db'
+import { db as prisma } from '../../../../../lib/db'
 import { Prisma } from '@prisma/client'
 import { getActiveUser, isBossRole } from '@/lib/access'
 

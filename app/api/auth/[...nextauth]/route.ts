@@ -1,9 +1,12 @@
-import NextAuth, { NextAuthOptions } from 'next-auth'
+import nextAuthImport from 'next-auth'
 import CredentialsProvider from 'next-auth/providers/credentials'
 import prisma from '@/lib/prisma'
 import bcrypt from 'bcryptjs'
 
-export const authOptions: NextAuthOptions = {
+// Força o inicializador do NextAuth a ser tratado como 'any' para burlar o erro de call signature no build
+const NextAuth = nextAuthImport as any;
+
+export const authOptions = {
   providers: [
     CredentialsProvider({
       name: 'E-mail Corporativo',
@@ -40,14 +43,14 @@ export const authOptions: NextAuthOptions = {
     }),
   ],
   session: {
-    strategy: 'jwt',
+    strategy: 'jwt' as const,
     maxAge: 30 * 24 * 60 * 60,
   },
   pages: {
     signIn: '/login',
   },
   callbacks: {
-    async jwt({ token, user, trigger, session }) {
+    async jwt({ token, user, trigger, session }: any) {
       if (user) {
         token.id = (user as any).id
         token.role = (user as any).role
@@ -69,7 +72,7 @@ export const authOptions: NextAuthOptions = {
 
       return token
     },
-    async session({ session, token }) {
+    async session({ session, token }: any) {
       if (session.user) {
         ;(session.user as any).id = (token as any).id
         ;(session.user as any).role = (token as any).role

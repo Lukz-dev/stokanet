@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
+import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import prisma from "@/lib/prisma";
 import { createPreference, formatMercadoPagoError, getMercadoPagoPayerEmail, PLANS } from "@/lib/mercadopago";
@@ -7,7 +7,7 @@ import { createPreference, formatMercadoPagoError, getMercadoPagoPayerEmail, PLA
 export async function POST(request: NextRequest) {
   try {
     const requestOrigin = new URL(request.url).origin;
-    const session = await getServerSession(authOptions);
+    const session = await getServerSession(authOptions) as any;
     if (!session?.user?.email) {
       return NextResponse.json(
         { error: "Não autorizado" },

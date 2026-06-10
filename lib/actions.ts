@@ -1814,6 +1814,21 @@ export async function getSales(limit = 50) {
   }))
 }
 
+export async function getSaleById(id: string) {
+  const companyId = await getCompanyId()
+
+  return prisma.sale.findFirst({
+    where: { id, companyId },
+    include: {
+      company: true,
+      customer: true,
+      items: {
+        orderBy: { id: 'asc' },
+      },
+    },
+  })
+}
+
 export async function createSupplier(data: {
   name: string
   email?: string

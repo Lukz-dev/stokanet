@@ -1,11 +1,15 @@
 'use server'
 
 import React from 'react'
-import { getActiveCompanyId } from '@/lib/access'
 import { getSaleById } from '@/lib/actions'
+import { notFound } from 'next/navigation'
 
 export default async function PrintSalePage({ params }: { params: { id: string } }) {
   const sale = await getSaleById(params.id)
+
+  if (!sale) {
+    notFound()
+  }
 
   return (
     <html>

@@ -29,10 +29,14 @@ function parseDateParam(value: string | null) {
 }
 
 function dayBounds(day: Date) {
-  const start = new Date(day)
-  start.setUTCHours(0, 0, 0, 0)
-  const end = new Date(start)
-  end.setUTCDate(end.getUTCDate() + 1)
+  const year = day.getUTCFullYear()
+  const month = day.getUTCMonth()
+  const date = day.getUTCDate()
+
+  // The business works on Brazil local time, so the report should use the
+  // full local day instead of a UTC midnight window.
+  const start = new Date(Date.UTC(year, month, date, 3, 0, 0, 0))
+  const end = new Date(Date.UTC(year, month, date + 1, 3, 0, 0, 0))
   return { start, end }
 }
 

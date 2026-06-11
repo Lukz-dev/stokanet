@@ -360,7 +360,7 @@ export async function closeDailyClosure(input: { day: string; notes?: string }) 
     return { ok: true, alreadyClosed: true, id: existing.id }
   }
 
-  const [salesAggregate, salesCount, salesByPaymentGroups, purchaseAggregate, purchaseCount, movementGroups, products] = await Promise.all([
+  const [salesAggregate, purchaseAggregate, purchaseCount, movementGroups, products] = await Promise.all([
     prisma.sale.findMany({
       where: {
         companyId,

@@ -341,12 +341,14 @@ export async function closeDailyClosure(input: { day: string; notes?: string }) 
       where: {
         companyId,
         createdAt: { gte: start, lt: end },
+        NOT: { notes: { contains: '[CANCELADA]' } },
       },
     }),
     prisma.sale.count({
       where: {
         companyId,
         createdAt: { gte: start, lt: end },
+        NOT: { notes: { contains: '[CANCELADA]' } },
       },
     }),
     prisma.sale.groupBy({
@@ -354,6 +356,7 @@ export async function closeDailyClosure(input: { day: string; notes?: string }) 
       where: {
         companyId,
         createdAt: { gte: start, lt: end },
+        NOT: { notes: { contains: '[CANCELADA]' } },
       },
       _sum: { total: true },
     }),
@@ -1768,6 +1771,7 @@ export async function cancelSale(input: { saleId: string; reason?: string }) {
   revalidatePath('/caixa')
   revalidatePath('/movimentacoes')
   revalidatePath('/estoque')
+  revalidatePath('/fechamento')
   revalidatePath('/')
 
   await logAudit({
@@ -1827,6 +1831,176 @@ export async function getSaleById(id: string) {
       },
     },
   })
+}
+
+export async function updateSale(input: {
+  saleId: string
+  paymentMethod?: string | null
+  discount?: number
+  notes?: string | null
+  items: Array<{
+    id: string
+    productName: string
+    sku: string
+    quantity: number
+    unitPrice: number
+  }>
+}) {
+  const user = await requireRole(['ADMIN', 'MANAGER', 'OPERATOR'])
+  const companyId = await getCompanyId()
+  const saleId = input.saleId.trim()
+
+  if (!saleId) {
+    throw new Error('Venda inválida para edição.')
+  }
+
+  const sale = await prisma.sale.findFirst({
+    where: { id: saleId, companyId },
+    include: {
+      items: {
+        select: {
+          id: true,
+          productId: true,
+          quantity: true,
+        },
+      },
+    },
+  })
+
+  if (!sale) {
+    throw new Error('Venda não encontrada.')
+  }
+
+  if (isSaleCancelled(sale.notes)) {
+    throw new Error('Não é possível editar uma venda cancelada.')
+  }
+
+  if (sale.nfeStatus === 'AUTORIZADO') {
+    throw new Error('Não é possível editar uma venda com NF-e autorizada.')
+  }
+
+  const normalizedItems = input.items.map((item) => ({
+    id: item.id.trim(),
+    productName: item.productName.trim(),
+    sku: item.sku.trim(),
+    quantity: Math.max(1, Math.floor(Number(item.quantity))),
+    unitPrice: Math.max(0, Number(item.unitPrice)),
+  }))
+
+  if (normalizedItems.length !== sale.items.length) {
+    throw new Error('Nesta versão, a edição mantém a mesma quantidade de itens da venda.')
+  }
+
+  const currentItemMap = new Map(sale.items.map((item) => [item.id, item]))
+  if (normalizedItems.some((item) => !currentItemMap.has(item.id))) {
+    throw new Error('Item da venda não encontrado.')
+  }
+
+  const stockDeltas = new Map<string, number>()
+  for (const item of normalizedItems) {
+    const current = currentItemMap.get(item.id)
+    if (!current) continue
+
+    const quantityDelta = item.quantity - current.quantity
+    if (quantityDelta !== 0) {
+      stockDeltas.set(current.productId, (stockDeltas.get(current.productId) ?? 0) + quantityDelta)
+    }
+  }
+
+  const subtotal = Number(
+    normalizedItems.reduce((acc, item) => acc + item.quantity * item.unitPrice, 0).toFixed(2),
+  )
+  const requestedDiscount = Number.isFinite(Number(input.discount)) ? Math.max(0, Number(input.discount)) : sale.discount
+  const discount = Math.min(requestedDiscount, subtotal)
+  const total = Number(Math.max(0, subtotal - discount).toFixed(2))
+
+  await prisma.$transaction(async (tx) => {
+    if (stockDeltas.size > 0) {
+      const affectedProducts = await tx.product.findMany({
+        where: { companyId, id: { in: [...stockDeltas.keys()] } },
+        select: { id: true, stockQty: true, minStock: true },
+      })
+
+      const affectedMap = new Map(affectedProducts.map((product) => [product.id, product]))
+
+      for (const [productId, quantityDelta] of stockDeltas.entries()) {
+        const product = affectedMap.get(productId)
+        if (!product) {
+          throw new Error('Produto da venda não encontrado.')
+        }
+
+        if (quantityDelta > 0 && product.stockQty < quantityDelta) {
+          throw new Error('Estoque insuficiente para ajustar a venda.')
+        }
+
+        if (quantityDelta > 0) {
+          await tx.product.update({
+            where: { id: productId },
+            data: { stockQty: { decrement: quantityDelta } },
+          })
+        } else if (quantityDelta < 0) {
+          await tx.product.update({
+            where: { id: productId },
+            data: { stockQty: { increment: Math.abs(quantityDelta) } },
+          })
+        }
+      }
+
+      const updatedProducts = await tx.product.findMany({
+        where: { companyId, id: { in: [...stockDeltas.keys()] } },
+        select: { id: true, stockQty: true, minStock: true },
+      })
+
+      for (const product of updatedProducts) {
+        await tx.product.update({
+          where: { id: product.id },
+          data: { status: resolveProductStatus(product.stockQty, product.minStock) },
+        })
+      }
+    }
+
+    for (const item of normalizedItems) {
+      await tx.saleItem.update({
+        where: { id: item.id },
+        data: {
+          productName: item.productName,
+          sku: item.sku,
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+          total: Number((item.quantity * item.unitPrice).toFixed(2)),
+        },
+      })
+    }
+
+    await tx.sale.update({
+      where: { id: sale.id },
+      data: {
+        paymentMethod: input.paymentMethod?.trim() || null,
+        discount,
+        notes: input.notes?.trim() || null,
+        subtotal,
+        total,
+      },
+    })
+  })
+
+  revalidatePath('/vendas')
+  revalidatePath('/caixa')
+  revalidatePath('/estoque')
+  revalidatePath('/fechamento')
+  revalidatePath('/relatorios')
+  revalidatePath('/')
+
+  await logAudit({
+    action: 'UPDATE',
+    entity: 'SALE',
+    entityId: sale.id,
+    details: `Venda ${sale.code} editada`,
+    companyId,
+    userId: user.id,
+  })
+
+  return { ok: true, id: sale.id, code: sale.code }
 }
 
 export async function createSupplier(data: {

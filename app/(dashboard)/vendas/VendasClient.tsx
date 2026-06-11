@@ -1,9 +1,10 @@
 'use client'
 
 import { useMemo, useState, useTransition } from 'react'
-import { Ban, Receipt, Search } from 'lucide-react'
+import { Ban, Pencil, Receipt, Search } from 'lucide-react'
 import { cancelSale } from '@/lib/actions'
 import { useRouter } from 'next/navigation'
+import { SaleEditModal } from '@/components/SaleEditModal'
 
 type SaleItem = {
   id: string
@@ -60,6 +61,7 @@ export function VendasClient({ initialSales }: { initialSales: Sale[] }) {
   const [cancelReason, setCancelReason] = useState('')
   const [feedback, setFeedback] = useState('')
   const [error, setError] = useState('')
+  const [editingSale, setEditingSale] = useState<Sale | null>(null)
   const [isPending, startTransition] = useTransition()
 
   const filteredSales = useMemo(() => {
@@ -78,6 +80,7 @@ export function VendasClient({ initialSales }: { initialSales: Sale[] }) {
   const saleCost = (sale: Sale) => sale.items.reduce((acc, item) => acc + item.quantity * item.unitCost, 0)
   const saleGrossProfit = (sale: Sale) => sale.total - saleCost(sale)
   const saleGrossMargin = (sale: Sale) => (sale.total > 0 ? (saleGrossProfit(sale) / sale.total) * 100 : 0)
+  const editingSaleCode = editingSale?.code ?? ''
 
   const handleCancel = (sale: Sale) => {
     setError('')
@@ -223,6 +226,15 @@ export function VendasClient({ initialSales }: { initialSales: Sale[] }) {
                 ) : null}
 
                 <div className="mt-3 flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setEditingSale(sale)}
+                    disabled={isPending || cancelled || sale.nfeStatus === 'AUTORIZADO'}
+                    className="inline-flex items-center gap-1 px-3 py-2 rounded-lg border border-border text-sm font-semibold hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <Pencil className="w-3.5 h-3.5" /> Editar venda
+                  </button>
+
                   {cancelled ? (
                     <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold bg-destructive/10 text-destructive">
                       <Ban className="w-3.5 h-3.5" /> Venda cancelada
@@ -247,6 +259,18 @@ export function VendasClient({ initialSales }: { initialSales: Sale[] }) {
           })}
         </div>
       </section>
+
+      {editingSale ? (
+        <SaleEditModal
+          sale={editingSale}
+          onClose={() => setEditingSale(null)}
+          onSuccess={() => {
+            setEditingSale(null)
+            setFeedback(`Venda ${editingSaleCode} atualizada com sucesso.`)
+            router.refresh()
+          }}
+        />
+      ) : null}
     </div>
   )
 }

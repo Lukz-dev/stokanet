@@ -39,7 +39,7 @@ export async function GET(request: Request) {
       ? await prisma.auditLog.findMany({ where: { companyId, entity: 'SALE', action: 'CREATE', entityId: { in: saleIds } } })
       : []
 
-    const userIds = [...new Set(auditLogs.map((l) => l.userId).filter(Boolean))]
+    const userIds = [...new Set(auditLogs.map((l) => l.userId).filter((v): v is string => Boolean(v)))]
     const users = userIds.length ? await prisma.user.findMany({ where: { id: { in: userIds }, companyId }, select: { id: true, name: true, email: true } }) : []
 
     const userById = new Map(users.map((u) => [u.id, u]))

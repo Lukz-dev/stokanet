@@ -106,7 +106,15 @@ function parseIsoDay(day: string) {
     throw new Error('Data invalida. Use o formato YYYY-MM-DD.')
   }
 
-  const date = new Date(`${day}T00:00:00.000Z`)
+  const parts = day.split('-').map(Number)
+  const [year, month, dayOfMonth] = parts
+  if ([year, month, dayOfMonth].some((n) => !Number.isInteger(n))) {
+    throw new Error('Data invalida para fechamento diario.')
+  }
+
+  // Interpretamos o dia como dia comercial local no BRT (UTC-3).
+  // Começo do dia local 00:00 BRT corresponde a 03:00 UTC do mesmo dia.
+  const date = new Date(Date.UTC(year, month - 1, dayOfMonth, 3, 0, 0, 0))
   if (Number.isNaN(date.getTime())) {
     throw new Error('Data invalida para fechamento diario.')
   }

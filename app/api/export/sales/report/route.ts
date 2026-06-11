@@ -90,6 +90,8 @@ export async function GET(request: Request) {
     const userById = new Map(users.map((user) => [user.id, user]))
     const auditBySaleId = new Map(auditLogs.map((log) => [log.entityId ?? '', log]))
 
+    const filterByUser = Boolean(userEmail || userName)
+
     const filteredSales = sales.filter((sale) => {
       const audit = auditBySaleId.get(sale.id)
       const seller = audit?.userId ? userById.get(audit.userId) : null
@@ -106,6 +108,8 @@ export async function GET(request: Request) {
 
       return true
     })
+
+    const outputSales = filteredSales
 
     const headers = [
       'venda_codigo',
@@ -131,7 +135,53 @@ export async function GET(request: Request) {
 
     const lines = [headers.map(csvEscape).join(',')]
 
-    for (const sale of filteredSales) {
+    if (sales.length === 0) {
+      lines.push([
+        'SEM_VENDAS_NO_DIA',
+        day.toISOString(),
+        '',
+        '',
+        '',
+        '0.00',
+        '0.00',
+        '0.00',
+        'NAO',
+        filterByUser ? 'Nenhuma venda encontrada para o usuário informado.' : 'Nenhuma venda encontrada para a data informada.',
+        '',
+        '0',
+        '0.00',
+        '0.00',
+        '0.00',
+        '0.00',
+        '0.00',
+        '',
+        '',
+      ].map(csvEscape).join(','))
+    } else if (filterByUser && filteredSales.length === 0) {
+      lines.push([
+        'SEM_VENDAS_PARA_O_USUARIO',
+        day.toISOString(),
+        '',
+        '',
+        '',
+        '0.00',
+        '0.00',
+        '0.00',
+        'NAO',
+        'Nenhuma venda desse dia foi vinculada ao usuário informado.',
+        '',
+        '0',
+        '0.00',
+        '0.00',
+        '0.00',
+        '0.00',
+        '0.00',
+        '',
+        '',
+      ].map(csvEscape).join(','))
+    }
+
+    for (const sale of outputSales) {
       const audit = auditBySaleId.get(sale.id)
       const seller = audit?.userId ? userById.get(audit.userId) : null
       const sellerName = seller?.name ?? ''

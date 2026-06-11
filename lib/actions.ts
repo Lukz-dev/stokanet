@@ -202,6 +202,23 @@ function buildClosureNotesWithSalesSummary(notes: string | null, salesSummary: s
   return [manualNotes, summaryBlock].filter(Boolean).join('\n\n').trim()
 }
 
+function isCancelledSale(notes: string | null | undefined) {
+  return (notes ?? '').includes('[CANCELADA]')
+}
+
+function groupSalesByPaymentMethod(sales: Array<{ paymentMethod: string | null; total: number }>) {
+  const groups = new Map<string | null, number>()
+
+  for (const sale of sales) {
+    groups.set(sale.paymentMethod ?? null, (groups.get(sale.paymentMethod ?? null) ?? 0) + sale.total)
+  }
+
+  return [...groups.entries()].map(([paymentMethod, total]) => ({
+    paymentMethod,
+    _sum: { total: Number(total.toFixed(2)) },
+  }))
+}
+
 export async function getMonthlyClosureCalendar(params?: { year?: number; month?: number }) {
   await requireRole(['ADMIN', 'MANAGER', 'OPERATOR'])
   const companyId = await getCompanyId()
@@ -344,29 +361,16 @@ export async function closeDailyClosure(input: { day: string; notes?: string }) 
   }
 
   const [salesAggregate, salesCount, salesByPaymentGroups, purchaseAggregate, purchaseCount, movementGroups, products] = await Promise.all([
-    prisma.sale.aggregate({
-      _sum: { total: true },
+    prisma.sale.findMany({
       where: {
         companyId,
         createdAt: { gte: start, lt: end },
-        NOT: { notes: { contains: '[CANCELADA]' } },
       },
-    }),
-    prisma.sale.count({
-      where: {
-        companyId,
-        createdAt: { gte: start, lt: end },
-        NOT: { notes: { contains: '[CANCELADA]' } },
+      select: {
+        total: true,
+        paymentMethod: true,
+        notes: true,
       },
-    }),
-    prisma.sale.groupBy({
-      by: ['paymentMethod'],
-      where: {
-        companyId,
-        createdAt: { gte: start, lt: end },
-        NOT: { notes: { contains: '[CANCELADA]' } },
-      },
-      _sum: { total: true },
     }),
     prisma.purchaseOrder.aggregate({
       _sum: { subtotal: true },
@@ -397,12 +401,15 @@ export async function closeDailyClosure(input: { day: string; notes?: string }) 
     }),
   ])
 
+  const validSales = salesAggregate.filter((sale) => !isCancelledSale(sale.notes))
+  const salesCount = validSales.length
+  const salesTotal = Number(validSales.reduce((acc, sale) => acc + sale.total, 0).toFixed(2))
+  const salesByPaymentGroups = groupSalesByPaymentMethod(validSales)
+
   const movementMap = new Map(movementGroups.map((group) => [group.type, group._sum.quantity ?? 0]))
   const stockEntriesQty = movementMap.get('ENTRADA') ?? 0
   const stockOutputsQty = movementMap.get('SAIDA') ?? 0
   const stockAdjustmentsQty = movementMap.get('AJUSTE') ?? 0
-
-  const salesTotal = Number((salesAggregate._sum.total ?? 0).toFixed(2))
   const purchaseTotal = Number((purchaseAggregate._sum.subtotal ?? 0).toFixed(2))
   const cashExpected = Number((salesTotal - purchaseTotal).toFixed(2))
   const stockValue = Number(products.reduce((acc, product) => acc + product.price * product.stockQty, 0).toFixed(2))
@@ -665,13 +672,16 @@ export async function closeMonthlyClosure(input: { year: number; month: number; 
         cashExpected: true,
       },
     }),
-    prisma.sale.groupBy({
-      by: ['paymentMethod'],
+    prisma.sale.findMany({
       where: {
         companyId,
         createdAt: { gte: start, lt: end },
       },
-      _sum: { total: true },
+      select: {
+        total: true,
+        paymentMethod: true,
+        notes: true,
+      },
     }),
   ])
 
@@ -680,7 +690,11 @@ export async function closeMonthlyClosure(input: { year: number; month: number; 
   }
 
   const normalizedNotes = input.notes?.trim() || null
-  const salesByPaymentSummary = buildSalesByPaymentSummary(salesByPaymentGroups)
+  const validSales = salesByPaymentGroups.filter((sale) => !isCancelledSale(sale.notes))
+  const salesByPaymentSummary = buildSalesByPaymentSummary(groupSalesByPaymentMethod(validSales.map((sale) => ({
+    paymentMethod: sale.paymentMethod,
+    total: sale.total,
+  }))))
   const closureNotes = buildClosureNotesWithSalesSummary(normalizedNotes, salesByPaymentSummary)
 
   const result = await prisma.$transaction(async (tx) => {

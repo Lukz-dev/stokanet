@@ -2189,11 +2189,16 @@ export async function createSupplier(data: {
 }
 
 export async function getSuppliers() {
-  const companyId = await getCompanyId()
-  return prisma.supplier.findMany({
-    where: { companyId },
-    orderBy: { name: 'asc' },
-  })
+  try {
+    const companyId = await getCompanyId()
+    return prisma.supplier.findMany({
+      where: { companyId },
+      orderBy: { name: 'asc' },
+    })
+  } catch {
+    // If the session/company context is unavailable, let the page render.
+    return []
+  }
 }
 
 export async function deleteSupplier(id: string) {
@@ -2373,25 +2378,30 @@ export async function receivePurchaseOrder(id: string) {
 }
 
 export async function getPurchaseOrders(limit = 100) {
-  const companyId = await getCompanyId()
-  return prisma.purchaseOrder.findMany({
-    where: { companyId },
-    include: {
-      supplier: { select: { id: true, name: true } },
-      items: {
-        select: {
-          id: true,
-          productId: true,
-          productName: true,
-          quantity: true,
-          unitCost: true,
-          total: true,
+  try {
+    const companyId = await getCompanyId()
+    return prisma.purchaseOrder.findMany({
+      where: { companyId },
+      include: {
+        supplier: { select: { id: true, name: true } },
+        items: {
+          select: {
+            id: true,
+            productId: true,
+            productName: true,
+            quantity: true,
+            unitCost: true,
+            total: true,
+          },
         },
       },
-    },
-    orderBy: { createdAt: 'desc' },
-    take: Math.max(1, Math.min(limit, 500)),
-  })
+      orderBy: { createdAt: 'desc' },
+      take: Math.max(1, Math.min(limit, 500)),
+    })
+  } catch {
+    // If the session/company context is unavailable, let the page render.
+    return []
+  }
 }
 
 export async function createWarehouse(data: {

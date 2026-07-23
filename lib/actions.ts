@@ -1932,35 +1932,41 @@ export async function completePendingSale(input: { saleId: string }) {
 }
 
 export async function getSales(limit = 50) {
-  const companyId = await getCompanyId()
+  try {
+    const companyId = await getCompanyId()
 
-  const sales = await prisma.sale.findMany({
-    where: { companyId },
-    include: {
-      items: {
-        include: {
-          product: { select: { purchaseCost: true } },
+    const sales = await prisma.sale.findMany({
+      where: { companyId },
+      include: {
+        items: {
+          include: {
+            product: { select: { purchaseCost: true } },
+          },
+          orderBy: { id: 'asc' },
         },
-        orderBy: { id: 'asc' },
       },
-    },
-    orderBy: { createdAt: 'desc' },
-    take: Math.max(1, Math.min(limit, 200)),
-  })
+      orderBy: { createdAt: 'desc' },
+      take: Math.max(1, Math.min(limit, 200)),
+    })
 
-  // Map to include unitCost directly on item for export convenience
-  return sales.map((s) => ({
-    ...s,
-    items: s.items.map((it: any) => ({
-      id: it.id,
-      productName: it.productName,
-      sku: it.sku,
-      quantity: it.quantity,
-      unitPrice: it.unitPrice,
-      total: it.total,
-      unitCost: it.product?.purchaseCost ?? 0,
-    })),
-  }))
+    // Map to include unitCost directly on item for export convenience
+    return sales.map((s) => ({
+      ...s,
+      items: s.items.map((it: any) => ({
+        id: it.id,
+        productName: it.productName,
+        sku: it.sku,
+        quantity: it.quantity,
+        unitPrice: it.unitPrice,
+        total: it.total,
+        unitCost: it.product?.purchaseCost ?? 0,
+      })),
+    }))
+  } catch {
+    // If the session/company context is unavailable, return an empty list so
+    // the caixa page can still render and the client can recover normally.
+    return []
+  }
 }
 
 export async function getSaleById(id: string) {

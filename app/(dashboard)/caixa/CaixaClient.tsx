@@ -3,8 +3,7 @@
 import Link from 'next/link'
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import { CreditCard, Plus, ScanLine, Trash2 } from 'lucide-react'
-import { completeSale, findProductByCode } from '@/lib/actions'
-import { useRouter } from 'next/navigation'
+import { findProductByCode } from '@/lib/actions'
 
 type Product = {
   id: string
@@ -103,7 +102,6 @@ function rankProductMatches(products: Product[], query: string) {
 }
 
 export function CaixaClient({ products, initialSales }: { products: Product[]; initialSales: Sale[] }) {
-  const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [code, setCode] = useState('')
   const [discountPercent, setDiscountPercent] = useState('0')
@@ -336,19 +334,42 @@ export function CaixaClient({ products, initialSales }: { products: Product[]; i
 
     startTransition(async () => {
       try {
-        const result = await completeSale({
-          items: cart.map((item) => ({ productId: item.productId, quantity: item.quantity })),
-          paymentMethod: paymentMode === 'UNICO' ? paymentMethod : undefined,
-          paymentBreakdown: paymentMode === 'MISTO'
-            ? splitPaymentValues
-                .filter((item) => item.amountValue > 0)
-                .map((item) => ({ method: item.method, amount: item.amountValue }))
-            : undefined,
-          discount: boundedDiscount,
-          amountReceived: paymentMode === 'UNICO' && isCashPayment ? parsedAmountReceived : undefined,
-          details: saleDetails.trim() || undefined,
-          isPending: isPendingSale,
+        const response = await fetch('/api/sales', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            items: cart.map((item) => ({ productId: item.productId, quantity: item.quantity })),
+            paymentMethod: paymentMode === 'UNICO' ? paymentMethod : undefined,
+            paymentBreakdown: paymentMode === 'MISTO'
+              ? splitPaymentValues
+                  .filter((item) => item.amountValue > 0)
+                  .map((item) => ({ method: item.method, amount: item.amountValue }))
+              : undefined,
+            discount: boundedDiscount,
+            amountReceived: paymentMode === 'UNICO' && isCashPayment ? parsedAmountReceived : undefined,
+            details: saleDetails.trim() || undefined,
+            isPending: isPendingSale,
+          }),
         })
+
+        const payload = await response.json() as {
+          sale?: {
+            id: string
+            code: string
+            subtotal: number
+            discount: number
+            total: number
+            amountReceived: number | null
+            change: number
+          }
+          error?: { message?: string }
+        }
+
+        if (!response.ok || !payload.sale) {
+          throw new Error(payload.error?.message || 'Não foi possível finalizar a venda.')
+        }
+
+        const result = payload.sale
         const changeMessage = result.change > 0 ? ` Troco: ${formatCurrency(result.change)}.` : ''
         setSuccess(
           isPendingSale

@@ -369,7 +369,6 @@ export function CaixaClient({ products, initialSales }: { products: Product[]; i
           { method: 'CARTAO_CREDITO', amount: '' },
           { method: 'DINHEIRO', amount: '' },
         ])
-        router.refresh()
       } catch (currentError: any) {
         setError(currentError?.message || 'Não foi possível finalizar a venda.')
       }
@@ -382,7 +381,6 @@ export function CaixaClient({ products, initialSales }: { products: Product[]; i
     parsedAmountReceived,
     paymentMethod,
     paymentMode,
-    router,
     splitPaymentMissing,
     splitPaymentValues,
     startTransition,

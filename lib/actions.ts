@@ -1705,6 +1705,10 @@ function isSaleCancelled(notes: string | null) {
   return notes.includes('[CANCELADA]')
 }
 
+function isPendingSaleRecord(sale: { nfeStatus: string; stockCommittedAt: Date | null }) {
+  return sale.nfeStatus === 'PENDENTE' && sale.stockCommittedAt === null
+}
+
 function buildCancelledSaleNotes(existingNotes: string | null, reason?: string) {
   const trimmedReason = reason?.trim()
   const header = `[CANCELADA] ${new Date().toISOString()}`
@@ -1748,14 +1752,16 @@ export async function cancelSale(input: { saleId: string; reason?: string }) {
     throw new Error('Não é possível cancelar por aqui uma venda com NF-e autorizada.')
   }
 
-  if (!sale.isPending && !sale.items.length) {
+  const isPending = isPendingSaleRecord(sale)
+
+  if (!isPending && !sale.items.length) {
     throw new Error('A venda não possui itens para estorno de estoque.')
   }
 
   const productIds = [...new Set(sale.items.map((item) => item.productId))]
 
   await prisma.$transaction(async (tx) => {
-    if (!sale.isPending) {
+    if (!isPending) {
       for (const item of sale.items) {
         await tx.product.update({
           where: { id: item.productId },
@@ -1844,7 +1850,9 @@ export async function completePendingSale(input: { saleId: string }) {
     throw new Error('Não é possível concluir uma venda cancelada.')
   }
 
-  if (!sale.isPending) {
+  const isPending = isPendingSaleRecord(sale)
+
+  if (!isPending) {
     throw new Error('Esta venda já foi concluída.')
   }
 
@@ -1903,7 +1911,6 @@ export async function completePendingSale(input: { saleId: string }) {
     await tx.sale.update({
       where: { id: sale.id },
       data: {
-        isPending: false,
         stockCommittedAt: new Date(),
       },
     })
@@ -1950,6 +1957,7 @@ export async function getSales(limit = 50) {
     // Map to include unitCost directly on item for export convenience
     return sales.map((s) => ({
       ...s,
+      isPending: isPendingSaleRecord(s),
       items: s.items.map((it: any) => ({
         id: it.id,
         productName: it.productName,
@@ -1970,7 +1978,7 @@ export async function getSales(limit = 50) {
 export async function getSaleById(id: string) {
   const companyId = await getCompanyId()
 
-  return prisma.sale.findFirst({
+  const sale = await prisma.sale.findFirst({
     where: { id, companyId },
     include: {
       company: true,
@@ -1980,6 +1988,13 @@ export async function getSaleById(id: string) {
       },
     },
   })
+
+  if (!sale) return null
+
+  return {
+    ...sale,
+    isPending: isPendingSaleRecord(sale),
+  }
 }
 
 export async function updateSale(input: {
@@ -2064,7 +2079,9 @@ export async function updateSale(input: {
   const total = Number(Math.max(0, subtotal - discount).toFixed(2))
 
   await prisma.$transaction(async (tx) => {
-    if (!sale.isPending && stockDeltas.size > 0) {
+    const isPending = isPendingSaleRecord(sale)
+
+    if (!isPending && stockDeltas.size > 0) {
       const affectedProducts = await tx.product.findMany({
         where: { companyId, id: { in: [...stockDeltas.keys()] } },
         select: { id: true, stockQty: true, minStock: true },

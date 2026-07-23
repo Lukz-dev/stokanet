@@ -22,7 +22,6 @@ type Sale = {
   discount: number
   total: number
   paymentMethod: string | null
-  details: string | null
   isPending: boolean
   createdAt: string
   items: Array<{
@@ -109,7 +108,6 @@ export function CaixaClient({ products, initialSales }: { products: Product[]; i
   const [paymentMode, setPaymentMode] = useState<PaymentMode>('UNICO')
   const [paymentMethod, setPaymentMethod] = useState('DINHEIRO')
   const [amountReceived, setAmountReceived] = useState('')
-  const [saleDetails, setSaleDetails] = useState('')
   const [isPendingSale, setIsPendingSale] = useState(false)
   const [amountReceivedTouched, setAmountReceivedTouched] = useState(false)
   const [splitPayments, setSplitPayments] = useState<SplitPayment[]>([
@@ -347,7 +345,6 @@ export function CaixaClient({ products, initialSales }: { products: Product[]; i
               : undefined,
             discount: boundedDiscount,
             amountReceived: paymentMode === 'UNICO' && isCashPayment ? parsedAmountReceived : undefined,
-            details: saleDetails.trim() || undefined,
             isPending: isPendingSale,
           }),
         })
@@ -382,7 +379,6 @@ export function CaixaClient({ products, initialSales }: { products: Product[]; i
         setDiscountPercent('0')
         setDiscountPreset('0')
         setAmountReceived('')
-        setSaleDetails('')
         setIsPendingSale(false)
         setAmountReceivedTouched(false)
         setPaymentMode('UNICO')
@@ -783,15 +779,8 @@ export function CaixaClient({ products, initialSales }: { products: Product[]; i
             </label>
             <div>
               <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                Detalhes da venda
+                Observações da venda
               </label>
-              <textarea
-                value={saleDetails}
-                onChange={(event) => setSaleDetails(event.target.value)}
-                rows={3}
-                placeholder="Informações adicionais, combinação com o cliente, observações do atendimento..."
-                className="w-full rounded-lg border border-border bg-background px-4 py-2.5 text-sm outline-none focus:border-primary/60 focus:ring-2 focus:ring-primary/20"
-              />
               <p className="mt-1 text-xs text-muted-foreground">A venda pendente não baixa o estoque e aparece destacada em vermelho na lista de vendas.</p>
             </div>
           </div>
@@ -906,7 +895,6 @@ export function CaixaClient({ products, initialSales }: { products: Product[]; i
                     </div>
                   </div>
                   <p className="text-xs text-muted-foreground mt-1">{sale.items.reduce((acc, item) => acc + item.quantity, 0)} item(ns)</p>
-                  {sale.details ? <p className="text-xs text-muted-foreground mt-1 whitespace-pre-line">Detalhes: {sale.details}</p> : null}
                   {sale.discount > 0 && sale.subtotal > 0 ? (
                     <p className="text-xs text-muted-foreground mt-1">
                       Desconto: {((sale.discount / sale.subtotal) * 100).toFixed(2)}% ({formatCurrency(sale.discount)})

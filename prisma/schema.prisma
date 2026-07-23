@@ -225,7 +225,6 @@ model Sale {
   total         Float      @default(0.0)
   paymentMethod String?
   notes         String?
-  details       String?
   isPending     Boolean    @default(false)
   customerId    String?
   customer      Customer?  @relation(fields: [customerId], references: [id])

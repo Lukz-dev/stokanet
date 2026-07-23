@@ -1628,7 +1628,6 @@ export async function completeSale(data: {
   discount?: number
   amountReceived?: number
   notes?: string
-  details?: string
   isPending?: boolean
 }) {
   const user = await getAuthenticatedUser()
@@ -1641,7 +1640,6 @@ export async function completeSale(data: {
     discount: data.discount,
     amountReceived: data.amountReceived,
     notes: data.notes,
-    details: data.details,
     isPending: data.isPending,
   })
 

@@ -24,7 +24,6 @@ type Sale = {
   total: number
   paymentMethod: string | null
   notes: string | null
-  details: string | null
   isPending: boolean
   nfeStatus: string
   createdAt: string
@@ -74,7 +73,6 @@ export function VendasClient({ initialSales }: { initialSales: Sale[] }) {
       return (
         sale.code.toLowerCase().includes(q) ||
         (sale.paymentMethod ?? '').toLowerCase().includes(q) ||
-        (sale.details ?? '').toLowerCase().includes(q) ||
         sale.items.some((item) => item.productName.toLowerCase().includes(q) || item.sku.toLowerCase().includes(q))
       )
     })
@@ -244,10 +242,6 @@ export function VendasClient({ initialSales }: { initialSales: Sale[] }) {
 
                 {sale.notes ? (
                   <p className="text-xs text-muted-foreground mt-3 whitespace-pre-line">Observações: {sale.notes}</p>
-                ) : null}
-
-                {sale.details ? (
-                  <p className="text-xs text-muted-foreground mt-2 whitespace-pre-line">Detalhes: {sale.details}</p>
                 ) : null}
 
                 <div className="mt-3 flex flex-wrap items-center gap-2">

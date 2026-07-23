@@ -13,7 +13,6 @@ export type ProcessSaleInput = {
   discount?: number
   amountReceived?: number
   notes?: string
-  details?: string
   isPending?: boolean
   customerId?: string | null
 }
@@ -110,7 +109,6 @@ function formatPaymentBreakdown(breakdown: Array<{ method: string; amount: numbe
 export async function processSaleWithNfe(input: ProcessSaleInput): Promise<ProcessSaleResult> {
   const companyId = await getActiveCompanyId()
   const isPending = input.isPending ?? false
-  const saleDetails = input.details?.trim() || null
 
   try {
     const nfeSettings = await prisma.nfeSettings.findUnique({
@@ -212,7 +210,6 @@ export async function processSaleWithNfe(input: ProcessSaleInput): Promise<Proce
             total,
             paymentMethod: normalizedPaymentLabel,
             notes: input.notes?.trim() || null,
-            details: saleDetails,
             isPending: true,
             companyId,
             customerId: input.customerId ?? null,
@@ -293,7 +290,6 @@ export async function processSaleWithNfe(input: ProcessSaleInput): Promise<Proce
             total,
             paymentMethod: normalizedPaymentLabel,
             notes: input.notes?.trim() || null,
-            details: saleDetails,
             isPending: false,
             companyId,
             customerId: input.customerId ?? null,
@@ -362,7 +358,6 @@ export async function processSaleWithNfe(input: ProcessSaleInput): Promise<Proce
           total,
           paymentMethod: normalizedPaymentLabel,
           notes: input.notes?.trim() || null,
-          details: saleDetails,
           isPending: false,
           companyId,
           customerId: input.customerId ?? null,

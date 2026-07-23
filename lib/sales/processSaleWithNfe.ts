@@ -13,6 +13,8 @@ export type ProcessSaleInput = {
   discount?: number
   amountReceived?: number
   notes?: string
+  details?: string
+  isPending?: boolean
   customerId?: string | null
 }
 
@@ -25,6 +27,7 @@ export type ProcessSaleResult = {
     total: number
     amountReceived: number | null
     change: number
+    isPending: boolean
     nfeEnabled: boolean
     nfe: NfeAuthorizationResult
   }
@@ -106,6 +109,8 @@ function formatPaymentBreakdown(breakdown: Array<{ method: string; amount: numbe
 
 export async function processSaleWithNfe(input: ProcessSaleInput): Promise<ProcessSaleResult> {
   const companyId = await getActiveCompanyId()
+  const isPending = input.isPending ?? false
+  const saleDetails = input.details?.trim() || null
 
   try {
     const nfeSettings = await prisma.nfeSettings.findUnique({
@@ -228,6 +233,55 @@ export async function processSaleWithNfe(input: ProcessSaleInput): Promise<Proce
       : normalizedPaymentMethod === 'DINHEIRO' && normalizedAmountReceived !== null
         ? Number((normalizedAmountReceived - total).toFixed(2))
         : 0
+    if (isPending) {
+      const pendingSale = await prisma.$transaction(async (tx) => {
+        const sale = await tx.sale.create({
+          data: {
+            code: saleCode,
+            subtotal,
+            discount: boundedDiscount,
+            total,
+            paymentMethod: normalizedPaymentLabel,
+            notes: input.notes?.trim() || null,
+            details: saleDetails,
+            isPending: true,
+            companyId,
+            customerId: input.customerId ?? null,
+            nfeStatus: 'PENDENTE',
+          } as any,
+        })
+
+        await tx.saleItem.createMany({
+          data: resolvedItems.map((item) => ({
+            saleId: sale.id,
+            productId: item.product.id,
+            productName: item.product.name,
+            sku: item.product.sku,
+            quantity: item.quantity,
+            unitPrice: item.unitPrice,
+            total: item.total,
+          })),
+        })
+
+        return sale
+      })
+
+      return {
+        sale: {
+          id: pendingSale.id,
+          code: pendingSale.code,
+          subtotal,
+          discount: boundedDiscount,
+          total,
+          amountReceived: normalizedAmountReceived,
+          change,
+          isPending: true,
+          nfeEnabled: false,
+          nfe: { status: 'PENDENTE' },
+        },
+      }
+    }
+
     if (!nfeEnabled) {
       const manualSale = await prisma.$transaction(async (tx) => {
         const sale = await tx.sale.create({
@@ -238,6 +292,8 @@ export async function processSaleWithNfe(input: ProcessSaleInput): Promise<Proce
             total,
             paymentMethod: normalizedPaymentLabel,
             notes: input.notes?.trim() || null,
+            details: saleDetails,
+            isPending: false,
             companyId,
             customerId: input.customerId ?? null,
             nfeStatus: 'PENDENTE',
@@ -283,6 +339,7 @@ export async function processSaleWithNfe(input: ProcessSaleInput): Promise<Proce
           total,
           amountReceived: normalizedAmountReceived,
           change,
+            isPending: false,
           nfeEnabled: false,
           nfe: { status: 'PENDENTE' },
         },
@@ -304,6 +361,8 @@ export async function processSaleWithNfe(input: ProcessSaleInput): Promise<Proce
           total,
           paymentMethod: normalizedPaymentLabel,
           notes: input.notes?.trim() || null,
+          details: saleDetails,
+          isPending: false,
           companyId,
           customerId: input.customerId ?? null,
           nfeStatus: 'PROCESSANDO',
@@ -377,6 +436,7 @@ export async function processSaleWithNfe(input: ProcessSaleInput): Promise<Proce
           total,
           amountReceived: normalizedAmountReceived,
           change,
+          isPending: false,
           nfeEnabled: true,
           nfe,
         },
@@ -421,6 +481,7 @@ export async function processSaleWithNfe(input: ProcessSaleInput): Promise<Proce
         total,
         amountReceived: normalizedAmountReceived,
         change,
+        isPending: false,
         nfeEnabled: true,
         nfe,
       },

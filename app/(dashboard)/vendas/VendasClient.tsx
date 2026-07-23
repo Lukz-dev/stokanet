@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useTransition } from 'react'
 import { Ban, Pencil, Receipt, Search } from 'lucide-react'
-import { cancelSale } from '@/lib/actions'
+import { cancelSale, completePendingSale } from '@/lib/actions'
 import { useRouter } from 'next/navigation'
 import { SaleEditModal } from '@/components/SaleEditModal'
 
@@ -24,6 +24,8 @@ type Sale = {
   total: number
   paymentMethod: string | null
   notes: string | null
+  details: string | null
+  isPending: boolean
   nfeStatus: string
   createdAt: string
   items: SaleItem[]
@@ -72,6 +74,7 @@ export function VendasClient({ initialSales }: { initialSales: Sale[] }) {
       return (
         sale.code.toLowerCase().includes(q) ||
         (sale.paymentMethod ?? '').toLowerCase().includes(q) ||
+        (sale.details ?? '').toLowerCase().includes(q) ||
         sale.items.some((item) => item.productName.toLowerCase().includes(q) || item.sku.toLowerCase().includes(q))
       )
     })
@@ -93,6 +96,21 @@ export function VendasClient({ initialSales }: { initialSales: Sale[] }) {
         router.refresh()
       } catch (currentError: any) {
         setError(currentError?.message || 'Não foi possível cancelar a venda.')
+      }
+    })
+  }
+
+  const handleCompletePending = (sale: Sale) => {
+    setError('')
+    setFeedback('')
+
+    startTransition(async () => {
+      try {
+        await completePendingSale({ saleId: sale.id })
+        setFeedback(`Venda ${sale.code} concluída com sucesso.`)
+        router.refresh()
+      } catch (currentError: any) {
+        setError(currentError?.message || 'Não foi possível concluir a venda pendente.')
       }
     })
   }
@@ -150,10 +168,13 @@ export function VendasClient({ initialSales }: { initialSales: Sale[] }) {
             const canCancel = !cancelled && sale.nfeStatus !== 'AUTORIZADO'
 
             return (
-              <article key={sale.id} className="p-4">
+              <article key={sale.id} className={`p-4 ${sale.isPending ? 'bg-red-500/5' : ''}`}>
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
-                    <p className="font-semibold">{sale.code}</p>
+                    <div className="flex items-center gap-2">
+                      <p className="font-semibold">{sale.code}</p>
+                      {sale.isPending ? <span className="inline-flex items-center rounded-full bg-red-500/10 px-2.5 py-1 text-xs font-semibold text-red-700">Venda pendente</span> : null}
+                    </div>
                     <p className="text-xs text-muted-foreground mt-1">
                       {new Date(sale.createdAt).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}
                     </p>
@@ -225,6 +246,10 @@ export function VendasClient({ initialSales }: { initialSales: Sale[] }) {
                   <p className="text-xs text-muted-foreground mt-3 whitespace-pre-line">Observações: {sale.notes}</p>
                 ) : null}
 
+                {sale.details ? (
+                  <p className="text-xs text-muted-foreground mt-2 whitespace-pre-line">Detalhes: {sale.details}</p>
+                ) : null}
+
                 <div className="mt-3 flex flex-wrap items-center gap-2">
                   <button
                     type="button"
@@ -234,6 +259,17 @@ export function VendasClient({ initialSales }: { initialSales: Sale[] }) {
                   >
                     <Pencil className="w-3.5 h-3.5" /> Editar venda
                   </button>
+
+                  {sale.isPending ? (
+                    <button
+                      type="button"
+                      onClick={() => handleCompletePending(sale)}
+                      disabled={isPending || cancelled}
+                      className="inline-flex items-center gap-1 px-3 py-2 rounded-lg border border-emerald-500/30 bg-emerald-500/10 text-emerald-700 text-sm font-semibold hover:bg-emerald-500/15 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <Receipt className="w-3.5 h-3.5" /> Concluir venda
+                    </button>
+                  ) : null}
 
                   {cancelled ? (
                     <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold bg-destructive/10 text-destructive">
@@ -251,7 +287,7 @@ export function VendasClient({ initialSales }: { initialSales: Sale[] }) {
                     disabled={isPending || !canCancel}
                     className="px-3 py-2 rounded-lg border border-destructive/30 text-destructive text-sm font-semibold hover:bg-destructive/10 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    Cancelar venda
+                    {sale.isPending ? 'Cancelar pendente' : 'Cancelar venda'}
                   </button>
                 </div>
               </article>

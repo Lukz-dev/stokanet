@@ -23,6 +23,8 @@ type Sale = {
   discount: number
   total: number
   paymentMethod: string | null
+  details: string | null
+  isPending: boolean
   createdAt: string
   items: Array<{
     id: string
@@ -109,6 +111,8 @@ export function CaixaClient({ products, initialSales }: { products: Product[]; i
   const [paymentMode, setPaymentMode] = useState<PaymentMode>('UNICO')
   const [paymentMethod, setPaymentMethod] = useState('DINHEIRO')
   const [amountReceived, setAmountReceived] = useState('')
+  const [saleDetails, setSaleDetails] = useState('')
+  const [isPendingSale, setIsPendingSale] = useState(false)
   const [amountReceivedTouched, setAmountReceivedTouched] = useState(false)
   const [splitPayments, setSplitPayments] = useState<SplitPayment[]>([
     { method: 'CARTAO_CREDITO', amount: '' },
@@ -342,15 +346,23 @@ export function CaixaClient({ products, initialSales }: { products: Product[]; i
             : undefined,
           discount: boundedDiscount,
           amountReceived: paymentMode === 'UNICO' && isCashPayment ? parsedAmountReceived : undefined,
+          details: saleDetails.trim() || undefined,
+          isPending: isPendingSale,
         })
         const changeMessage = result.change > 0 ? ` Troco: ${formatCurrency(result.change)}.` : ''
-        setSuccess(`Venda ${result.code} finalizada com sucesso.${changeMessage}`)
+        setSuccess(
+          isPendingSale
+            ? `Venda ${result.code} registrada como pendente com sucesso.${changeMessage}`
+            : `Venda ${result.code} finalizada com sucesso.${changeMessage}`,
+        )
         setLastSaleId(result.id)
         setLastSaleCode(result.code)
         setCart([])
         setDiscountPercent('0')
         setDiscountPreset('0')
         setAmountReceived('')
+        setSaleDetails('')
+        setIsPendingSale(false)
         setAmountReceivedTouched(false)
         setPaymentMode('UNICO')
         setSplitPayments([
@@ -740,6 +752,31 @@ export function CaixaClient({ products, initialSales }: { products: Product[]; i
             </div>
           </div>
 
+          <div className="grid grid-cols-1 gap-3 rounded-xl border border-border bg-muted/10 p-4 md:grid-cols-[auto_1fr] md:items-start">
+            <label className="inline-flex items-center gap-2 text-sm font-medium text-foreground">
+              <input
+                type="checkbox"
+                checked={isPendingSale}
+                onChange={(event) => setIsPendingSale(event.target.checked)}
+                className="h-4 w-4 rounded border-border text-primary focus:ring-primary/30"
+              />
+              Marcar como venda pendente
+            </label>
+            <div>
+              <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Detalhes da venda
+              </label>
+              <textarea
+                value={saleDetails}
+                onChange={(event) => setSaleDetails(event.target.value)}
+                rows={3}
+                placeholder="Informações adicionais, combinação com o cliente, observações do atendimento..."
+                className="w-full rounded-lg border border-border bg-background px-4 py-2.5 text-sm outline-none focus:border-primary/60 focus:ring-2 focus:ring-primary/20"
+              />
+              <p className="mt-1 text-xs text-muted-foreground">A venda pendente não baixa o estoque e aparece destacada em vermelho na lista de vendas.</p>
+            </div>
+          </div>
+
           {error && <p className="text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded-lg px-4 py-3 mb-4">{error}</p>}
           {success && <p className="text-sm text-emerald-600 bg-emerald-500/10 border border-emerald-500/20 rounded-lg px-4 py-3 mb-4">{success}</p>}
 
@@ -833,10 +870,11 @@ export function CaixaClient({ products, initialSales }: { products: Product[]; i
                   {showOnlyDiscountedSales ? 'Nenhuma venda com desconto encontrada.' : 'Nenhuma venda registrada ainda.'}
                 </p>
               ) : recentSales.map((sale) => (
-                <div key={sale.id} className="rounded-lg border border-border p-3">
+                <div key={sale.id} className={`rounded-lg border p-3 ${sale.isPending ? 'border-red-500/30 bg-red-500/5' : 'border-border'}`}>
                   <div className="flex items-center justify-between">
                     <p className="font-semibold text-sm">{sale.code}</p>
                     <div className="flex items-center gap-2">
+                      {sale.isPending ? <span className="rounded-full bg-red-500/10 px-2 py-1 text-[11px] font-semibold text-red-700">Pendente</span> : null}
                       <Link
                         href={`/api/export/nfse/${sale.id}`}
                         target="_blank"
@@ -849,6 +887,7 @@ export function CaixaClient({ products, initialSales }: { products: Product[]; i
                     </div>
                   </div>
                   <p className="text-xs text-muted-foreground mt-1">{sale.items.reduce((acc, item) => acc + item.quantity, 0)} item(ns)</p>
+                  {sale.details ? <p className="text-xs text-muted-foreground mt-1 whitespace-pre-line">Detalhes: {sale.details}</p> : null}
                   {sale.discount > 0 && sale.subtotal > 0 ? (
                     <p className="text-xs text-muted-foreground mt-1">
                       Desconto: {((sale.discount / sale.subtotal) * 100).toFixed(2)}% ({formatCurrency(sale.discount)})

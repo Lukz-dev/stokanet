@@ -14,6 +14,8 @@ export async function POST(request: Request) {
       discount?: number
       amountReceived?: number
       notes?: string
+      details?: string
+      isPending?: boolean
       customerId?: string | null
     }
 
@@ -24,6 +26,8 @@ export async function POST(request: Request) {
       discount: body.discount,
       amountReceived: body.amountReceived,
       notes: body.notes,
+      details: body.details,
+      isPending: body.isPending,
       customerId: body.customerId ?? null,
     })
 

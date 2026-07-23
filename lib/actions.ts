@@ -1628,6 +1628,8 @@ export async function completeSale(data: {
   discount?: number
   amountReceived?: number
   notes?: string
+  details?: string
+  isPending?: boolean
 }) {
   const user = await getAuthenticatedUser()
   const companyId = await getCompanyId()
@@ -1639,6 +1641,8 @@ export async function completeSale(data: {
     discount: data.discount,
     amountReceived: data.amountReceived,
     notes: data.notes,
+    details: data.details,
+    isPending: data.isPending,
   })
 
   if (processed.sale.nfe.status === 'REJEITADO') {
@@ -1660,7 +1664,9 @@ export async function completeSale(data: {
     action: 'CREATE',
     entity: 'SALE',
     entityId: processed.sale.id,
-    details: `Venda ${processed.sale.code} finalizada com total ${processed.sale.total.toFixed(2)} (NF-e autorizada)`,
+    details: processed.sale.isPending
+      ? `Venda ${processed.sale.code} registrada como pendente com total ${processed.sale.total.toFixed(2)}`
+      : `Venda ${processed.sale.code} finalizada com total ${processed.sale.total.toFixed(2)} (NF-e autorizada)`,
     companyId,
     userId: user.id,
   })
@@ -1744,42 +1750,44 @@ export async function cancelSale(input: { saleId: string; reason?: string }) {
     throw new Error('Não é possível cancelar por aqui uma venda com NF-e autorizada.')
   }
 
-  if (!sale.items.length) {
+  if (!sale.isPending && !sale.items.length) {
     throw new Error('A venda não possui itens para estorno de estoque.')
   }
 
   const productIds = [...new Set(sale.items.map((item) => item.productId))]
 
   await prisma.$transaction(async (tx) => {
-    for (const item of sale.items) {
-      await tx.product.update({
-        where: { id: item.productId },
-        data: { stockQty: { increment: item.quantity } },
+    if (!sale.isPending) {
+      for (const item of sale.items) {
+        await tx.product.update({
+          where: { id: item.productId },
+          data: { stockQty: { increment: item.quantity } },
+        })
+      }
+
+      const productsAfter = await tx.product.findMany({
+        where: { id: { in: productIds }, companyId },
+        select: { id: true, stockQty: true, minStock: true },
+      })
+
+      for (const product of productsAfter) {
+        const status = resolveProductStatus(product.stockQty, product.minStock)
+        await tx.product.update({
+          where: { id: product.id },
+          data: { status },
+        })
+      }
+
+      await tx.movement.createMany({
+        data: sale.items.map((item) => ({
+          type: 'ENTRADA' as const,
+          quantity: item.quantity,
+          reason: `Cancelamento da venda ${sale.code}`,
+          productId: item.productId,
+          companyId,
+        })),
       })
     }
-
-    const productsAfter = await tx.product.findMany({
-      where: { id: { in: productIds }, companyId },
-      select: { id: true, stockQty: true, minStock: true },
-    })
-
-    for (const product of productsAfter) {
-      const status = resolveProductStatus(product.stockQty, product.minStock)
-      await tx.product.update({
-        where: { id: product.id },
-        data: { status },
-      })
-    }
-
-    await tx.movement.createMany({
-      data: sale.items.map((item) => ({
-        type: 'ENTRADA' as const,
-        quantity: item.quantity,
-        reason: `Cancelamento da venda ${sale.code}`,
-        productId: item.productId,
-        companyId,
-      })),
-    })
 
     await tx.sale.update({
       where: { id: sale.id },
@@ -1801,6 +1809,121 @@ export async function cancelSale(input: { saleId: string; reason?: string }) {
     entity: 'SALE',
     entityId: sale.id,
     details: `Venda ${sale.code} cancelada${input.reason?.trim() ? `: ${input.reason.trim()}` : ''}`,
+    companyId,
+    userId: user.id,
+  })
+
+  return { ok: true, id: sale.id, code: sale.code }
+}
+
+export async function completePendingSale(input: { saleId: string }) {
+  const user = await requireRole(['ADMIN', 'MANAGER', 'OPERATOR'])
+  const companyId = await getCompanyId()
+  const saleId = input.saleId.trim()
+
+  if (!saleId) {
+    throw new Error('Venda inválida para conclusão.')
+  }
+
+  const sale = await prisma.sale.findFirst({
+    where: { id: saleId, companyId },
+    include: {
+      items: {
+        select: {
+          id: true,
+          productId: true,
+          quantity: true,
+        },
+      },
+    },
+  })
+
+  if (!sale) {
+    throw new Error('Venda não encontrada.')
+  }
+
+  if (isSaleCancelled(sale.notes)) {
+    throw new Error('Não é possível concluir uma venda cancelada.')
+  }
+
+  if (!sale.isPending) {
+    throw new Error('Esta venda já foi concluída.')
+  }
+
+  if (sale.items.length === 0) {
+    throw new Error('A venda não possui itens para concluir.')
+  }
+
+  const productIds = [...new Set(sale.items.map((item) => item.productId))]
+
+  await prisma.$transaction(async (tx) => {
+    const products = await tx.product.findMany({
+      where: { companyId, id: { in: productIds } },
+      select: { id: true, name: true, stockQty: true, minStock: true },
+    })
+
+    const productMap = new Map(products.map((product) => [product.id, product]))
+
+    for (const item of sale.items) {
+      const product = productMap.get(item.productId)
+      if (!product) {
+        throw new Error('Produto da venda não encontrado.')
+      }
+
+      if (product.stockQty < item.quantity) {
+        throw new Error(`Estoque insuficiente para ${product.name}. Disponível: ${product.stockQty}.`)
+      }
+
+      await tx.product.update({
+        where: { id: item.productId },
+        data: { stockQty: { decrement: item.quantity } },
+      })
+    }
+
+    const updatedProducts = await tx.product.findMany({
+      where: { companyId, id: { in: productIds } },
+      select: { id: true, stockQty: true, minStock: true },
+    })
+
+    for (const product of updatedProducts) {
+      await tx.product.update({
+        where: { id: product.id },
+        data: { status: resolveProductStatus(product.stockQty, product.minStock) },
+      })
+    }
+
+    await tx.movement.createMany({
+      data: sale.items.map((item) => ({
+        type: 'SAIDA' as const,
+        quantity: item.quantity,
+        reason: `Conclusão da venda pendente ${sale.code}`,
+        productId: item.productId,
+        companyId,
+      })),
+    })
+
+    await tx.sale.update({
+      where: { id: sale.id },
+      data: {
+        isPending: false,
+        stockCommittedAt: new Date(),
+      },
+    })
+  })
+
+  revalidatePath('/vendas')
+  revalidatePath('/caixa')
+  revalidatePath('/movimentacoes')
+  revalidatePath('/estoque')
+  revalidatePath('/fechamento')
+  revalidatePath('/relatorios')
+  revalidatePath('/')
+
+  await logAudit({
+    action: 'COMPLETE',
+    entity: 'SALE',
+    entityId: sale.id,
+    details: `Venda pendente ${sale.code} concluída`,
     companyId,
     userId: user.id,
   })
@@ -1937,7 +2060,7 @@ export async function updateSale(input: {
   const total = Number(Math.max(0, subtotal - discount).toFixed(2))
 
   await prisma.$transaction(async (tx) => {
-    if (stockDeltas.size > 0) {
+    if (!sale.isPending && stockDeltas.size > 0) {
       const affectedProducts = await tx.product.findMany({
         where: { companyId, id: { in: [...stockDeltas.keys()] } },
         select: { id: true, stockQty: true, minStock: true },

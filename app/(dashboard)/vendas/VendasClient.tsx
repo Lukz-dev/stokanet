@@ -58,7 +58,7 @@ function isCancelled(notes: string | null) {
 }
 
 function isPendingSale(sale: Sale) {
-  return sale.isPending || (sale.nfeStatus === 'PENDENTE' && sale.stockCommittedAt === null)
+  return sale.isPending || sale.notes?.includes('[VENDA_PENDENTE]') === true
 }
 
 export function VendasClient({ initialSales }: { initialSales: Sale[] }) {

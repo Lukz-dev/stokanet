@@ -106,6 +106,13 @@ function formatPaymentBreakdown(breakdown: Array<{ method: string; amount: numbe
   return breakdown.map((item) => `${paymentMethodLabel(item.method)} ${formatCurrency(item.amount)}`).join(' + ')
 }
 
+const PENDING_SALE_MARKER = '[VENDA_PENDENTE]'
+
+function buildPendingSaleNotes(existingNotes?: string | null) {
+  const trimmedNotes = existingNotes?.trim()
+  return trimmedNotes ? `${PENDING_SALE_MARKER}\n${trimmedNotes}` : PENDING_SALE_MARKER
+}
+
 export async function processSaleWithNfe(input: ProcessSaleInput): Promise<ProcessSaleResult> {
   const companyId = await getActiveCompanyId()
   const isPending = input.isPending ?? false
@@ -209,7 +216,7 @@ export async function processSaleWithNfe(input: ProcessSaleInput): Promise<Proce
             discount: boundedDiscount,
             total,
             paymentMethod: normalizedPaymentLabel,
-            notes: input.notes?.trim() || null,
+            notes: buildPendingSaleNotes(input.notes),
             companyId,
             customerId: input.customerId ?? null,
             nfeStatus: 'PENDENTE',

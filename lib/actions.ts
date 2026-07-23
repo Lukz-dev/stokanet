@@ -1705,8 +1705,20 @@ function isSaleCancelled(notes: string | null) {
   return notes.includes('[CANCELADA]')
 }
 
-function isPendingSaleRecord(sale: { nfeStatus: string; stockCommittedAt: Date | null }) {
-  return sale.nfeStatus === 'PENDENTE' && sale.stockCommittedAt === null
+const PENDING_SALE_MARKER = '[VENDA_PENDENTE]'
+
+function isPendingSaleRecord(sale: { notes: string | null; stockCommittedAt: Date | null }) {
+  const hasPendingMarker = sale.notes?.includes(PENDING_SALE_MARKER) === true
+  const isLegacyPendingSale = sale.stockCommittedAt === null && (sale.notes ?? '').trim() === ''
+
+  return hasPendingMarker || isLegacyPendingSale
+}
+
+function stripPendingSaleMarker(notes: string | null) {
+  if (!notes) return null
+
+  const withoutMarker = notes.replace(PENDING_SALE_MARKER, '').trim()
+  return withoutMarker.length > 0 ? withoutMarker : null
 }
 
 function buildCancelledSaleNotes(existingNotes: string | null, reason?: string) {
@@ -1796,7 +1808,7 @@ export async function cancelSale(input: { saleId: string; reason?: string }) {
     await tx.sale.update({
       where: { id: sale.id },
       data: {
-        notes: buildCancelledSaleNotes(sale.notes, input.reason),
+        notes: buildCancelledSaleNotes(stripPendingSaleMarker(sale.notes), input.reason),
       },
     })
   })
@@ -1911,6 +1923,7 @@ export async function completePendingSale(input: { saleId: string }) {
     await tx.sale.update({
       where: { id: sale.id },
       data: {
+        notes: stripPendingSaleMarker(sale.notes),
         stockCommittedAt: new Date(),
       },
     })

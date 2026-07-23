@@ -26,6 +26,7 @@ type Sale = {
   notes: string | null
   isPending: boolean
   nfeStatus: string
+  stockCommittedAt: string | null
   createdAt: string
   items: SaleItem[]
 }
@@ -54,6 +55,10 @@ function paymentLabel(paymentMethod: string | null) {
 function isCancelled(notes: string | null) {
   if (!notes) return false
   return notes.includes('[CANCELADA]')
+}
+
+function isPendingSale(sale: Sale) {
+  return sale.isPending || (sale.nfeStatus === 'PENDENTE' && sale.stockCommittedAt === null)
 }
 
 export function VendasClient({ initialSales }: { initialSales: Sale[] }) {
@@ -163,15 +168,16 @@ export function VendasClient({ initialSales }: { initialSales: Sale[] }) {
             </div>
           ) : filteredSales.map((sale) => {
             const cancelled = isCancelled(sale.notes)
+            const pending = isPendingSale(sale)
             const canCancel = !cancelled && sale.nfeStatus !== 'AUTORIZADO'
 
             return (
-              <article key={sale.id} className={`p-4 ${sale.isPending ? 'bg-red-500/5' : ''}`}>
+              <article key={sale.id} className={`p-4 ${pending ? 'bg-red-500/5' : ''}`}>
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
                     <div className="flex items-center gap-2">
                       <p className="font-semibold">{sale.code}</p>
-                      {sale.isPending ? <span className="inline-flex items-center rounded-full bg-red-500/10 px-2.5 py-1 text-xs font-semibold text-red-700">Venda pendente</span> : null}
+                      {pending ? <span className="inline-flex items-center rounded-full bg-red-500/10 px-2.5 py-1 text-xs font-semibold text-red-700">Venda pendente</span> : null}
                     </div>
                     <p className="text-xs text-muted-foreground mt-1">
                       {new Date(sale.createdAt).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}
@@ -254,7 +260,7 @@ export function VendasClient({ initialSales }: { initialSales: Sale[] }) {
                     <Pencil className="w-3.5 h-3.5" /> Editar venda
                   </button>
 
-                  {sale.isPending ? (
+                  {pending ? (
                     <button
                       type="button"
                       onClick={() => handleCompletePending(sale)}
@@ -281,7 +287,7 @@ export function VendasClient({ initialSales }: { initialSales: Sale[] }) {
                     disabled={isPending || !canCancel}
                     className="px-3 py-2 rounded-lg border border-destructive/30 text-destructive text-sm font-semibold hover:bg-destructive/10 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    {sale.isPending ? 'Cancelar pendente' : 'Cancelar venda'}
+                    {pending ? 'Cancelar pendente' : 'Cancelar venda'}
                   </button>
                 </div>
               </article>

@@ -201,38 +201,7 @@ export async function processSaleWithNfe(input: ProcessSaleInput): Promise<Proce
     const normalizedPaymentLabel = hasPaymentBreakdown
       ? formatPaymentBreakdown(normalizedBreakdown)
       : normalizedPaymentMethod
-    const totalPaid = hasPaymentBreakdown
-      ? Number(normalizedBreakdown.reduce((acc, item) => acc + item.amount, 0).toFixed(2))
-      : null
-    const normalizedAmountReceived = hasPaymentBreakdown
-      ? totalPaid
-      : normalizedPaymentMethod === 'DINHEIRO' && Number.isFinite(input.amountReceived)
-        ? Math.max(0, Number(input.amountReceived))
-        : null
 
-    if (hasPaymentBreakdown) {
-      if (totalPaid === null || totalPaid < total) {
-        throw new NfeIntegrationError('A soma dos pagamentos é menor que o total da venda.', { code: 'SALE_AMOUNT_INSUFFICIENT' })
-      }
-
-      if (totalPaid > total) {
-        throw new NfeIntegrationError('A soma dos pagamentos é maior que o total da venda.', { code: 'SALE_AMOUNT_EXCESS' })
-      }
-    } else {
-      if (normalizedPaymentMethod === 'DINHEIRO' && normalizedAmountReceived === null) {
-        throw new NfeIntegrationError('Informe o valor recebido para pagamentos em dinheiro.', { code: 'SALE_AMOUNT_REQUIRED' })
-      }
-
-      if (normalizedPaymentMethod === 'DINHEIRO' && normalizedAmountReceived !== null && normalizedAmountReceived < total) {
-        throw new NfeIntegrationError('O valor recebido é menor que o total da venda.', { code: 'SALE_AMOUNT_INSUFFICIENT' })
-      }
-    }
-
-    const change = hasPaymentBreakdown
-      ? 0
-      : normalizedPaymentMethod === 'DINHEIRO' && normalizedAmountReceived !== null
-        ? Number((normalizedAmountReceived - total).toFixed(2))
-        : 0
     if (isPending) {
       const pendingSale = await prisma.$transaction(async (tx) => {
         const sale = await tx.sale.create({
@@ -273,8 +242,8 @@ export async function processSaleWithNfe(input: ProcessSaleInput): Promise<Proce
           subtotal,
           discount: boundedDiscount,
           total,
-          amountReceived: normalizedAmountReceived,
-          change,
+          amountReceived: null,
+          change: 0,
           isPending: true,
           nfeEnabled: false,
           nfe: { status: 'PENDENTE' },
@@ -282,6 +251,38 @@ export async function processSaleWithNfe(input: ProcessSaleInput): Promise<Proce
       }
     }
 
+    const totalPaid = hasPaymentBreakdown
+      ? Number(normalizedBreakdown.reduce((acc, item) => acc + item.amount, 0).toFixed(2))
+      : null
+    const normalizedAmountReceived = hasPaymentBreakdown
+      ? totalPaid
+      : normalizedPaymentMethod === 'DINHEIRO' && Number.isFinite(input.amountReceived)
+        ? Math.max(0, Number(input.amountReceived))
+        : null
+
+    if (hasPaymentBreakdown) {
+      if (totalPaid === null || totalPaid < total) {
+        throw new NfeIntegrationError('A soma dos pagamentos é menor que o total da venda.', { code: 'SALE_AMOUNT_INSUFFICIENT' })
+      }
+
+      if (totalPaid > total) {
+        throw new NfeIntegrationError('A soma dos pagamentos é maior que o total da venda.', { code: 'SALE_AMOUNT_EXCESS' })
+      }
+    } else {
+      if (normalizedPaymentMethod === 'DINHEIRO' && normalizedAmountReceived === null) {
+        throw new NfeIntegrationError('Informe o valor recebido para pagamentos em dinheiro.', { code: 'SALE_AMOUNT_REQUIRED' })
+      }
+
+      if (normalizedPaymentMethod === 'DINHEIRO' && normalizedAmountReceived !== null && normalizedAmountReceived < total) {
+        throw new NfeIntegrationError('O valor recebido é menor que o total da venda.', { code: 'SALE_AMOUNT_INSUFFICIENT' })
+      }
+    }
+
+    const change = hasPaymentBreakdown
+      ? 0
+      : normalizedPaymentMethod === 'DINHEIRO' && normalizedAmountReceived !== null
+        ? Number((normalizedAmountReceived - total).toFixed(2))
+        : 0
     if (!nfeEnabled) {
       const manualSale = await prisma.$transaction(async (tx) => {
         const sale = await tx.sale.create({

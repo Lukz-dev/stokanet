@@ -1,11 +1,12 @@
 'use client'
 
 import { useMemo, useState, useTransition, type FormEvent } from 'react'
-import { Pencil, X } from 'lucide-react'
-import { updateSale } from '@/lib/actions'
+import { Pencil, Plus, Search, X } from 'lucide-react'
+import { findProductByCode, updateSale } from '@/lib/actions'
 
 type SaleItem = {
   id: string
+  productId: string
   productName: string
   sku: string
   quantity: number
@@ -22,6 +23,7 @@ type Sale = {
   paymentMethod: string | null
   notes: string | null
   nfeStatus: string
+  stockCommittedAt: string | null
   createdAt: string
   items: SaleItem[]
 }
@@ -41,15 +43,30 @@ function toNumber(value: string) {
   return Number.isFinite(parsed) ? parsed : 0
 }
 
+const PENDING_SALE_MARKER = '[VENDA_PENDENTE]'
+
+function stripPendingSaleMarker(notes: string | null) {
+  if (!notes) return ''
+
+  return notes
+    .split('\n')
+    .filter((line) => line.trim() !== PENDING_SALE_MARKER)
+    .join('\n')
+    .trim()
+}
+
 export function SaleEditModal({ sale, onClose, onSuccess }: Props) {
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState('')
+  const [searchCode, setSearchCode] = useState('')
+  const [searchError, setSearchError] = useState('')
   const [paymentMethod, setPaymentMethod] = useState(sale.paymentMethod ?? '')
   const [discount, setDiscount] = useState(String(sale.discount ?? 0))
-  const [notes, setNotes] = useState(sale.notes ?? '')
+  const [notes, setNotes] = useState(stripPendingSaleMarker(sale.notes))
   const [items, setItems] = useState(
     sale.items.map((item) => ({
       id: item.id,
+      productId: item.productId,
       productName: item.productName,
       sku: item.sku,
       quantity: String(item.quantity),
@@ -64,8 +81,51 @@ export function SaleEditModal({ sale, onClose, onSuccess }: Props) {
   const discountValue = Math.min(Math.max(0, toNumber(discount)), subtotal)
   const total = Math.max(0, subtotal - discountValue)
 
+  const pendingSale = sale.notes?.includes(PENDING_SALE_MARKER) === true || (sale.stockCommittedAt === null && sale.nfeStatus === 'PENDENTE')
+
   const handleChangeItem = (index: number, field: 'productName' | 'sku' | 'quantity' | 'unitPrice', value: string) => {
     setItems((current) => current.map((item, itemIndex) => (itemIndex === index ? { ...item, [field]: value } : item)))
+  }
+
+  const handleAddProduct = () => {
+    const code = searchCode.trim()
+    if (!code) {
+      setSearchError('Informe um código ou SKU para adicionar.')
+      return
+    }
+
+    setSearchError('')
+
+    startTransition(async () => {
+      try {
+        const product = await findProductByCode(code)
+        setItems((current) => {
+          const existingIndex = current.findIndex((item) => item.productId === product.id)
+          if (existingIndex >= 0) {
+            return current.map((item, index) => {
+              if (index !== existingIndex) return item
+              const nextQuantity = toNumber(item.quantity) + 1
+              return { ...item, quantity: String(nextQuantity) }
+            })
+          }
+
+          return [
+            ...current,
+            {
+              id: `new-${product.id}-${Date.now()}`,
+              productId: product.id,
+              productName: product.name,
+              sku: product.sku,
+              quantity: '1',
+              unitPrice: String(product.price),
+            },
+          ]
+        })
+        setSearchCode('')
+      } catch (currentError: any) {
+        setSearchError(currentError?.message || 'Não foi possível encontrar o produto.')
+      }
+    })
   }
 
   const handleSubmit = (event: FormEvent) => {
@@ -157,6 +217,37 @@ export function SaleEditModal({ sale, onClose, onSuccess }: Props) {
               className="px-4 py-2.5 bg-background border border-border rounded-lg text-sm outline-none focus:border-primary/60 focus:ring-2 focus:ring-primary/20"
             />
           </label>
+
+          <div className="rounded-xl border border-border bg-muted/10 p-4">
+            <div className="flex flex-col gap-3 md:flex-row md:items-end">
+              <label className="flex-1 flex flex-col gap-2 text-sm font-medium">
+                Adicionar produto
+                <div className="flex gap-2">
+                  <div className="relative flex-1">
+                    <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    <input
+                      value={searchCode}
+                      onChange={(event) => setSearchCode(event.target.value)}
+                      placeholder="Digite o código ou SKU do produto"
+                      className="w-full rounded-lg border border-border bg-background py-2.5 pl-10 pr-3 text-sm outline-none focus:border-primary/60 focus:ring-2 focus:ring-primary/20"
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleAddProduct}
+                    disabled={isPending}
+                    className="inline-flex items-center gap-2 rounded-lg border border-border bg-background px-4 py-2.5 text-sm font-semibold hover:bg-muted disabled:opacity-60"
+                  >
+                    <Plus className="h-4 w-4" /> Adicionar
+                  </button>
+                </div>
+              </label>
+            </div>
+            {searchError ? <p className="mt-2 text-xs text-destructive">{searchError}</p> : null}
+            <p className="mt-2 text-xs text-muted-foreground">
+              {pendingSale ? 'Se a venda estiver pendente, os itens novos só descontam do estoque quando ela for concluída.' : 'Se a venda já estiver concluída, os itens novos descontam do estoque ao salvar.'}
+            </p>
+          </div>
 
           <div className="border border-border rounded-xl overflow-hidden">
             <div className="px-4 py-3 border-b border-border bg-muted/20 text-sm font-semibold">Itens da venda</div>

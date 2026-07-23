@@ -1714,6 +1714,11 @@ function isPendingSaleRecord(sale: { notes: string | null; stockCommittedAt: Dat
   return hasPendingMarker || isLegacyPendingSale
 }
 
+function buildPendingSaleNotes(existingNotes?: string | null) {
+  const trimmedNotes = existingNotes?.trim()
+  return trimmedNotes ? `${PENDING_SALE_MARKER}\n${trimmedNotes}` : PENDING_SALE_MARKER
+}
+
 function stripPendingSaleMarker(notes: string | null) {
   if (!notes) return null
 
@@ -2016,7 +2021,8 @@ export async function updateSale(input: {
   discount?: number
   notes?: string | null
   items: Array<{
-    id: string
+    id?: string
+    productId: string
     productName: string
     sku: string
     quantity: number
@@ -2057,31 +2063,42 @@ export async function updateSale(input: {
   }
 
   const normalizedItems = input.items.map((item) => ({
-    id: item.id.trim(),
+    id: item.id?.trim() || null,
+    productId: item.productId.trim(),
     productName: item.productName.trim(),
     sku: item.sku.trim(),
     quantity: Math.max(1, Math.floor(Number(item.quantity))),
     unitPrice: Math.max(0, Number(item.unitPrice)),
   }))
 
-  if (normalizedItems.length !== sale.items.length) {
-    throw new Error('Nesta versão, a edição mantém a mesma quantidade de itens da venda.')
+  if (normalizedItems.length < sale.items.length) {
+    throw new Error('Nesta versão, a edição permite manter ou adicionar itens, não remover.')
   }
 
   const currentItemMap = new Map(sale.items.map((item) => [item.id, item]))
-  if (normalizedItems.some((item) => !currentItemMap.has(item.id))) {
-    throw new Error('Item da venda não encontrado.')
+
+  const existingInputItems = normalizedItems.filter((item) => item.id && currentItemMap.has(item.id))
+  const newInputItems = normalizedItems.filter((item) => !item.id || !currentItemMap.has(item.id))
+
+  if (existingInputItems.length !== sale.items.length) {
+    throw new Error('Nesta versão, a edição precisa manter todos os itens atuais da venda.')
   }
 
   const stockDeltas = new Map<string, number>()
-  for (const item of normalizedItems) {
-    const current = currentItemMap.get(item.id)
-    if (!current) continue
+  for (const item of existingInputItems) {
+    const current = currentItemMap.get(item.id!)
+    if (!current) {
+      throw new Error('Item da venda não encontrado.')
+    }
 
     const quantityDelta = item.quantity - current.quantity
     if (quantityDelta !== 0) {
       stockDeltas.set(current.productId, (stockDeltas.get(current.productId) ?? 0) + quantityDelta)
     }
+  }
+
+  for (const item of newInputItems) {
+    stockDeltas.set(item.productId, (stockDeltas.get(item.productId) ?? 0) + item.quantity)
   }
 
   const subtotal = Number(
@@ -2090,10 +2107,9 @@ export async function updateSale(input: {
   const requestedDiscount = Number.isFinite(Number(input.discount)) ? Math.max(0, Number(input.discount)) : sale.discount
   const discount = Math.min(requestedDiscount, subtotal)
   const total = Number(Math.max(0, subtotal - discount).toFixed(2))
+  const isPending = isPendingSaleRecord(sale)
 
   await prisma.$transaction(async (tx) => {
-    const isPending = isPendingSaleRecord(sale)
-
     if (!isPending && stockDeltas.size > 0) {
       const affectedProducts = await tx.product.findMany({
         where: { companyId, id: { in: [...stockDeltas.keys()] } },
@@ -2138,9 +2154,9 @@ export async function updateSale(input: {
       }
     }
 
-    for (const item of normalizedItems) {
+    for (const item of existingInputItems) {
       await tx.saleItem.update({
-        where: { id: item.id },
+        where: { id: item.id! },
         data: {
           productName: item.productName,
           sku: item.sku,
@@ -2151,12 +2167,26 @@ export async function updateSale(input: {
       })
     }
 
+    if (newInputItems.length > 0) {
+      await tx.saleItem.createMany({
+        data: newInputItems.map((item) => ({
+          saleId: sale.id,
+          productId: item.productId,
+          productName: item.productName,
+          sku: item.sku,
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+          total: Number((item.quantity * item.unitPrice).toFixed(2)),
+        })),
+      })
+    }
+
     await tx.sale.update({
       where: { id: sale.id },
       data: {
         paymentMethod: input.paymentMethod?.trim() || null,
         discount,
-        notes: input.notes?.trim() || null,
+        notes: isPending ? buildPendingSaleNotes(input.notes) : stripPendingSaleMarker(input.notes?.trim() || null),
         subtotal,
         total,
       },

@@ -8,6 +8,7 @@ import { SaleEditModal } from '@/components/SaleEditModal'
 
 type SaleItem = {
   id: string
+  productId: string
   productName: string
   sku: string
   quantity: number
@@ -59,6 +60,16 @@ function isCancelled(notes: string | null) {
 
 function isPendingSale(sale: Sale) {
   return sale.isPending || sale.notes?.includes('[VENDA_PENDENTE]') === true
+}
+
+function displayNotes(notes: string | null) {
+  if (!notes) return ''
+
+  return notes
+    .split('\n')
+    .filter((line) => line.trim() !== '[VENDA_PENDENTE]')
+    .join('\n')
+    .trim()
 }
 
 export function VendasClient({ initialSales }: { initialSales: Sale[] }) {
@@ -246,8 +257,8 @@ export function VendasClient({ initialSales }: { initialSales: Sale[] }) {
                   </div>
                 </details>
 
-                {sale.notes ? (
-                  <p className="text-xs text-muted-foreground mt-3 whitespace-pre-line">Observações: {sale.notes}</p>
+                {displayNotes(sale.notes) ? (
+                  <p className="text-xs text-muted-foreground mt-3 whitespace-pre-line">Observações: {displayNotes(sale.notes)}</p>
                 ) : null}
 
                 <div className="mt-3 flex flex-wrap items-center gap-2">

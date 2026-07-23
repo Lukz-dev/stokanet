@@ -145,8 +145,8 @@ export function CaixaClient({ products, initialSales }: { products: Product[]; i
   const splitPaymentDifference = Number((splitPaymentTotal - total).toFixed(2))
   const splitPaymentRowsFilled = splitPaymentValues.every((item) => item.amountValue > 0)
   const splitPaymentMethodsValid = new Set(splitPaymentValues.map((item) => item.method)).size === splitPaymentValues.length
-  const splitPaymentMissing = paymentMode === 'MISTO' && (!splitPaymentRowsFilled || !splitPaymentMethodsValid || splitPaymentDifference !== 0)
-  const paymentMissing = paymentMode === 'UNICO' && isCashPayment && total > 0 && parsedAmountReceived < total
+  const splitPaymentMissing = !isPendingSale && paymentMode === 'MISTO' && (!splitPaymentRowsFilled || !splitPaymentMethodsValid || splitPaymentDifference !== 0)
+  const paymentMissing = !isPendingSale && paymentMode === 'UNICO' && isCashPayment && total > 0 && parsedAmountReceived < total
   const searchResults = useMemo(() => rankProductMatches(products, code), [code, products])
   const hasSearchResults = searchResults.length > 0
   const recentSales = useMemo(
@@ -325,7 +325,7 @@ export function CaixaClient({ products, initialSales }: { products: Product[]; i
       return
     }
 
-    if (paymentMode === 'MISTO' && splitPaymentMissing) {
+    if (!isPendingSale && paymentMode === 'MISTO' && splitPaymentMissing) {
       setError('Preencha os dois meios de pagamento para fechar o valor total.')
       return
     }

@@ -10,25 +10,36 @@ export default async function DashboardLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const session = await getServerSession(authOptions);
-  const sessionUser = session?.user as { companyId?: string; role?: string; isSystemAdmin?: boolean; isApproved?: boolean } | undefined;
-  const companyId = sessionUser?.companyId;
-  const isSystemAdmin = sessionUser?.isSystemAdmin === true;
-  const isApprovalAdmin = isSystemAdmin || sessionUser?.role === 'ADMIN';
+  try {
+    const session = await getServerSession(authOptions);
+    const sessionUser = session?.user as { companyId?: string; role?: string; isSystemAdmin?: boolean; isApproved?: boolean } | undefined;
+    const companyId = sessionUser?.companyId;
+    const isSystemAdmin = sessionUser?.isSystemAdmin === true;
+    const isApprovalAdmin = isSystemAdmin || sessionUser?.role === 'ADMIN';
 
-  if (!companyId && !isSystemAdmin) {
-    redirect('/login');
-  }
-
-  if (companyId && !isApprovalAdmin) {
-    const subscription = await getSubscriptionStatus(companyId);
-
-    // Allow access if the user was explicitly approved by an admin
-    const sessionUserApproved = sessionUser?.isApproved === true;
-
-    if (!subscription.isActive && !sessionUserApproved) {
-      redirect('/plans');
+    if (!companyId && !isSystemAdmin) {
+      redirect('/login');
     }
+
+    if (companyId && !isApprovalAdmin) {
+      let subscription: Awaited<ReturnType<typeof getSubscriptionStatus>> | null = null;
+
+      try {
+        subscription = await getSubscriptionStatus(companyId);
+      } catch (error) {
+        console.error('[DashboardLayout] Failed to load subscription status', error);
+      }
+
+      // Allow access if the user was explicitly approved by an admin.
+      const sessionUserApproved = sessionUser?.isApproved === true;
+
+      if (subscription && !subscription.isActive && !sessionUserApproved) {
+        redirect('/plans');
+      }
+    }
+  } catch (error) {
+    console.error('[DashboardLayout] Failed to resolve session', error);
+    redirect('/login');
   }
 
   return (

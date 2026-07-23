@@ -1978,6 +1978,7 @@ export async function getSales(limit = 50) {
       isPending: isPendingSaleRecord(s),
       items: s.items.map((it: any) => ({
         id: it.id,
+        productId: it.productId,
         productName: it.productName,
         sku: it.sku,
         quantity: it.quantity,

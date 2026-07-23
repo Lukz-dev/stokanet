@@ -141,6 +141,7 @@ export function SaleEditModal({ sale, onClose, onSuccess }: Props) {
           notes,
           items: items.map((item) => ({
             id: item.id,
+            productId: item.productId,
             productName: item.productName,
             sku: item.sku,
             quantity: Math.max(1, Math.floor(toNumber(item.quantity))),

@@ -402,18 +402,51 @@ export async function processSaleWithNfe(input: ProcessSaleInput): Promise<Proce
     } catch (error) {
       const details = error instanceof NfeIntegrationError ? error.details : undefined
 
-      await prisma.sale.update({
-        where: { id: draftSale.id },
-        data: {
-          nfeStatus: 'ERRO',
-          nfeErrorCode: error instanceof NfeIntegrationError ? error.code : 'NFE_UNKNOWN',
-          nfeErrorMessage: error instanceof Error ? error.message : String(error),
-          nfeRawResponse: details as any,
-          nfeLastAttemptAt: new Date(),
-        } as any,
+      await prisma.$transaction(async (tx) => {
+        await applyInventoryChanges(tx, companyId, resolvedItems, 'Estoque alterado durante a finalização da venda. Tente novamente.')
+
+        await tx.movement.createMany({
+          data: resolvedItems.map((item) => ({
+            type: 'SAIDA' as const,
+            quantity: item.quantity,
+            reason: `Venda ${draftSale.code} (NF-e indisponível)`,
+            productId: item.product.id,
+            companyId,
+          })),
+        })
+
+        await tx.sale.update({
+          where: { id: draftSale.id },
+          data: {
+            nfeStatus: 'ERRO',
+            nfeErrorCode: error instanceof NfeIntegrationError ? error.code : 'NFE_UNKNOWN',
+            nfeErrorMessage: error instanceof Error ? error.message : String(error),
+            nfeRawResponse: details as any,
+            nfeLastAttemptAt: new Date(),
+            stockCommittedAt: new Date(),
+          } as any,
+        })
       })
 
-      throw error
+      return {
+        sale: {
+          id: draftSale.id,
+          code: draftSale.code,
+          subtotal,
+          discount: boundedDiscount,
+          total,
+          amountReceived: normalizedAmountReceived,
+          change,
+          isPending: false,
+          nfeEnabled: true,
+          nfe: {
+            status: 'ERRO',
+            sefazCode: error instanceof NfeIntegrationError ? error.code : 'NFE_UNKNOWN',
+            sefazMessage: error instanceof Error ? error.message : 'NF-e indisponível. Venda concluída sem emissão fiscal.',
+            raw: details ?? null,
+          },
+        },
+      }
     }
 
     if (nfe.status !== 'AUTORIZADO') {

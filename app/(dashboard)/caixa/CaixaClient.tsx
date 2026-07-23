@@ -395,6 +395,7 @@ export function CaixaClient({ products, initialSales }: { products: Product[]; i
     cart,
     formatCurrency,
     isCashPayment,
+    isPendingSale,
     parsedAmountReceived,
     paymentMethod,
     paymentMode,

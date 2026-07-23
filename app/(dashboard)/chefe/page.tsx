@@ -89,25 +89,26 @@ function buildHref(period: string, from?: string, to?: string) {
 }
 
 export default async function ChefePage({ searchParams }: { searchParams?: Promise<SearchParams> }) {
-  const activeUser = await getActiveUser()
+  try {
+    const activeUser = await getActiveUser()
 
-  if (!isBossRole(activeUser.role)) {
-    redirect('/')
-  }
+    if (!isBossRole(activeUser.role)) {
+      redirect('/')
+    }
 
-  const resolvedSearchParams = searchParams ? await searchParams : undefined
-  const period = resolvePeriod(resolvedSearchParams)
-  const stats = await getBossProfileStatsForRange(period.from, period.to)
+    const resolvedSearchParams = searchParams ? await searchParams : undefined
+    const period = resolvePeriod(resolvedSearchParams)
+    const stats = await getBossProfileStatsForRange(period.from, period.to)
 
-  const periodLinks = [
-    { label: '7 dias', period: '7d' },
-    { label: '30 dias', period: '30d' },
-    { label: '90 dias', period: '90d' },
-    { label: 'Mês atual', period: 'month' },
-  ]
+    const periodLinks = [
+      { label: '7 dias', period: '7d' },
+      { label: '30 dias', period: '30d' },
+      { label: '90 dias', period: '90d' },
+      { label: 'Mês atual', period: 'month' },
+    ]
 
-  return (
-    <div className="space-y-8">
+    return (
+      <div className="space-y-8">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.24em] text-primary">Painel do chefe</p>
@@ -249,5 +250,16 @@ export default async function ChefePage({ searchParams }: { searchParams?: Promi
         </div>
       </section>
     </div>
-  )
+    )
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Não foi possível carregar o painel do chefe.'
+
+    return (
+      <div className="max-w-2xl rounded-3xl border border-border bg-card p-8 shadow-sm">
+        <p className="text-xs font-semibold uppercase tracking-[0.24em] text-destructive">Erro ao carregar</p>
+        <h1 className="mt-2 text-3xl font-bold tracking-tight">Não foi possível abrir o painel do chefe</h1>
+        <p className="mt-3 text-sm leading-6 text-muted-foreground">{message}</p>
+      </div>
+    )
+  }
 }

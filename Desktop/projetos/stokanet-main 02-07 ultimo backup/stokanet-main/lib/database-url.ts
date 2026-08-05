@@ -1,15 +1,28 @@
-export function resolveDatabaseUrl() {
-  const databaseUrl =
-    process.env.DATABASE_URL ??
-    process.env.DIRECT_URL ??
-    null
+type ResolveDatabaseUrlOptions = {
+  allowFallback?: boolean
+}
 
-  const trimmed = databaseUrl?.trim() || null
+const DEFAULT_FALLBACK_URL = 'postgresql://postgres:postgres@localhost:5432/postgres'
 
-  if (!trimmed) return null
+export function resolveDatabaseUrl(options: ResolveDatabaseUrlOptions = {}) {
+  const candidates = [
+    process.env.DATABASE_URL,
+    process.env.DIRECT_URL,
+    process.env.POSTGRES_URL,
+    process.env.POSTGRES_PRISMA_URL,
+    process.env.POSTGRES_URL_NON_POOLING,
+    process.env.TURSO_DATABASE_URL,
+    process.env.LIBSQL_URL,
+  ]
+
+  const trimmed = candidates.find((value): value is string => Boolean(value && value.trim()))?.trim() || null
+
+  if (!trimmed) {
+    return options.allowFallback ? DEFAULT_FALLBACK_URL : null
+  }
 
   if ((trimmed.startsWith('"') && trimmed.endsWith('"')) || (trimmed.startsWith("'") && trimmed.endsWith("'"))) {
-    return trimmed.slice(1, -1).trim() || null
+    return trimmed.slice(1, -1).trim() || (options.allowFallback ? DEFAULT_FALLBACK_URL : null)
   }
 
   return trimmed

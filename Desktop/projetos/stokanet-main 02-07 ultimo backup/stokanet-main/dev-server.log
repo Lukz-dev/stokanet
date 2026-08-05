@@ -1,0 +1,12 @@
+
+> saas-estoque@0.1.0 dev
+> next dev
+
+▲ Next.js 16.2.3 (Turbopack)
+- Local:         http://localhost:3000
+- Network:       http://26.236.176.202:3000
+- Environments: .env.local
+✓ Ready in 1259ms
+
+ GET /configuracoes 500 in 2.1s (next.js: 307ms, proxy.ts: 768ms, application-code: 1006ms)
+ GET /api/auth/session 200 in 1453ms (next.js: 1401ms, application-code: 53ms)

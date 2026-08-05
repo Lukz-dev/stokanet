@@ -152,7 +152,7 @@ export function SettingsClient({
           storeTheme: form.storeTheme,
           storeActive: form.storeActive,
           mercadopagoAccessToken: form.mercadopagoAccessToken,
-        })
+        } as Parameters<typeof updateCompanyPreferences>[0])
         setSuccess('Configurações salvas com sucesso.')
         router.refresh()
       } catch (currentError: any) {

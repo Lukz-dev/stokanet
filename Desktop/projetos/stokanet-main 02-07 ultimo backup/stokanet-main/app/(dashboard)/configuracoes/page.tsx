@@ -1,7 +1,14 @@
 import prisma from '@/lib/prisma'
 import { getActiveUser, getOrCreateDefaultCompany } from '@/lib/access'
 import { SettingsClient } from './SettingsClient'
-import { THEME_COLOR_PRESETS, type ThemePreference } from '@/lib/theme'
+import { type ThemePreference } from '@/lib/theme'
+
+const THEME_COLOR_PRESETS: Record<ThemePreference, { primary: string; secondary: string }> = {
+  SUNSET: { primary: '#e0a15f', secondary: '#cf6f7a' },
+  OCEAN: { primary: '#3f8fbf', secondary: '#61add9' },
+  FOREST: { primary: '#5f9a58', secondary: '#7db677' },
+  ROSE: { primary: '#cf6f7a', secondary: '#e0a15f' },
+}
 
 export default async function ConfiguracoesPage() {
   const company = await getOrCreateDefaultCompany()

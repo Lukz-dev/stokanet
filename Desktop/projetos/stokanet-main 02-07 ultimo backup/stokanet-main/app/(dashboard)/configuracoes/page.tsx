@@ -14,38 +14,37 @@ export default async function ConfiguracoesPage() {
   const company = await getOrCreateDefaultCompany()
   const user = await getActiveUser()
 
-  const currentCompany = await prisma.company.findUnique({
+  const currentCompany = (await prisma.company.findUnique({
     where: { id: company.id },
-    select: {
-      name: true,
-      defaultMinStock: true,
-      notificationWebhookUrl: true,
-      storeSlug: true,
-      storeName: true,
-      storeDescription: true,
-      storeHeroTitle: true,
-      storeHeroSubtitle: true,
-      storeBadgeText: true,
-      storePrimaryButtonLabel: true,
-      storeSecondaryButtonLabel: true,
-      storeWhatsappNumber: true,
-      storeInstagramUrl: true,
-      storeFacebookUrl: true,
-      storeTiktokUrl: true,
-      storeShippingFee: true,
-      storeFreeShippingMin: true,
-      storeShippingNote: true,
-      storePrimaryColor: true,
-      storeSecondaryColor: true,
-      storeShowSocialLinks: true,
-      storeShowShippingInfo: true,
-      storeBannerUrl: true,
-      storeLogoUrl: true,
-      storeTheme: true,
-      storeActive: true,
-      mercadopagoAccessToken: true,
-    },
-  })
+  })) as {
+    name: string
+    defaultMinStock: number
+    notificationWebhookUrl: string | null
+    storeSlug: string | null
+    storeName: string | null
+    storeDescription: string | null
+    storeHeroTitle: string | null
+    storeHeroSubtitle: string | null
+    storeBadgeText: string | null
+    storePrimaryButtonLabel: string | null
+    storeSecondaryButtonLabel: string | null
+    storeWhatsappNumber: string | null
+    storeInstagramUrl: string | null
+    storeFacebookUrl: string | null
+    storeTiktokUrl: string | null
+    storeShippingFee: number | null
+    storeFreeShippingMin: number | null
+    storeShippingNote: string | null
+    storePrimaryColor: string | null
+    storeSecondaryColor: string | null
+    storeShowSocialLinks: boolean | null
+    storeShowShippingInfo: boolean | null
+    storeBannerUrl: string | null
+    storeLogoUrl: string | null
+    storeTheme: string | null
+    storeActive: boolean
+    mercadopagoAccessToken: string | null
+  } | null
 
   if (!currentCompany) {
     throw new Error('Configurações indisponíveis')
@@ -76,8 +75,8 @@ export default async function ConfiguracoesPage() {
       storeShippingNote={currentCompany.storeShippingNote ?? ''}
       storePrimaryColor={currentCompany.storePrimaryColor ?? presetColors.primary}
       storeSecondaryColor={currentCompany.storeSecondaryColor ?? presetColors.secondary}
-      storeShowSocialLinks={currentCompany.storeShowSocialLinks}
-      storeShowShippingInfo={currentCompany.storeShowShippingInfo}
+      storeShowSocialLinks={currentCompany.storeShowSocialLinks ?? true}
+      storeShowShippingInfo={currentCompany.storeShowShippingInfo ?? true}
       storeBannerUrl={currentCompany.storeBannerUrl ?? ''}
       storeLogoUrl={currentCompany.storeLogoUrl ?? ''}
       storeTheme={storeTheme}

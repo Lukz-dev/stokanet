@@ -5,7 +5,10 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Settings, PackagePlus, RotateCw, Store, ArrowRight, Webhook, Palette, Check, Copy } from 'lucide-react'
 import { testNotificationWebhook, updateCompanyPreferences, updateThemePreference } from '@/lib/actions'
-import { THEME_ATTRIBUTE_MAP, THEME_COLOR_PRESETS, type ThemePreference } from '@/lib/theme'
+import * as theme from '@/lib/theme'
+
+const { THEME_ATTRIBUTE_MAP, THEME_COLOR_PRESETS } = theme
+type ThemePreference = theme.ThemePreference
 
 interface Props {
   companyName: string

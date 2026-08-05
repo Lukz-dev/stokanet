@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import { Clock3, CreditCard, Plus, ScanLine, Trash2 } from 'lucide-react'
-import { completeSale, findProductByCode, savePendingSale } from '@/lib/caixa-actions'
+import { completeSale, findProductByCode, savePendingSale } from '../../../lib/caixa-actions'
 import { useRouter } from 'next/navigation'
 
 type Product = {

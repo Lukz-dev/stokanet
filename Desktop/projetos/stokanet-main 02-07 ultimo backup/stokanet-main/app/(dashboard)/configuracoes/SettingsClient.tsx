@@ -5,10 +5,14 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Settings, PackagePlus, RotateCw, Store, ArrowRight, Webhook, Palette, Check, Copy } from 'lucide-react'
 import { testNotificationWebhook, updateCompanyPreferences, updateThemePreference } from '@/lib/actions'
-import * as theme from '@/lib/theme'
+import { THEME_ATTRIBUTE_MAP, type ThemePreference } from '@/lib/theme'
 
-const { THEME_ATTRIBUTE_MAP, THEME_COLOR_PRESETS } = theme
-type ThemePreference = theme.ThemePreference
+const THEME_COLOR_PRESETS: Record<ThemePreference, { primary: string; secondary: string }> = {
+  SUNSET: { primary: '#e0a15f', secondary: '#cf6f7a' },
+  OCEAN: { primary: '#3f8fbf', secondary: '#61add9' },
+  FOREST: { primary: '#5f9a58', secondary: '#7db677' },
+  ROSE: { primary: '#cf6f7a', secondary: '#e0a15f' },
+}
 
 interface Props {
   companyName: string

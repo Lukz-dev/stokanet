@@ -2,7 +2,7 @@ import prisma from '@/lib/prisma'
 import { getActiveCompanyId } from '@/lib/access'
 import Link from 'next/link'
 import { BadgeCheck, ExternalLink, Globe, LayoutGrid, Megaphone, Package, Sparkles, Store, Ticket, Truck } from 'lucide-react'
-import { buildStorefrontUrl } from '@/lib/storefront'
+import { buildStorefrontUrl } from '../../../lib/storefront'
 
 async function getSandboxStatus() {
   return {

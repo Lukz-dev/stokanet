@@ -28,23 +28,7 @@ export default async function LojaPage() {
   const companyId = await getActiveCompanyId()
 
   const [company, products] = await Promise.all([
-    prisma.company.findUnique({
-      where: { id: companyId },
-      select: {
-        id: true,
-        name: true,
-        legalName: true,
-        defaultMinStock: true,
-        storeSlug: true,
-        storeName: true,
-        storeDescription: true,
-        storeBannerUrl: true,
-        storeLogoUrl: true,
-        storeTheme: true,
-        storeActive: true,
-        mercadopagoAccessToken: true,
-      },
-    }),
+    prisma.company.findUnique({ where: { id: companyId } }),
     prisma.product.findMany({
       where: { companyId },
       orderBy: [{ createdAt: 'desc' }],

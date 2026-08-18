@@ -5,31 +5,7 @@ import { Ban, CheckCircle2, Clock3, Pencil, Receipt, Search } from 'lucide-react
 import { cancelSale, finalizePendingSale } from '../../../lib/actions'
 import { useRouter } from 'next/navigation'
 import { SaleEditModal } from '@/components/SaleEditModal'
-
-type SaleItem = {
-  id: string
-  productName: string
-  sku: string
-  quantity: number
-  unitPrice: number
-  unitCost: number
-  total: number
-}
-
-type Sale = {
-  id: string
-  code: string
-  subtotal: number
-  discount: number
-  total: number
-  paymentMethod: string | null
-  notes: string | null
-  nfeStatus: string
-  stockCommittedAt?: string | null
-  saleStatus: string
-  createdAt: string
-  items: SaleItem[]
-}
+import type { Sale, SaleItem } from '@/lib/types/sale'
 
 function formatCurrency(value: number) {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value)
@@ -298,7 +274,7 @@ export function VendasClient({ initialSales }: { initialSales: Sale[] }) {
 
       {editingSale ? (
         <SaleEditModal
-          sale={editingSale}
+          sale={{ ...editingSale, stockCommittedAt: editingSale.stockCommittedAt ?? null }}
           onClose={() => setEditingSale(null)}
           onSuccess={() => {
             setEditingSale(null)

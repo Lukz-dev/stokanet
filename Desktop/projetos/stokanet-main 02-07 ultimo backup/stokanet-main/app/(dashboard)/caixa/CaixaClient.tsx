@@ -16,23 +16,7 @@ type Product = {
   color: string | null
 }
 
-type Sale = {
-  id: string
-  code: string
-  subtotal: number
-  discount: number
-  total: number
-  paymentMethod: string | null
-  createdAt: string
-  items: Array<{
-    id: string
-    productName: string
-    sku: string
-    quantity: number
-    unitPrice: number
-    total: number
-  }>
-}
+import type { Sale } from '@/lib/types/sale'
 
 type CartItem = {
   productId: string

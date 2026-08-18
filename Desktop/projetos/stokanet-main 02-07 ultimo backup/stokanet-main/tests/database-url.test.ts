@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { resolveDatabaseUrl } from '../lib/database-url.ts'
+import { resolveDatabaseUrl } from '../lib/database-url'
 
 test('prefers Vercel Postgres environment variables when present', () => {
   const previousDatabaseUrl = process.env.DATABASE_URL

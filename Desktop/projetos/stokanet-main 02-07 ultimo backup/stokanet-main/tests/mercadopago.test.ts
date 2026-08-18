@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { createHmac } from 'node:crypto'
-import { verifyMercadoPagoWebhookSignature } from '../lib/mercadopago.ts'
+import { verifyMercadoPagoWebhookSignature } from '../lib/mercadopago'
 
 test('verifies a valid Mercado Pago webhook signature', () => {
   const secret = 'top-secret'

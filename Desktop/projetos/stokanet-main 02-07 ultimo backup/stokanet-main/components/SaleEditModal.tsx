@@ -3,29 +3,7 @@
 import { useMemo, useState, useTransition, type FormEvent } from 'react'
 import { Pencil, X } from 'lucide-react'
 import { updateSale } from '@/lib/actions'
-
-type SaleItem = {
-  id: string
-  productName: string
-  sku: string
-  quantity: number
-  unitPrice: number
-  total: number
-}
-
-type Sale = {
-  id: string
-  code: string
-  subtotal: number
-  discount: number
-  total: number
-  paymentMethod: string | null
-  notes: string | null
-  nfeStatus: string
-  stockCommittedAt?: string | null
-  createdAt: string
-  items: SaleItem[]
-}
+import type { Sale, SaleItem } from '@/lib/types/sale'
 
 type Props = {
   sale: Sale

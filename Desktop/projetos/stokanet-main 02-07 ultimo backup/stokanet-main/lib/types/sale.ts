@@ -14,3 +14,5 @@ export type Sale = PrismaSale & {
   stockCommittedAt: string | null
   items: SaleItem[]
 }
+
+export type SaleRecord = Sale

@@ -1369,6 +1369,30 @@ export async function updateAccountProfile(data: {
 export async function updateCompanyPreferences(data: {
   defaultMinStock: number
   notificationWebhookUrl?: string
+  storeSlug?: string
+  storeName?: string
+  storeDescription?: string
+  storeHeroTitle?: string
+  storeHeroSubtitle?: string
+  storeBadgeText?: string
+  storePrimaryButtonLabel?: string
+  storeSecondaryButtonLabel?: string
+  storeWhatsappNumber?: string
+  storeInstagramUrl?: string
+  storeFacebookUrl?: string
+  storeTiktokUrl?: string
+  storeShippingFee?: number
+  storeFreeShippingMin?: number
+  storeShippingNote?: string
+  storePrimaryColor?: string
+  storeSecondaryColor?: string
+  storeShowSocialLinks?: boolean
+  storeShowShippingInfo?: boolean
+  storeBannerUrl?: string
+  storeLogoUrl?: string
+  storeTheme?: string
+  storeActive?: boolean
+  mercadopagoAccessToken?: string
 }) {
   const user = await requireRole(['ADMIN', 'MANAGER'])
   const companyId = await getCompanyId()
@@ -1383,6 +1407,34 @@ export async function updateCompanyPreferences(data: {
       defaultMinStock,
       ...(Object.prototype.hasOwnProperty.call(data, 'notificationWebhookUrl')
         ? { notificationWebhookUrl: data.notificationWebhookUrl?.trim() || null }
+        : {}),
+      ...(Object.prototype.hasOwnProperty.call(data, 'storeSlug')
+        ? { storeSlug: data.storeSlug?.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || null }
+        : {}),
+      ...(Object.prototype.hasOwnProperty.call(data, 'storeName') ? { storeName: data.storeName?.trim() || null } : {}),
+      ...(Object.prototype.hasOwnProperty.call(data, 'storeDescription') ? { storeDescription: data.storeDescription?.trim() || null } : {}),
+      ...(Object.prototype.hasOwnProperty.call(data, 'storeHeroTitle') ? { storeHeroTitle: data.storeHeroTitle?.trim() || null } : {}),
+      ...(Object.prototype.hasOwnProperty.call(data, 'storeHeroSubtitle') ? { storeHeroSubtitle: data.storeHeroSubtitle?.trim() || null } : {}),
+      ...(Object.prototype.hasOwnProperty.call(data, 'storeBadgeText') ? { storeBadgeText: data.storeBadgeText?.trim() || null } : {}),
+      ...(Object.prototype.hasOwnProperty.call(data, 'storePrimaryButtonLabel') ? { storePrimaryButtonLabel: data.storePrimaryButtonLabel?.trim() || null } : {}),
+      ...(Object.prototype.hasOwnProperty.call(data, 'storeSecondaryButtonLabel') ? { storeSecondaryButtonLabel: data.storeSecondaryButtonLabel?.trim() || null } : {}),
+      ...(Object.prototype.hasOwnProperty.call(data, 'storeWhatsappNumber') ? { storeWhatsappNumber: data.storeWhatsappNumber?.trim() || null } : {}),
+      ...(Object.prototype.hasOwnProperty.call(data, 'storeInstagramUrl') ? { storeInstagramUrl: data.storeInstagramUrl?.trim() || null } : {}),
+      ...(Object.prototype.hasOwnProperty.call(data, 'storeFacebookUrl') ? { storeFacebookUrl: data.storeFacebookUrl?.trim() || null } : {}),
+      ...(Object.prototype.hasOwnProperty.call(data, 'storeTiktokUrl') ? { storeTiktokUrl: data.storeTiktokUrl?.trim() || null } : {}),
+      ...(Object.prototype.hasOwnProperty.call(data, 'storeShippingFee') ? { storeShippingFee: Number.isFinite(Number(data.storeShippingFee)) ? Math.max(0, Number(data.storeShippingFee)) : null } : {}),
+      ...(Object.prototype.hasOwnProperty.call(data, 'storeFreeShippingMin') ? { storeFreeShippingMin: Number.isFinite(Number(data.storeFreeShippingMin)) ? Math.max(0, Number(data.storeFreeShippingMin)) : null } : {}),
+      ...(Object.prototype.hasOwnProperty.call(data, 'storeShippingNote') ? { storeShippingNote: data.storeShippingNote?.trim() || null } : {}),
+      ...(Object.prototype.hasOwnProperty.call(data, 'storePrimaryColor') ? { storePrimaryColor: data.storePrimaryColor?.trim() || null } : {}),
+      ...(Object.prototype.hasOwnProperty.call(data, 'storeSecondaryColor') ? { storeSecondaryColor: data.storeSecondaryColor?.trim() || null } : {}),
+      ...(Object.prototype.hasOwnProperty.call(data, 'storeShowSocialLinks') ? { storeShowSocialLinks: Boolean(data.storeShowSocialLinks) } : {}),
+      ...(Object.prototype.hasOwnProperty.call(data, 'storeShowShippingInfo') ? { storeShowShippingInfo: Boolean(data.storeShowShippingInfo) } : {}),
+      ...(Object.prototype.hasOwnProperty.call(data, 'storeBannerUrl') ? { storeBannerUrl: data.storeBannerUrl?.trim() || null } : {}),
+      ...(Object.prototype.hasOwnProperty.call(data, 'storeLogoUrl') ? { storeLogoUrl: data.storeLogoUrl?.trim() || null } : {}),
+      ...(Object.prototype.hasOwnProperty.call(data, 'storeTheme') ? { storeTheme: data.storeTheme?.trim() || 'ocean' } : {}),
+      ...(Object.prototype.hasOwnProperty.call(data, 'storeActive') ? { storeActive: Boolean(data.storeActive) } : {}),
+      ...(Object.prototype.hasOwnProperty.call(data, 'mercadopagoAccessToken')
+        ? { mercadopagoAccessToken: data.mercadopagoAccessToken?.trim() || null }
         : {}),
     },
   })

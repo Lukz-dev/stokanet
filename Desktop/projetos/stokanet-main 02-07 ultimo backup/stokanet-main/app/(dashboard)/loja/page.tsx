@@ -39,12 +39,14 @@ export default async function LojaPage() {
     throw new Error('Empresa não encontrada')
   }
 
-  const publicUrl = company.storeSlug ? await buildStorefrontUrl(company.storeSlug) : null
+  const c = company as any
+
+  const publicUrl = c.storeSlug ? await buildStorefrontUrl(c.storeSlug) : null
   const sandboxStatus = await getSandboxStatus()
   const publishedProducts = products.filter((product) => product.storePublished)
   const activeProducts = products.filter((product) => product.status !== 'Arquivado')
   const lowStockProducts = products.filter((product) => ['Baixo', 'Crítico', 'Esgotado'].includes(product.status))
-  const storeReady = Boolean(company.storeActive && company.storeSlug && company.mercadopagoAccessToken)
+  const storeReady = Boolean(c.storeActive && c.storeSlug && c.mercadopagoAccessToken)
 
   return (
     <div className="flex flex-col gap-8">
@@ -74,7 +76,7 @@ export default async function LojaPage() {
           <div className="flex items-center justify-between gap-4">
             <div>
               <p className="text-sm text-muted-foreground">URL pública</p>
-              <h2 className="text-lg font-semibold mt-1 truncate">{company.storeSlug ? `/loja/${company.storeSlug}` : 'Sem slug configurado'}</h2>
+              <h2 className="text-lg font-semibold mt-1 truncate">{c.storeSlug ? `/loja/${c.storeSlug}` : 'Sem slug configurado'}</h2>
             </div>
             <Globe className="w-5 h-5 text-primary" />
           </div>
@@ -85,18 +87,18 @@ export default async function LojaPage() {
           <div className="flex items-center justify-between gap-4">
             <div>
               <p className="text-sm text-muted-foreground">Loja</p>
-              <h2 className="text-lg font-semibold mt-1">{company.storeActive ? 'Ativa' : 'Inativa'}</h2>
+              <h2 className="text-lg font-semibold mt-1">{c.storeActive ? 'Ativa' : 'Inativa'}</h2>
             </div>
             <BadgeCheck className="w-5 h-5 text-emerald-500" />
           </div>
-          <p className="mt-3 text-xs text-muted-foreground">{company.storeName ?? company.name}</p>
+          <p className="mt-3 text-xs text-muted-foreground">{c.storeName ?? c.name}</p>
         </div>
 
         <div className="bg-card border border-border rounded-2xl p-6 shadow-sm">
           <div className="flex items-center justify-between gap-4">
             <div>
               <p className="text-sm text-muted-foreground">Gateway</p>
-              <h2 className="text-lg font-semibold mt-1">{company.mercadopagoAccessToken ? 'Configurado' : 'Pendente'}</h2>
+              <h2 className="text-lg font-semibold mt-1">{c.mercadopagoAccessToken ? 'Configurado' : 'Pendente'}</h2>
             </div>
             <Ticket className="w-5 h-5 text-primary" />
           </div>
@@ -129,17 +131,17 @@ export default async function LojaPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="rounded-xl border border-border bg-muted/20 p-4">
                 <p className="text-xs uppercase tracking-wider text-muted-foreground">Nome exibido</p>
-                <p className="mt-2 font-semibold">{company.storeName ?? company.name}</p>
-                <p className="mt-1 text-xs text-muted-foreground">{company.storeDescription ?? 'Sem descrição configurada'}</p>
+                <p className="mt-2 font-semibold">{c.storeName ?? c.name}</p>
+                <p className="mt-1 text-xs text-muted-foreground">{c.storeDescription ?? 'Sem descrição configurada'}</p>
               </div>
               <div className="rounded-xl border border-border bg-muted/20 p-4">
                 <p className="text-xs uppercase tracking-wider text-muted-foreground">Tema</p>
-                <p className="mt-2 font-semibold">{themeLabel(company.storeTheme)}</p>
+                <p className="mt-2 font-semibold">{themeLabel(c.storeTheme)}</p>
                 <p className="mt-1 text-xs text-muted-foreground">Layout da vitrine pública</p>
               </div>
               <div className="rounded-xl border border-border bg-muted/20 p-4">
                 <p className="text-xs uppercase tracking-wider text-muted-foreground">Gateway</p>
-                <p className="mt-2 font-semibold">{company.mercadopagoAccessToken ? 'Ativo' : 'Faltando token'}</p>
+                <p className="mt-2 font-semibold">{c.mercadopagoAccessToken ? 'Ativo' : 'Faltando token'}</p>
                 <p className="mt-1 text-xs text-muted-foreground">PIX e cartão via Mercado Pago</p>
               </div>
               <div className="rounded-xl border border-border bg-muted/20 p-4">
@@ -260,7 +262,7 @@ export default async function LojaPage() {
             <div className="space-y-3 text-sm">
               <div className="flex items-center justify-between gap-3 rounded-lg bg-muted/20 border border-border/50 p-3">
                 <span className="text-muted-foreground">Slug</span>
-                <span className="font-medium truncate max-w-[150px] text-right">{company.storeSlug ?? 'não configurado'}</span>
+                <span className="font-medium truncate max-w-[150px] text-right">{c.storeSlug ?? 'não configurado'}</span>
               </div>
               <div className="flex items-center justify-between gap-3 rounded-lg bg-muted/20 border border-border/50 p-3">
                 <span className="text-muted-foreground">Link</span>
@@ -268,11 +270,11 @@ export default async function LojaPage() {
               </div>
               <div className="flex items-center justify-between gap-3 rounded-lg bg-muted/20 border border-border/50 p-3">
                 <span className="text-muted-foreground">Banner</span>
-                <span className="font-medium truncate max-w-[150px] text-right">{company.storeBannerUrl ? 'Sim' : 'Não'}</span>
+                <span className="font-medium truncate max-w-[150px] text-right">{c.storeBannerUrl ? 'Sim' : 'Não'}</span>
               </div>
               <div className="flex items-center justify-between gap-3 rounded-lg bg-muted/20 border border-border/50 p-3">
                 <span className="text-muted-foreground">Logo</span>
-                <span className="font-medium truncate max-w-[150px] text-right">{company.storeLogoUrl ? 'Sim' : 'Não'}</span>
+                <span className="font-medium truncate max-w-[150px] text-right">{c.storeLogoUrl ? 'Sim' : 'Não'}</span>
               </div>
               <div className="flex items-center justify-between gap-3 rounded-lg bg-muted/20 border border-border/50 p-3">
                 <span className="text-muted-foreground">Sandbox</span>

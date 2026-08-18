@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { Settings, PackagePlus, RotateCw, Store, ArrowRight, Webhook, Palette, Check, Copy } from 'lucide-react'
 import { testNotificationWebhook, updateCompanyPreferences, updateThemePreference } from '@/lib/actions'
 import { THEME_ATTRIBUTE_MAP, type ThemePreference } from '@/lib/theme'
@@ -76,11 +76,13 @@ export function SettingsClient({
   currentThemePreference,
 }: Props) {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [isPending, startTransition] = useTransition()
   const [themePending, startThemeTransition] = useTransition()
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   const [themePreference, setThemePreference] = useState<ThemePreference>(currentThemePreference)
+  const oauthError = searchParams.get('mercadopago') === 'error' ? searchParams.get('message') : ''
   const [form, setForm] = useState({
     defaultMinStock: String(defaultMinStock),
     notificationWebhookUrl,
@@ -259,7 +261,7 @@ export function SettingsClient({
             </div>
 
             <form className="grid grid-cols-1 md:grid-cols-2 gap-4" onSubmit={handleSubmit}>
-              {error && <p className="md:col-span-2 text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded-lg px-4 py-3">{error}</p>}
+              {(error || oauthError) && <p className="md:col-span-2 text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded-lg px-4 py-3">{error || oauthError}</p>}
               {success && <p className="md:col-span-2 text-sm text-emerald-500 bg-emerald-500/10 border border-emerald-500/20 rounded-lg px-4 py-3">{success}</p>}
 
               <label className="flex flex-col gap-2 md:col-span-2">

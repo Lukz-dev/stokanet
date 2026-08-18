@@ -1,6 +1,82 @@
 import "dotenv/config";
+import { createHmac, timingSafeEqual } from "node:crypto";
+
+export type MercadoPagoPreferenceItem = {
+  id: string;
+  title: string;
+  description?: string;
+  picture_url?: string;
+  category_id?: string;
+  quantity: number;
+  unit_price: number;
+  currency_id: string;
+};
+
+export type MercadoPagoCheckoutPreferenceInput = {
+  accessToken: string;
+  items: MercadoPagoPreferenceItem[];
+  payerName?: string;
+  payerEmail: string;
+  backUrls: {
+    success: string;
+    failure: string;
+    pending: string;
+  };
+  notificationUrl: string;
+  externalReference: string;
+  expiresInHours?: number;
+  metadata?: Record<string, unknown>;
+};
 
 export const mercadopagoClient = null;
+
+export type WebhookSignatureResult = {
+  ok: boolean;
+  skipped: boolean;
+  reason?: string;
+};
+
+export function verifyMercadoPagoWebhookSignature(
+  signatureHeader: string | null | undefined,
+  body: string,
+  secret: string | null | undefined
+): WebhookSignatureResult {
+  if (!secret) {
+    return { ok: true, skipped: true, reason: "No secret configured" };
+  }
+
+  if (!signatureHeader) {
+    return { ok: false, skipped: false, reason: "Missing signature header" };
+  }
+
+  const parts = signatureHeader.split(",").reduce<Record<string, string>>((acc, chunk) => {
+    const [key, value] = chunk.split("=", 2);
+    if (key && value) {
+      acc[key] = value;
+    }
+    return acc;
+  }, {});
+
+  const timestamp = parts.ts;
+  const version = parts.v1;
+
+  if (!timestamp || !version) {
+    return { ok: false, skipped: false, reason: "Malformed signature header" };
+  }
+
+  const expected = createHmac("sha256", secret).update(`${timestamp}.${body}`).digest("hex");
+  const received = version;
+
+  const expectedBuffer = Buffer.from(expected);
+  const receivedBuffer = Buffer.from(received);
+
+  if (expectedBuffer.length !== receivedBuffer.length) {
+    return { ok: false, skipped: false, reason: "Signature mismatch" };
+  }
+
+  const isValid = timingSafeEqual(expectedBuffer, receivedBuffer);
+  return { ok: isValid, skipped: false, reason: isValid ? undefined : "Signature mismatch" };
+}
 
 export const PLANS = {
   MONTHLY: {
@@ -115,6 +191,60 @@ export function getMercadoPagoPayerEmail(sessionEmail: string) {
   }
 
   return sessionEmail;
+}
+
+export async function createCheckoutPreference(input: MercadoPagoCheckoutPreferenceInput) {
+  if (!input.accessToken) {
+    throw new Error("MERCADOPAGO_ACCESS_TOKEN não configurado");
+  }
+
+  if (!input.payerEmail) {
+    throw new Error("E-mail do pagador não informado");
+  }
+
+  if (!input.items.length) {
+    throw new Error("Nenhum item informado para checkout");
+  }
+
+  const expiresInHours = Math.max(1, Math.min(input.expiresInHours ?? 24, 168));
+  const now = new Date();
+
+  const response = await fetch("https://api.mercadopago.com/checkout/preferences", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${input.accessToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      items: input.items,
+      payer: {
+        name: input.payerName,
+        email: input.payerEmail,
+      },
+      back_urls: input.backUrls,
+      notification_url: input.notificationUrl,
+      external_reference: input.externalReference,
+      metadata: input.metadata,
+      payment_methods: {
+        excluded_payment_types: [{ id: "ticket" }],
+      },
+      expires: true,
+      expiration_date_from: now.toISOString(),
+      expiration_date_to: new Date(now.getTime() + expiresInHours * 60 * 60 * 1000).toISOString(),
+    }),
+  });
+
+  const responseBody = await response.json().catch(async () => ({
+    raw: await response.text(),
+  }));
+
+  if (!response.ok) {
+    throw new Error(
+      `MercadoPago API error (${response.status}): ${JSON.stringify(responseBody)}`
+    );
+  }
+
+  return responseBody;
 }
 
 async function createRecurringPreference(

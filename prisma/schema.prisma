@@ -123,12 +123,37 @@ model Company {
   fiscalAddress Json?
   defaultMinStock Int      @default(5)
   notificationWebhookUrl String?
+  storeSlug   String?
+  storeName   String?
+  storeDescription String?
+  storeHeroTitle String?
+  storeHeroSubtitle String?
+  storeBadgeText String?
+  storePrimaryButtonLabel String?
+  storeSecondaryButtonLabel String?
+  storeWhatsappNumber String?
+  storeInstagramUrl String?
+  storeFacebookUrl String?
+  storeTiktokUrl String?
+  storeShippingFee Float?
+  storeFreeShippingMin Float?
+  storeShippingNote String?
+  storePrimaryColor String?
+  storeSecondaryColor String?
+  storeShowSocialLinks Boolean @default(true)
+  storeShowShippingInfo Boolean @default(true)
+  storeBannerUrl String?
+  storeLogoUrl String?
+  storeTheme  String      @default("ocean")
+  storeActive Boolean     @default(true)
+  mercadopagoAccessToken String?
   users       User[]
   customers   Customer[]
   products    Product[]
   categories  Category[]
   movements   Movement[]
   sales       Sale[]
+  storeOrders StoreOrder[]
   documents   Document[]
   nfeSettings NfeSettings?
   suppliers   Supplier[]
@@ -191,18 +216,33 @@ model Product {
   unitsPerBox Int?
   minStock    Int         @default(5)
   status      String      @default("Normal")
+  storePublished Boolean  @default(true)
+  description String?
+  highlights  String?
   categoryId  String?
   category    Category?   @relation(fields: [categoryId], references: [id])
   companyId   String
   company     Company     @relation(fields: [companyId], references: [id])
   movements   Movement[]
   saleItems   SaleItem[]
+  storeOrderItems StoreOrderItem[]
   warehouseStocks WarehouseStock[]
   batches     Batch[]
   purchaseOrderItems PurchaseOrderItem[]
   transferItems WarehouseTransferItem[]
+  images      ProductImage[]
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
+}
+
+model ProductImage {
+  id          String      @id @default(cuid())
+  productId   String
+  product     Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
+  imageUrl    String
+  displayOrder Int       @default(0)
+  createdAt   DateTime    @default(now())
+  @@index([productId])
 }
 
 model Movement {
@@ -225,6 +265,7 @@ model Sale {
   total         Float      @default(0.0)
   paymentMethod String?
   notes         String?
+  saleStatus    String     @default("FINALIZADA")
   customerId    String?
   customer      Customer?  @relation(fields: [customerId], references: [id])
   nfeStatus     NfeStatus  @default(PENDENTE)
@@ -245,6 +286,7 @@ model Sale {
   company       Company    @relation(fields: [companyId], references: [id])
   items         SaleItem[]
   documents     Document[]
+  storeOrder    StoreOrder?
   createdAt     DateTime   @default(now())
   updatedAt     DateTime   @default(now()) @updatedAt
 
@@ -300,6 +342,54 @@ model SaleItem {
   createdAt   DateTime @default(now())
 
   @@index([saleId])
+  @@index([productId])
+}
+
+model StoreOrder {
+  id                 String            @id @default(cuid())
+  code               String            @unique
+  status             String            @default("PENDING")
+  paymentProvider    String            @default("MERCADOPAGO")
+  paymentPreferenceId String?
+  paymentId          String?
+  mercadopagoStatus  String?
+  customerName       String?
+  customerEmail      String?
+  customerPhone      String?
+  shippingAddress    Json?
+  subtotal           Float             @default(0.0)
+  discount           Float             @default(0.0)
+  shippingFee        Float             @default(0.0)
+  total              Float             @default(0.0)
+  notes              String?
+  externalReference  String?           @unique
+  paidAt             DateTime?
+  saleId             String?           @unique
+  sale               Sale?             @relation(fields: [saleId], references: [id], onDelete: SetNull)
+  companyId          String
+  company            Company           @relation(fields: [companyId], references: [id])
+  items              StoreOrderItem[]
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+
+  @@index([companyId, createdAt])
+  @@index([companyId, status])
+}
+
+model StoreOrderItem {
+  id            String      @id @default(cuid())
+  storeOrderId  String
+  storeOrder    StoreOrder  @relation(fields: [storeOrderId], references: [id], onDelete: Cascade)
+  productId     String
+  product       Product     @relation(fields: [productId], references: [id])
+  productName   String
+  sku           String
+  quantity      Int
+  unitPrice     Float
+  total         Float
+  createdAt     DateTime    @default(now())
+
+  @@index([storeOrderId])
   @@index([productId])
 }
 

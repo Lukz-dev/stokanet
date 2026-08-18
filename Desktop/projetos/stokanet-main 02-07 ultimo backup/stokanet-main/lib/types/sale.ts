@@ -1,3 +1,9 @@
+import type { Sale as PrismaSale } from '@prisma/client'
+
+export type Sale = PrismaSale & {
+  stockCommittedAt: string | null
+}
+
 export type SaleItem = {
   id: string
   productName: string
@@ -7,20 +13,3 @@ export type SaleItem = {
   unitCost: number
   total: number
 }
-
-export type Sale = {
-  id: string
-  code: string
-  subtotal: number
-  discount: number
-  total: number
-  paymentMethod: string | null
-  notes: string | null
-  nfeStatus: string
-  saleStatus: string
-  stockCommittedAt: string | null
-  createdAt: string
-  items: SaleItem[]
-}
-
-export default {} as unknown

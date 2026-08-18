@@ -32,19 +32,6 @@ export default async function LojaPage() {
     prisma.product.findMany({
       where: { companyId },
       orderBy: [{ createdAt: 'desc' }],
-      select: {
-        id: true,
-        name: true,
-        sku: true,
-        price: true,
-        stockQty: true,
-        minStock: true,
-        status: true,
-        size: true,
-        color: true,
-        storePublished: true,
-        category: { select: { id: true, name: true } },
-      },
     }),
   ])
 

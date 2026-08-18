@@ -9,6 +9,12 @@ export default async function proxy(req: NextRequest) {
     return NextResponse.next()
   }
 
+  const isPublicStorefront = pathname.startsWith('/loja/') || pathname.startsWith('/api/loja/')
+
+  if (isPublicStorefront) {
+    return NextResponse.next()
+  }
+
   if (!token) {
     return NextResponse.redirect(new URL('/login', req.url))
   }

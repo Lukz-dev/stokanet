@@ -1,5 +1,5 @@
 ALTER TABLE "Company"
-  ADD COLUMN "mercadopagoRefreshToken" TEXT,
-  ADD COLUMN "mercadopagoUserId" TEXT,
-  ADD COLUMN "mercadopagoTokenExpiresAt" TIMESTAMP(3),
-  ADD COLUMN "mercadopagoConnectedAt" TIMESTAMP(3);
+  ADD COLUMN IF NOT EXISTS "mercadopagoRefreshToken" TEXT,
+  ADD COLUMN IF NOT EXISTS "mercadopagoUserId" TEXT,
+  ADD COLUMN IF NOT EXISTS "mercadopagoTokenExpiresAt" TIMESTAMP(3),
+  ADD COLUMN IF NOT EXISTS "mercadopagoConnectedAt" TIMESTAMP(3);

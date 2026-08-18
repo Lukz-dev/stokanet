@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useTransition } from 'react'
 import { Ban, CheckCircle2, Clock3, Pencil, Receipt, Search } from 'lucide-react'
-import { cancelSale, finalizePendingSale } from '@/lib/actions'
+import { cancelSale, finalizePendingSale } from '../../../lib/actions'
 import { useRouter } from 'next/navigation'
 import { SaleEditModal } from '@/components/SaleEditModal'
 

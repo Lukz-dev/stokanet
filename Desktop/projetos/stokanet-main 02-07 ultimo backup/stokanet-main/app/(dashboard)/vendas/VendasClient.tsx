@@ -25,6 +25,7 @@ type Sale = {
   paymentMethod: string | null
   notes: string | null
   nfeStatus: string
+  stockCommittedAt?: string | null
   saleStatus: string
   createdAt: string
   items: SaleItem[]

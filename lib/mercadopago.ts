@@ -28,6 +28,81 @@ export type MercadoPagoCheckoutPreferenceInput = {
   metadata?: Record<string, unknown>;
 };
 
+export type MercadoPagoOAuthTokenResponse = {
+  access_token: string;
+  refresh_token?: string;
+  user_id?: number | string;
+  expires_in?: number;
+};
+
+export function getMercadoPagoOAuthConfig() {
+  const clientId = process.env.MERCADOPAGO_CLIENT_ID?.trim() ?? '';
+  const clientSecret = process.env.MERCADOPAGO_CLIENT_SECRET?.trim() ?? '';
+  const redirectUri = process.env.MERCADOPAGO_REDIRECT_URI?.trim() ?? '';
+
+  if (!clientId || !clientSecret || !redirectUri) {
+    throw new Error('OAuth do Mercado Pago não configurado no servidor.');
+  }
+
+  return { clientId, clientSecret, redirectUri };
+}
+
+export function buildMercadoPagoOAuthUrl(state: string) {
+  const { clientId, redirectUri } = getMercadoPagoOAuthConfig();
+  const params = new URLSearchParams({
+    client_id: clientId,
+    response_type: 'code',
+    platform_id: 'mp',
+    state,
+    redirect_uri: redirectUri,
+  });
+
+  return `https://auth.mercadopago.com/authorization?${params.toString()}`;
+}
+
+export async function exchangeMercadoPagoOAuthCode(code: string) {
+  const { clientId, clientSecret, redirectUri } = getMercadoPagoOAuthConfig();
+  const response = await fetch('https://api.mercadopago.com/oauth/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      client_id: clientId,
+      client_secret: clientSecret,
+      code,
+      grant_type: 'authorization_code',
+      redirect_uri: redirectUri,
+    }),
+  });
+
+  const responseBody = await response.json().catch(() => ({}));
+  if (!response.ok || typeof responseBody.access_token !== 'string') {
+    throw new Error(`Falha ao conectar o Mercado Pago (${response.status}).`);
+  }
+
+  return responseBody as MercadoPagoOAuthTokenResponse;
+}
+
+export async function refreshMercadoPagoOAuthToken(refreshToken: string) {
+  const { clientId, clientSecret } = getMercadoPagoOAuthConfig();
+  const response = await fetch('https://api.mercadopago.com/oauth/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      client_id: clientId,
+      client_secret: clientSecret,
+      refresh_token: refreshToken,
+      grant_type: 'refresh_token',
+    }),
+  });
+
+  const responseBody = await response.json().catch(() => ({}));
+  if (!response.ok || typeof responseBody.access_token !== 'string') {
+    throw new Error(`Falha ao renovar a conexão do Mercado Pago (${response.status}).`);
+  }
+
+  return responseBody as MercadoPagoOAuthTokenResponse;
+}
+
 export const mercadopagoClient = null;
 
 export type WebhookSignatureResult = {

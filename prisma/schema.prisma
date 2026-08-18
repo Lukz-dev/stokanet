@@ -147,6 +147,10 @@ model Company {
   storeTheme  String      @default("ocean")
   storeActive Boolean     @default(true)
   mercadopagoAccessToken String?
+  mercadopagoRefreshToken String?
+  mercadopagoUserId String?
+  mercadopagoTokenExpiresAt DateTime?
+  mercadopagoConnectedAt DateTime?
   users       User[]
   customers   Customer[]
   products    Product[]

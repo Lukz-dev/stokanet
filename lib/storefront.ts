@@ -1,7 +1,7 @@
 import { Prisma } from '@prisma/client'
 import { revalidatePath } from 'next/cache'
 import prisma from '@/lib/prisma'
-import { createCheckoutPreference } from '@/lib/mercadopago'
+import { createCheckoutPreference, refreshMercadoPagoOAuthToken } from '@/lib/mercadopago'
 
 export type StorefrontCheckoutItemInput = {
   productId: string
@@ -66,6 +66,37 @@ function resolveShippingFee(storefront: {
   }
 
   return Math.max(0, baseFee)
+}
+
+async function getMercadoPagoAccessTokenForCompany(companyId: string) {
+  const company = await prisma.company.findUnique({
+    where: { id: companyId },
+    select: {
+      mercadopagoAccessToken: true,
+      mercadopagoRefreshToken: true,
+      mercadopagoTokenExpiresAt: true,
+    },
+  })
+
+  if (!company?.mercadopagoAccessToken) return null
+
+  const expiresSoon = company.mercadopagoTokenExpiresAt
+    ? company.mercadopagoTokenExpiresAt.getTime() <= Date.now() + 60_000
+    : false
+
+  if (!expiresSoon || !company.mercadopagoRefreshToken) return company.mercadopagoAccessToken
+
+  const token = await refreshMercadoPagoOAuthToken(company.mercadopagoRefreshToken)
+  await prisma.company.update({
+    where: { id: companyId },
+    data: {
+      mercadopagoAccessToken: token.access_token,
+      mercadopagoRefreshToken: token.refresh_token ?? company.mercadopagoRefreshToken,
+      mercadopagoTokenExpiresAt: token.expires_in ? new Date(Date.now() + token.expires_in * 1000) : null,
+    },
+  })
+
+  return token.access_token
 }
 
 async function applyInventoryChanges(
@@ -141,7 +172,6 @@ export async function getStorefrontBySlug(slug: string) {
       storeLogoUrl: true,
       storeTheme: true,
       storeActive: true,
-      mercadopagoAccessToken: true,
       products: {
         where: { storePublished: true, status: { not: 'Arquivado' } },
         select: {
@@ -211,9 +241,8 @@ export async function createStorefrontCheckout(input: StorefrontCheckoutInput) {
     throw new Error('Loja não encontrada ou inativa.')
   }
 
-  if (!storefront.mercadopagoAccessToken) {
-    throw new Error('A loja ainda não possui token do Mercado Pago configurado.')
-  }
+  const mercadopagoAccessToken = await getMercadoPagoAccessTokenForCompany(storefront.id)
+  if (!mercadopagoAccessToken) throw new Error('A loja ainda não está conectada ao Mercado Pago.')
 
   const sanitizedItems = input.items
     .map((item) => ({
@@ -308,7 +337,7 @@ export async function createStorefrontCheckout(input: StorefrontCheckoutInput) {
 
   try {
     const preference = await createCheckoutPreference({
-      accessToken: storefront.mercadopagoAccessToken,
+      accessToken: mercadopagoAccessToken,
       items: [
         ...resolvedItems.map((item) => ({
           id: item.product.id,

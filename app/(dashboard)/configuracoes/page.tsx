@@ -43,7 +43,8 @@ export default async function ConfiguracoesPage() {
     storeLogoUrl: string | null
     storeTheme: string | null
     storeActive: boolean
-    mercadopagoAccessToken: string | null
+    mercadopagoRefreshToken: string | null
+    mercadopagoConnectedAt: Date | null
   } | null
 
   if (!currentCompany) {
@@ -81,7 +82,7 @@ export default async function ConfiguracoesPage() {
       storeLogoUrl={currentCompany.storeLogoUrl ?? ''}
       storeTheme={storeTheme}
       storeActive={currentCompany.storeActive}
-      mercadopagoAccessToken={currentCompany.mercadopagoAccessToken ?? ''}
+      mercadopagoConnected={Boolean(currentCompany.mercadopagoRefreshToken && currentCompany.mercadopagoConnectedAt)}
       currentThemePreference={user.themePreference as ThemePreference}
     />
   )

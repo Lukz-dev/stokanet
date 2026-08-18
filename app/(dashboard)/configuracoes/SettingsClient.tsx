@@ -41,7 +41,7 @@ interface Props {
   storeLogoUrl: string
   storeTheme: ThemePreference
   storeActive: boolean
-  mercadopagoAccessToken: string
+  mercadopagoConnected: boolean
   currentThemePreference: ThemePreference
 }
 
@@ -72,7 +72,7 @@ export function SettingsClient({
   storeLogoUrl,
   storeTheme,
   storeActive,
-  mercadopagoAccessToken,
+  mercadopagoConnected,
   currentThemePreference,
 }: Props) {
   const router = useRouter()
@@ -106,7 +106,6 @@ export function SettingsClient({
     storeBannerUrl,
     storeLogoUrl,
     storeTheme,
-    mercadopagoAccessToken,
     storeActive: Boolean(storeActive),
   })
   const storeThemePreset = THEME_COLOR_PRESETS[String(form.storeTheme ?? 'ocean').toUpperCase() as ThemePreference] ?? THEME_COLOR_PRESETS.OCEAN
@@ -151,7 +150,6 @@ export function SettingsClient({
           storeLogoUrl: form.storeLogoUrl,
           storeTheme: form.storeTheme,
           storeActive: form.storeActive,
-          mercadopagoAccessToken: form.mercadopagoAccessToken,
         } as Parameters<typeof updateCompanyPreferences>[0])
         setSuccess('Configurações salvas com sucesso.')
         router.refresh()
@@ -159,6 +157,20 @@ export function SettingsClient({
         setError(currentError.message || 'Não foi possível salvar as configurações.')
       }
     })
+  }
+
+  const disconnectMercadoPago = async () => {
+    setError('')
+    setSuccess('')
+
+    try {
+      const response = await fetch('/api/mercadopago/oauth/disconnect', { method: 'POST' })
+      if (!response.ok) throw new Error('Não foi possível desconectar o Mercado Pago.')
+      setSuccess('Mercado Pago desconectado.')
+      router.refresh()
+    } catch (currentError: any) {
+      setError(currentError.message || 'Não foi possível desconectar o Mercado Pago.')
+    }
   }
 
   const handleTestWebhook = () => {
@@ -313,6 +325,37 @@ export function SettingsClient({
                 </button>
               </div>
             </form>
+          </section>
+
+          <section className="bg-card border border-border rounded-2xl shadow-sm p-6">
+            <div className="flex items-center justify-between gap-4 mb-4">
+              <div>
+                <h2 className="text-lg font-semibold">Pagamento da loja</h2>
+                <p className="text-sm text-muted-foreground">Conecte a conta do próprio cliente. Nenhum token precisa ser compartilhado.</p>
+              </div>
+              <Store className="w-5 h-5 text-primary" />
+            </div>
+            {mercadopagoConnected ? (
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4">
+                <div>
+                  <p className="font-semibold text-emerald-700">Mercado Pago conectado</p>
+                  <p className="mt-1 text-xs text-muted-foreground">Os pagamentos da loja serão recebidos na conta autorizada.</p>
+                </div>
+                <button type="button" onClick={disconnectMercadoPago} className="rounded-lg border border-border bg-card px-3 py-2 text-sm font-semibold hover:bg-muted">
+                  Desconectar
+                </button>
+              </div>
+            ) : (
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-500/30 bg-amber-500/10 p-4">
+                <div>
+                  <p className="font-semibold text-amber-700">Mercado Pago não conectado</p>
+                  <p className="mt-1 text-xs text-muted-foreground">O cliente será levado ao Mercado Pago para autorizar a própria conta.</p>
+                </div>
+                <a href="/api/mercadopago/oauth/start" className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90">
+                  Conectar Mercado Pago
+                </a>
+              </div>
+            )}
           </section>
 
           <section className="bg-card border border-border rounded-2xl shadow-sm p-6">

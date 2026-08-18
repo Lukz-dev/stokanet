@@ -12,8 +12,19 @@ function normalizeResourceId(value: unknown) {
   return rawValue || null
 }
 
-async function fetchPayment(id: string) {
-  const accessToken = process.env.MERCADOPAGO_ACCESS_TOKEN || process.env.MERCADO_PAGO_ACCESS_TOKEN || process.env.MP_ACCESS_TOKEN || ''
+async function fetchPayment(id: string, companyId: string | null) {
+  let accessToken = ''
+
+  if (companyId) {
+    const { default: prisma } = await import('@/lib/prisma')
+    const company = await prisma.company.findUnique({
+      where: { id: companyId },
+      select: { mercadopagoAccessToken: true },
+    })
+    accessToken = company?.mercadopagoAccessToken ?? ''
+  }
+
+  accessToken ||= process.env.MERCADOPAGO_ACCESS_TOKEN || process.env.MERCADO_PAGO_ACCESS_TOKEN || process.env.MP_ACCESS_TOKEN || ''
   if (!accessToken) {
     throw new Error('MERCADOPAGO_ACCESS_TOKEN não configurado')
   }
@@ -31,6 +42,7 @@ async function fetchPayment(id: string) {
 
 export async function POST(request: NextRequest) {
   try {
+    const companyId = request.nextUrl.searchParams.get('companyId')
     const rawBody = await request.text()
     const body = JSON.parse(rawBody || '{}')
     const signatureHeader = request.headers.get('x-signature')
@@ -52,7 +64,7 @@ export async function POST(request: NextRequest) {
     }
 
     console.log('Webhook Mercado Pago processando pagamento', { paymentId, signatureResult })
-    const payment = await fetchPayment(paymentId)
+    const payment = await fetchPayment(paymentId, companyId)
     const result = await finalizeStorefrontOrderFromPayment(payment)
 
     return NextResponse.json({ success: true, result })

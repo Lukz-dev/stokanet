@@ -5,7 +5,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import { useSession, signOut } from 'next-auth/react'
-import { Package, LayoutDashboard, ArrowRightLeft, Box, Building2, UserRound, Settings, ScanLine, Truck, ClipboardList, BarChart3, ShieldCheck, LogOut, CalendarCheck2, Receipt, BadgeDollarSign, Store } from 'lucide-react'
+import { Package, LayoutDashboard, ArrowRightLeft, Box, Building2, UserRound, Settings, ScanLine, Truck, ClipboardList, BarChart3, ShieldCheck, LogOut, CalendarCheck2, Receipt, BadgeDollarSign, Store, ShoppingCart } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { loadAvatarCached } from '@/lib/client-avatar'
 
@@ -15,6 +15,7 @@ const navItems = [
   { name: 'Caixa', href: '/caixa', icon: ScanLine },
   { name: 'Vendas', href: '/vendas', icon: Receipt },
   { name: 'Loja online', href: '/loja', icon: Store },
+  { name: 'Pedidos online', href: '/loja/pedidos', icon: ShoppingCart },
   { name: 'Fornecedores', href: '/fornecedores', icon: Truck },
   { name: 'Compras', href: '/compras', icon: ClipboardList },
   { name: 'Fechamento', href: '/fechamento', icon: CalendarCheck2 },

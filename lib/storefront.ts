@@ -365,7 +365,7 @@ export async function createStorefrontCheckout(input: StorefrontCheckoutInput) {
         failure: `${storeUrl}?order=${orderCode}&status=failure`,
         pending: `${storeUrl}?order=${orderCode}&status=pending`,
       },
-      notificationUrl: `${baseUrl}/api/loja/webhook/mercadopago`,
+      notificationUrl: `${baseUrl}/api/loja/webhook/mercadopago?companyId=${encodeURIComponent(storefront.id)}&orderCode=${encodeURIComponent(orderCode)}`,
       externalReference: orderCode,
       metadata: {
         storeSlug: storefront.storeSlug,

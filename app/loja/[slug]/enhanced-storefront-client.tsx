@@ -142,6 +142,7 @@ export function EnhancedStorefrontClient({ storefront }: { storefront: Storefron
   const [customerEmail, setCustomerEmail] = useState('')
   const [customerName, setCustomerName] = useState('')
   const [customerPhone, setCustomerPhone] = useState('')
+  const [address, setAddress] = useState({ street: '', number: '', complement: '', neighborhood: '', city: '', state: '', postalCode: '' })
   const [paymentMethod, setPaymentMethod] = useState<'auto' | 'pix' | 'card'>('auto')
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
@@ -264,6 +265,7 @@ export function EnhancedStorefrontClient({ storefront }: { storefront: Storefron
             name: customerName,
             email: customerEmail,
             phone: customerPhone,
+            address,
           },
           paymentMethod,
         }),
@@ -434,6 +436,18 @@ export function EnhancedStorefrontClient({ storefront }: { storefront: Storefron
                   <input value={customerName} onChange={(event) => setCustomerName(event.target.value)} placeholder="Nome" className="w-full rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3 text-sm outline-none placeholder:text-white/30" />
                   <input value={customerEmail} onChange={(event) => setCustomerEmail(event.target.value)} placeholder="E-mail" type="email" className="w-full rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3 text-sm outline-none placeholder:text-white/30" />
                   <input value={customerPhone} onChange={(event) => setCustomerPhone(event.target.value)} placeholder="Telefone" className="w-full rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3 text-sm outline-none placeholder:text-white/30" />
+                  <p className="pt-2 text-xs uppercase tracking-[0.24em] text-white/45">Endereço de entrega</p>
+                  <div className="grid grid-cols-[1fr_7rem] gap-2">
+                    <input value={address.street} onChange={(event) => setAddress((current) => ({ ...current, street: event.target.value }))} placeholder="Rua / avenida" className="w-full rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3 text-sm outline-none placeholder:text-white/30" />
+                    <input value={address.number} onChange={(event) => setAddress((current) => ({ ...current, number: event.target.value }))} placeholder="Número" className="w-full rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3 text-sm outline-none placeholder:text-white/30" />
+                  </div>
+                  <input value={address.complement} onChange={(event) => setAddress((current) => ({ ...current, complement: event.target.value }))} placeholder="Complemento (opcional)" className="w-full rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3 text-sm outline-none placeholder:text-white/30" />
+                  <input value={address.neighborhood} onChange={(event) => setAddress((current) => ({ ...current, neighborhood: event.target.value }))} placeholder="Bairro" className="w-full rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3 text-sm outline-none placeholder:text-white/30" />
+                  <div className="grid grid-cols-[1fr_5rem] gap-2">
+                    <input value={address.city} onChange={(event) => setAddress((current) => ({ ...current, city: event.target.value }))} placeholder="Cidade" className="w-full rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3 text-sm outline-none placeholder:text-white/30" />
+                    <input value={address.state} onChange={(event) => setAddress((current) => ({ ...current, state: event.target.value.toUpperCase().slice(0, 2) }))} placeholder="UF" maxLength={2} className="w-full rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3 text-sm uppercase outline-none placeholder:text-white/30" />
+                  </div>
+                  <input value={address.postalCode} onChange={(event) => setAddress((current) => ({ ...current, postalCode: event.target.value }))} placeholder="CEP" inputMode="numeric" className="w-full rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3 text-sm outline-none placeholder:text-white/30" />
                 </div>
 
                 <div className="mt-4 flex flex-wrap gap-2">

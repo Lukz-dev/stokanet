@@ -40,12 +40,13 @@ export default async function LojaPage() {
   }
 
   const c = company as any
+  const productsAny = products as any[]
 
   const publicUrl = c.storeSlug ? await buildStorefrontUrl(c.storeSlug) : null
   const sandboxStatus = await getSandboxStatus()
-  const publishedProducts = products.filter((product) => product.storePublished)
-  const activeProducts = products.filter((product) => product.status !== 'Arquivado')
-  const lowStockProducts = products.filter((product) => ['Baixo', 'Crítico', 'Esgotado'].includes(product.status))
+  const publishedProducts = productsAny.filter((product) => product.storePublished)
+  const activeProducts = productsAny.filter((product) => product.status !== 'Arquivado')
+  const lowStockProducts = productsAny.filter((product) => ['Baixo', 'Crítico', 'Esgotado'].includes(product.status))
   const storeReady = Boolean(c.storeActive && c.storeSlug && c.mercadopagoAccessToken)
 
   return (
@@ -184,7 +185,7 @@ export default async function LojaPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {products.map((product) => (
+                  {productsAny.map((product) => (
                     <tr key={product.id} className="border-t border-border/70">
                       <td className="px-4 py-3">
                         <p className="font-medium">{product.name}</p>

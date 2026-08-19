@@ -418,8 +418,8 @@ export async function finalizeStorefrontOrderFromPayment(payment: {
   payment_type_id?: string | null
   transaction_amount?: number | null
   date_approved?: string | null
-}) {
-  const externalReference = String(payment.external_reference ?? '').trim()
+}, fallbackOrderCode?: string | null) {
+  const externalReference = String(payment.external_reference ?? fallbackOrderCode ?? '').trim()
   const paymentId = String(payment.id)
   const preferenceId = payment.preference_id != null ? String(payment.preference_id) : null
 
@@ -439,7 +439,6 @@ export async function finalizeStorefrontOrderFromPayment(payment: {
       },
     },
   })
-
   if (!order) {
     return { ok: false, reason: 'ORDER_NOT_FOUND' as const }
   }

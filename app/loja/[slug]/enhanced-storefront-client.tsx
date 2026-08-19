@@ -2,6 +2,7 @@
 
 import { type CSSProperties, useMemo, useState } from 'react'
 import Image from 'next/image'
+import { useSearchParams } from 'next/navigation'
 import { BadgeCheck, Link2, Loader2, MessageCircle, Minus, Plus, ShoppingBag, Store, Ticket, Truck, X, Search, Filter, ChevronDown } from 'lucide-react'
 import clsx from 'clsx'
 import { THEME_COLOR_PRESETS, type ThemePreference } from '@/lib/theme'
@@ -136,6 +137,7 @@ function formatShippingAmount(value: number | null) {
 }
 
 export function EnhancedStorefrontClient({ storefront }: { storefront: Storefront }) {
+  const searchParams = useSearchParams()
   const [cart, setCart] = useState<Record<string, number>>({})
   const [loadingCheckout, setLoadingCheckout] = useState(false)
   const [checkoutError, setCheckoutError] = useState('')
@@ -149,6 +151,9 @@ export function EnhancedStorefrontClient({ storefront }: { storefront: Storefron
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
   const [sortBy, setSortBy] = useState<SortOption>('newest')
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null)
+  const checkoutStatus = searchParams.get('status')
+  const checkoutOrderCode = searchParams.get('order')
+  const showCheckoutResult = ['success', 'pending', 'failure'].includes(checkoutStatus ?? '')
 
   const theme = THEME_STYLES[storefront.storeTheme] ?? THEME_STYLES.ocean
   const customTheme = buildCustomThemePalette(storefront.storePrimaryColor, storefront.storeSecondaryColor, storefront.storeTheme)
@@ -298,6 +303,27 @@ export function EnhancedStorefrontClient({ storefront }: { storefront: Storefron
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.15),transparent_40%),linear-gradient(to_bottom,rgba(15,23,42,0.12),rgba(2,6,23,0.92))]" />
 
       <main className="relative mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+        {showCheckoutResult && (
+          <section className={clsx(
+            'relative z-10 mb-6 rounded-3xl border p-5 shadow-xl backdrop-blur-xl',
+            checkoutStatus === 'success' && 'border-emerald-400/30 bg-emerald-950/70',
+            checkoutStatus === 'pending' && 'border-amber-400/30 bg-amber-950/70',
+            checkoutStatus === 'failure' && 'border-rose-400/30 bg-rose-950/70',
+          )}>
+            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-white/55">Pedido {checkoutOrderCode ?? 'online'}</p>
+            <h2 className="mt-2 text-2xl font-semibold">
+              {checkoutStatus === 'success' && 'Pedido realizado com sucesso'}
+              {checkoutStatus === 'pending' && 'Pagamento pendente'}
+              {checkoutStatus === 'failure' && 'Não foi possível concluir o pagamento'}
+            </h2>
+            <p className="mt-2 text-sm leading-6 text-white/75">
+              {checkoutStatus === 'success' && 'Recebemos seu retorno do Mercado Pago. A confirmação final do pagamento será atualizada assim que o gateway processar a transação.'}
+              {checkoutStatus === 'pending' && 'Seu pedido foi registrado e o Mercado Pago ainda está processando o pagamento.'}
+              {checkoutStatus === 'failure' && 'O pagamento não foi concluído. Você pode revisar o carrinho e tentar novamente.'}
+            </p>
+            {checkoutStatus !== 'failure' && <p className="mt-3 text-sm font-medium text-white/90">Guarde o código do pedido para falar com a loja.</p>}
+          </section>
+        )}
         <section className="overflow-hidden rounded-[2rem] border border-white/10 bg-white/5 shadow-2xl shadow-black/20 backdrop-blur-xl">
           <div className="grid gap-0 lg:grid-cols-[1.3fr_0.9fr]">
             <div className="relative min-h-[20rem] p-6 sm:p-10">

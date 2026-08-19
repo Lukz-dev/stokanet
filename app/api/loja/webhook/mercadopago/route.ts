@@ -12,16 +12,16 @@ function normalizeResourceId(value: unknown) {
   return rawValue || null
 }
 
-async function fetchPayment(id: string, companyId: string | null) {
+async function fetchPayment(id: string, companyId: string | null, orderCode: string | null) {
   let accessToken = ''
 
-  if (companyId) {
+  if (companyId || orderCode) {
     const { default: prisma } = await import('@/lib/prisma')
-    const company = await prisma.company.findUnique({
-      where: { id: companyId },
-      select: { mercadopagoAccessToken: true },
+    const order = await prisma.storeOrder.findFirst({
+      where: companyId ? { companyId, ...(orderCode ? { code: orderCode } : {}) } : { code: orderCode ?? undefined },
+      select: { company: { select: { mercadopagoAccessToken: true } } },
     })
-    accessToken = company?.mercadopagoAccessToken ?? ''
+    accessToken = order?.company.mercadopagoAccessToken ?? ''
   }
 
   accessToken ||= process.env.MERCADOPAGO_ACCESS_TOKEN || process.env.MERCADO_PAGO_ACCESS_TOKEN || process.env.MP_ACCESS_TOKEN || ''
@@ -43,6 +43,7 @@ async function fetchPayment(id: string, companyId: string | null) {
 export async function POST(request: NextRequest) {
   try {
     const companyId = request.nextUrl.searchParams.get('companyId')
+    const orderCode = request.nextUrl.searchParams.get('orderCode')
     const rawBody = await request.text()
     const body = JSON.parse(rawBody || '{}')
     const signatureHeader = request.headers.get('x-signature')
@@ -64,8 +65,8 @@ export async function POST(request: NextRequest) {
     }
 
     console.log('Webhook Mercado Pago processando pagamento', { paymentId, signatureResult })
-    const payment = await fetchPayment(paymentId, companyId)
-    const result = await finalizeStorefrontOrderFromPayment(payment)
+    const payment = await fetchPayment(paymentId, companyId, orderCode)
+    const result = await finalizeStorefrontOrderFromPayment(payment, orderCode)
 
     return NextResponse.json({ success: true, result })
   } catch (error) {

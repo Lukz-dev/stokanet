@@ -3,6 +3,7 @@ import { getActiveCompanyId } from '@/lib/access'
 import Link from 'next/link'
 import { BadgeCheck, ExternalLink, Globe, LayoutGrid, Megaphone, Package, Sparkles, Store, Ticket, Truck } from 'lucide-react'
 import { buildStorefrontUrl } from '../../../lib/storefront'
+import { StoreProductsManager } from './StoreProductsManager'
 
 async function getSandboxStatus() {
   return {
@@ -31,6 +32,7 @@ export default async function LojaPage() {
     prisma.company.findUnique({ where: { id: companyId } }),
     prisma.product.findMany({
       where: { companyId },
+      include: { images: { orderBy: { displayOrder: 'asc' } } },
       orderBy: [{ createdAt: 'desc' }],
     }),
   ])
@@ -174,39 +176,7 @@ export default async function LojaPage() {
               <Package className="w-5 h-5 text-primary" />
             </div>
 
-            <div className="overflow-hidden rounded-xl border border-border">
-              <table className="w-full text-sm">
-                <thead className="bg-muted/30 text-muted-foreground">
-                  <tr>
-                    <th className="px-4 py-3 text-left font-medium">Produto</th>
-                    <th className="px-4 py-3 text-left font-medium">Preço</th>
-                    <th className="px-4 py-3 text-left font-medium">Estoque</th>
-                    <th className="px-4 py-3 text-left font-medium">Loja</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {productsAny.map((product) => (
-                    <tr key={product.id} className="border-t border-border/70">
-                      <td className="px-4 py-3">
-                        <p className="font-medium">{product.name}</p>
-                        <p className="text-xs text-muted-foreground font-mono">{product.sku} {product.category ? `• ${product.category.name}` : ''}</p>
-                      </td>
-                      <td className="px-4 py-3">{formatCurrency(product.price)}</td>
-                      <td className="px-4 py-3">
-                        <span className={product.stockQty <= 0 ? 'text-destructive' : product.stockQty <= product.minStock ? 'text-amber-500' : 'text-foreground'}>
-                          {product.stockQty} unds
-                        </span>
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className={product.storePublished ? 'rounded-full bg-emerald-500/10 text-emerald-600 px-3 py-1 text-xs font-semibold' : 'rounded-full bg-muted px-3 py-1 text-xs font-semibold text-muted-foreground'}>
-                          {product.storePublished ? 'Publicado' : 'Oculto'}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <StoreProductsManager products={productsAny} />
           </section>
         </div>
 

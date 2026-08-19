@@ -78,6 +78,7 @@ export default async function OnlineOrdersPage() {
                     </span>
                   </div>
                   <p className="mt-1 text-xs text-muted-foreground">Criado em {formatDate(order.createdAt)}{order.paidAt ? ` • Pago em ${formatDate(order.paidAt)}` : ''}</p>
+                  <p className="mt-1 text-xs font-medium text-primary">{order.deliveryMethod === 'PICKUP' ? 'Retirada na loja' : 'Entrega'}</p>
                 </div>
                 <div className="text-left lg:text-right">
                   <p className="text-xs text-muted-foreground">Total</p>
@@ -95,7 +96,7 @@ export default async function OnlineOrdersPage() {
                 </div>
                 <div>
                   <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground"><MapPin className="h-3.5 w-3.5" />Entrega</p>
-                  <p className="mt-2 text-sm leading-6 text-muted-foreground">{formatAddress(order.shippingAddress)}</p>
+                  <p className="mt-2 text-sm leading-6 text-muted-foreground">{order.deliveryMethod === 'PICKUP' ? 'Cliente fará a retirada na loja.' : formatAddress(order.shippingAddress)}</p>
                   {order.notes && <p className="mt-2 text-sm text-muted-foreground">Observação: {order.notes}</p>}
                 </div>
                 <div>

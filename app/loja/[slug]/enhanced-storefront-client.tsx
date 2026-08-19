@@ -142,6 +142,7 @@ export function EnhancedStorefrontClient({ storefront }: { storefront: Storefron
   const [customerEmail, setCustomerEmail] = useState('')
   const [customerName, setCustomerName] = useState('')
   const [customerPhone, setCustomerPhone] = useState('')
+  const [deliveryMethod, setDeliveryMethod] = useState<'DELIVERY' | 'PICKUP'>('DELIVERY')
   const [address, setAddress] = useState({ street: '', number: '', complement: '', neighborhood: '', city: '', state: '', postalCode: '' })
   const [paymentMethod, setPaymentMethod] = useState<'auto' | 'pix' | 'card'>('auto')
   const [searchQuery, setSearchQuery] = useState('')
@@ -261,11 +262,12 @@ export function EnhancedStorefrontClient({ storefront }: { storefront: Storefron
         body: JSON.stringify({
           slug: storefront.storeSlug,
           items: cartItems.map((item) => ({ productId: item.product.id, quantity: item.quantity })),
+          deliveryMethod,
           customer: {
             name: customerName,
             email: customerEmail,
             phone: customerPhone,
-            address,
+            address: deliveryMethod === 'DELIVERY' ? address : undefined,
           },
           paymentMethod,
         }),
@@ -436,6 +438,12 @@ export function EnhancedStorefrontClient({ storefront }: { storefront: Storefron
                   <input value={customerName} onChange={(event) => setCustomerName(event.target.value)} placeholder="Nome" className="w-full rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3 text-sm outline-none placeholder:text-white/30" />
                   <input value={customerEmail} onChange={(event) => setCustomerEmail(event.target.value)} placeholder="E-mail" type="email" className="w-full rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3 text-sm outline-none placeholder:text-white/30" />
                   <input value={customerPhone} onChange={(event) => setCustomerPhone(event.target.value)} placeholder="Telefone" className="w-full rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3 text-sm outline-none placeholder:text-white/30" />
+                  <p className="pt-2 text-xs uppercase tracking-[0.24em] text-white/45">Como receber o pedido</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button type="button" onClick={() => setDeliveryMethod('DELIVERY')} className={clsx('rounded-2xl border px-3 py-2.5 text-sm font-semibold transition', deliveryMethod === 'DELIVERY' ? 'border-white bg-white text-slate-950' : 'border-white/10 bg-white/5 text-white/70')}>Entrega</button>
+                    <button type="button" onClick={() => setDeliveryMethod('PICKUP')} className={clsx('rounded-2xl border px-3 py-2.5 text-sm font-semibold transition', deliveryMethod === 'PICKUP' ? 'border-white bg-white text-slate-950' : 'border-white/10 bg-white/5 text-white/70')}>Retirada</button>
+                  </div>
+                  {deliveryMethod === 'DELIVERY' && <>
                   <p className="pt-2 text-xs uppercase tracking-[0.24em] text-white/45">Endereço de entrega</p>
                   <div className="grid grid-cols-[1fr_7rem] gap-2">
                     <input value={address.street} onChange={(event) => setAddress((current) => ({ ...current, street: event.target.value }))} placeholder="Rua / avenida" className="w-full rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3 text-sm outline-none placeholder:text-white/30" />
@@ -448,6 +456,8 @@ export function EnhancedStorefrontClient({ storefront }: { storefront: Storefron
                     <input value={address.state} onChange={(event) => setAddress((current) => ({ ...current, state: event.target.value.toUpperCase().slice(0, 2) }))} placeholder="UF" maxLength={2} className="w-full rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3 text-sm uppercase outline-none placeholder:text-white/30" />
                   </div>
                   <input value={address.postalCode} onChange={(event) => setAddress((current) => ({ ...current, postalCode: event.target.value }))} placeholder="CEP" inputMode="numeric" className="w-full rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3 text-sm outline-none placeholder:text-white/30" />
+                  </>}
+                  {deliveryMethod === 'PICKUP' && <p className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white/65">O cliente retirará o pedido no endereço informado pela loja.</p>}
                 </div>
 
                 <div className="mt-4 flex flex-wrap gap-2">

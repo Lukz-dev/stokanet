@@ -353,6 +353,7 @@ model StoreOrder {
   id                 String            @id @default(cuid())
   code               String            @unique
   status             String            @default("PENDING")
+  deliveryMethod     String            @default("DELIVERY")
   paymentProvider    String            @default("MERCADOPAGO")
   paymentPreferenceId String?
   paymentId          String?

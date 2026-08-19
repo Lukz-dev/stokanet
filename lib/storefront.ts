@@ -19,6 +19,7 @@ export type StorefrontCheckoutInput = {
   slug: string
   items: StorefrontCheckoutItemInput[]
   customer?: StorefrontCustomerInput
+  deliveryMethod?: 'DELIVERY' | 'PICKUP'
   discount?: number
   notes?: string
 }
@@ -297,7 +298,12 @@ export async function createStorefrontCheckout(input: StorefrontCheckoutInput) {
 
   const discount = Number.isFinite(input.discount) ? Math.max(0, Number(input.discount)) : 0
   const boundedDiscount = Math.min(discount, subtotal)
-  const shippingFee = resolveShippingFee(storefront, subtotal)
+  const deliveryMethod = input.deliveryMethod === 'PICKUP' ? 'PICKUP' : 'DELIVERY'
+  const requiredAddressFields = ['street', 'number', 'neighborhood', 'city', 'state', 'postalCode']
+  if (deliveryMethod === 'DELIVERY' && requiredAddressFields.some((field) => !String(input.customer?.address?.[field] ?? '').trim())) {
+    throw new Error('Informe o endereço completo para receber o pedido.')
+  }
+  const shippingFee = deliveryMethod === 'PICKUP' ? 0 : resolveShippingFee(storefront, subtotal)
   const total = Number(Math.max(0, subtotal - boundedDiscount + shippingFee).toFixed(2))
   const orderCode = formatStoreCode('LO')
   const baseUrl = resolveBaseUrl()
@@ -307,6 +313,7 @@ export async function createStorefrontCheckout(input: StorefrontCheckoutInput) {
     data: {
       code: orderCode,
       status: 'PENDING',
+      deliveryMethod,
       paymentProvider: 'MERCADOPAGO',
       externalReference: orderCode,
       subtotal,
@@ -317,7 +324,7 @@ export async function createStorefrontCheckout(input: StorefrontCheckoutInput) {
       customerName: input.customer?.name?.trim() || null,
       customerEmail: input.customer?.email?.trim() || null,
       customerPhone: input.customer?.phone?.trim() || null,
-      shippingAddress: input.customer?.address ? (input.customer.address as Prisma.InputJsonValue) : Prisma.JsonNull,
+      shippingAddress: deliveryMethod === 'DELIVERY' && input.customer?.address ? (input.customer.address as Prisma.InputJsonValue) : Prisma.JsonNull,
       companyId: storefront.id,
       items: {
         createMany: {

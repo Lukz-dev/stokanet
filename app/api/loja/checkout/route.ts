@@ -9,6 +9,7 @@ export async function POST(request: Request) {
       slug: typeof body.slug === 'string' ? body.slug : '',
       items: Array.isArray(body.items) ? body.items : [],
       customer: typeof body.customer === 'object' && body.customer !== null ? body.customer : undefined,
+      deliveryMethod: body.deliveryMethod === 'PICKUP' ? 'PICKUP' : 'DELIVERY',
       discount: typeof body.discount === 'number' ? body.discount : 0,
       notes: typeof body.notes === 'string' ? body.notes : undefined,
     })

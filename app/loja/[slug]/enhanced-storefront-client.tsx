@@ -290,7 +290,7 @@ export function EnhancedStorefrontClient({ storefront }: { storefront: Storefron
             phone: customerPhone,
             address: deliveryMethod === 'DELIVERY' ? address : undefined,
           },
-          paymentMethod,
+          paymentMethod: paymentMethod === 'cash' ? 'CASH' : 'MERCADOPAGO',
           cashReceived: paymentMethod === 'cash' ? Number(cashReceived.replace(',', '.')) : undefined,
         }),
       })

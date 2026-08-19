@@ -10,7 +10,7 @@ export async function POST(request: Request) {
       items: Array.isArray(body.items) ? body.items : [],
       customer: typeof body.customer === 'object' && body.customer !== null ? body.customer : undefined,
       deliveryMethod: body.deliveryMethod === 'PICKUP' ? 'PICKUP' : 'DELIVERY',
-      paymentMethod: body.paymentMethod === 'CASH' ? 'CASH' : 'MERCADOPAGO',
+      paymentMethod: String(body.paymentMethod ?? '').toUpperCase() === 'CASH' ? 'CASH' : 'MERCADOPAGO',
       cashReceived: typeof body.cashReceived === 'number' ? body.cashReceived : undefined,
       discount: typeof body.discount === 'number' ? body.discount : 0,
       notes: typeof body.notes === 'string' ? body.notes : undefined,

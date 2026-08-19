@@ -146,7 +146,9 @@ export function EnhancedStorefrontClient({ storefront }: { storefront: Storefron
   const [customerPhone, setCustomerPhone] = useState('')
   const [deliveryMethod, setDeliveryMethod] = useState<'DELIVERY' | 'PICKUP'>('DELIVERY')
   const [address, setAddress] = useState({ street: '', number: '', complement: '', neighborhood: '', city: '', state: '', postalCode: '' })
-  const [paymentMethod, setPaymentMethod] = useState<'auto' | 'pix' | 'card'>('auto')
+  const [paymentMethod, setPaymentMethod] = useState<'auto' | 'pix' | 'card' | 'cash'>('auto')
+  const [cashReceived, setCashReceived] = useState('')
+  const [cashConfirmation, setCashConfirmation] = useState<{ orderCode: string; changeDue: number } | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
   const [sortBy, setSortBy] = useState<SortOption>('newest')
@@ -200,6 +202,8 @@ export function EnhancedStorefrontClient({ storefront }: { storefront: Storefron
     return baseShippingFee
   }, [subtotal, storefront.storeFreeShippingMin, storefront.storeShippingFee])
   const cartTotal = subtotal + cartShippingFee
+  const cashAmount = Number(cashReceived.replace(',', '.'))
+  const calculatedChange = Number.isFinite(cashAmount) && cashAmount >= cartTotal ? cashAmount - cartTotal : null
   const whatsappUrl = formatPhoneLink(storefront.storeWhatsappNumber)
 
   useEffect(() => {
@@ -270,6 +274,7 @@ export function EnhancedStorefrontClient({ storefront }: { storefront: Storefron
 
     setLoadingCheckout(true)
     setCheckoutError('')
+    setCashConfirmation(null)
 
     try {
       const response = await fetch('/api/loja/checkout', {
@@ -286,6 +291,7 @@ export function EnhancedStorefrontClient({ storefront }: { storefront: Storefron
             address: deliveryMethod === 'DELIVERY' ? address : undefined,
           },
           paymentMethod,
+          cashReceived: paymentMethod === 'cash' ? Number(cashReceived.replace(',', '.')) : undefined,
         }),
       })
 
@@ -293,6 +299,12 @@ export function EnhancedStorefrontClient({ storefront }: { storefront: Storefron
 
       if (!response.ok) {
         throw new Error(payload.error || 'Não foi possível iniciar o pagamento.')
+      }
+
+      if (payload.cashOrder) {
+        setCashConfirmation({ orderCode: payload.orderCode, changeDue: payload.changeDue ?? 0 })
+        setCart({})
+        return
       }
 
       const checkoutUrl = payload.initPoint || payload.sandboxInitPoint
@@ -531,13 +543,29 @@ export function EnhancedStorefrontClient({ storefront }: { storefront: Storefron
                   <button type="button" onClick={() => setPaymentMethod('card')} className={clsx('rounded-full px-3 py-2 text-xs font-semibold', paymentMethod === 'card' ? 'bg-white text-slate-950' : 'bg-white/5 text-white/70')}>
                     Cartão
                   </button>
+                  <button type="button" onClick={() => setPaymentMethod('cash')} className={clsx('rounded-full px-3 py-2 text-xs font-semibold', paymentMethod === 'cash' ? 'bg-white text-slate-950' : 'bg-white/5 text-white/70')}>
+                    Dinheiro
+                  </button>
                 </div>
+
+                {paymentMethod === 'cash' && (
+                  <div className="mt-3 rounded-2xl border border-white/10 bg-white/5 p-3">
+                    <label className="text-xs uppercase tracking-[0.2em] text-white/45">Dinheiro para</label>
+                    <input value={cashReceived} onChange={(event) => setCashReceived(event.target.value)} placeholder={formatCurrency(cartTotal)} inputMode="decimal" className="mt-2 w-full rounded-xl border border-white/10 bg-slate-950/60 px-4 py-3 text-sm outline-none placeholder:text-white/30" />
+                    <p className="mt-2 text-xs text-white/55">Total do pedido: {formatCurrency(cartTotal)}</p>
+                    <p className={clsx('mt-1 text-sm font-semibold', calculatedChange === null ? 'text-amber-200' : 'text-emerald-300')}>
+                      {calculatedChange === null ? 'Informe um valor igual ou maior que o total.' : `Troco: ${formatCurrency(calculatedChange)}`}
+                    </p>
+                  </div>
+                )}
 
                 {checkoutError && <p className="mt-3 rounded-2xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">{checkoutError}</p>}
 
+                {cashConfirmation && <div className="mt-3 rounded-2xl border border-emerald-400/30 bg-emerald-950/50 px-4 py-3 text-sm text-emerald-100"><strong>Pedido {cashConfirmation.orderCode} registrado.</strong><br />Troco: {formatCurrency(cashConfirmation.changeDue)}. Aguarde a confirmação da loja.</div>}
+
                 <button type="button" onClick={() => void handleCheckout()} disabled={loadingCheckout || cartItems.length === 0} className={clsx('mt-4 inline-flex w-full items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-semibold transition', loadingCheckout || cartItems.length === 0 ? 'cursor-not-allowed bg-white/10 text-white/40' : !customTheme && theme.button)} style={customTheme ? primaryButtonStyle : undefined}>
                   {loadingCheckout ? <Loader2 className="h-4 w-4 animate-spin" /> : <Ticket className="h-4 w-4" />}
-                  Pagar com Mercado Pago
+                  {paymentMethod === 'cash' ? 'Registrar pedido em dinheiro' : 'Pagar com Mercado Pago'}
                 </button>
               </div>
             </aside>

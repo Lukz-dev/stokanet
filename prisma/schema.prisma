@@ -355,6 +355,9 @@ model StoreOrder {
   status             String            @default("PENDING")
   deliveryMethod     String            @default("DELIVERY")
   paymentProvider    String            @default("MERCADOPAGO")
+  paymentMethod      String            @default("MERCADOPAGO")
+  cashReceived       Float?
+  changeDue          Float?
   paymentPreferenceId String?
   paymentId          String?
   mercadopagoStatus  String?

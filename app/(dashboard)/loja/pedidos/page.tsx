@@ -1,6 +1,7 @@
 import { ShoppingCart, MapPin, PackageCheck } from 'lucide-react'
 import prisma from '@/lib/prisma'
 import { getActiveCompanyId } from '@/lib/access'
+import { OrderActions } from './OrderActions'
 
 const statusLabels: Record<string, string> = {
   PENDING: 'Aguardando pagamento',
@@ -84,6 +85,7 @@ export default async function OnlineOrdersPage() {
                   <p className="text-xs text-muted-foreground">Total</p>
                   <p className="text-xl font-bold">{formatCurrency(order.total)}</p>
                   <p className="text-xs text-muted-foreground">{order.mercadopagoStatus ?? 'Pagamento não confirmado'}</p>
+                  {order.paymentMethod === 'CASH' && <p className="mt-1 text-xs text-amber-600">Dinheiro: {order.cashReceived ? formatCurrency(order.cashReceived) : 'não informado'} • Troco: {formatCurrency(order.changeDue ?? 0)}</p>}
                 </div>
               </div>
 
@@ -112,6 +114,8 @@ export default async function OnlineOrdersPage() {
                   <div className="mt-3 flex justify-between text-sm text-muted-foreground"><span>Subtotal + frete</span><strong className="text-foreground">{formatCurrency(order.subtotal + order.shippingFee - order.discount)}</strong></div>
                 </div>
               </div>
+
+              <OrderActions order={order} />
             </article>
           ))}
         </div>

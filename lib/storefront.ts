@@ -20,6 +20,8 @@ export type StorefrontCheckoutInput = {
   items: StorefrontCheckoutItemInput[]
   customer?: StorefrontCustomerInput
   deliveryMethod?: 'DELIVERY' | 'PICKUP'
+  paymentMethod?: 'MERCADOPAGO' | 'CASH'
+  cashReceived?: number
   discount?: number
   notes?: string
 }
@@ -299,12 +301,18 @@ export async function createStorefrontCheckout(input: StorefrontCheckoutInput) {
   const discount = Number.isFinite(input.discount) ? Math.max(0, Number(input.discount)) : 0
   const boundedDiscount = Math.min(discount, subtotal)
   const deliveryMethod = input.deliveryMethod === 'PICKUP' ? 'PICKUP' : 'DELIVERY'
+  const paymentMethod = input.paymentMethod === 'CASH' ? 'CASH' : 'MERCADOPAGO'
   const requiredAddressFields = ['street', 'number', 'neighborhood', 'city', 'state', 'postalCode']
   if (deliveryMethod === 'DELIVERY' && requiredAddressFields.some((field) => !String(input.customer?.address?.[field] ?? '').trim())) {
     throw new Error('Informe o endereço completo para receber o pedido.')
   }
   const shippingFee = deliveryMethod === 'PICKUP' ? 0 : resolveShippingFee(storefront, subtotal)
   const total = Number(Math.max(0, subtotal - boundedDiscount + shippingFee).toFixed(2))
+  const cashReceived = paymentMethod === 'CASH' && Number.isFinite(input.cashReceived) ? Number(input.cashReceived) : null
+  if (paymentMethod === 'CASH' && (cashReceived === null || cashReceived < total)) {
+    throw new Error(`Informe um valor em dinheiro igual ou maior que ${total.toFixed(2)}.`)
+  }
+  const changeDue = cashReceived === null ? null : Number((cashReceived - total).toFixed(2))
   const orderCode = formatStoreCode('LO')
   const baseUrl = resolveBaseUrl()
   const storeUrl = await buildStorefrontUrl(storefront.storeSlug ?? slugify(storefront.storeName ?? storefront.name))
@@ -314,7 +322,10 @@ export async function createStorefrontCheckout(input: StorefrontCheckoutInput) {
       code: orderCode,
       status: 'PENDING',
       deliveryMethod,
-      paymentProvider: 'MERCADOPAGO',
+      paymentProvider: paymentMethod === 'CASH' ? 'CASH' : 'MERCADOPAGO',
+      paymentMethod,
+      cashReceived,
+      changeDue,
       externalReference: orderCode,
       subtotal,
       discount: boundedDiscount,
@@ -341,6 +352,21 @@ export async function createStorefrontCheckout(input: StorefrontCheckoutInput) {
     },
     include: { items: true },
   })
+
+  if (paymentMethod === 'CASH') {
+    return {
+      storefront,
+      orderCode,
+      order,
+      cashOrder: true,
+      cashReceived,
+      changeDue,
+      subtotal,
+      discount: boundedDiscount,
+      shippingFee,
+      total,
+    }
+  }
 
   try {
     const preference = await createCheckoutPreference({

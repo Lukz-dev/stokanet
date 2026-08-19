@@ -1,8 +1,65 @@
 'use server'
 
 import prisma from '@/lib/prisma'
+import { Prisma } from '@prisma/client'
 import { getActiveCompanyId } from '@/lib/access'
 import { revalidatePath } from 'next/cache'
+import { finalizeStorefrontOrderFromPayment } from '@/lib/storefront'
+
+export type StoreOrderEditInput = {
+  customerName?: string
+  customerEmail?: string
+  customerPhone?: string
+  notes?: string
+  shippingAddress?: Record<string, string>
+}
+
+export async function approveStoreOrder(orderId: string) {
+  const companyId = await getActiveCompanyId()
+  const order = await prisma.storeOrder.findFirst({ where: { id: orderId, companyId }, select: { id: true, code: true, status: true } })
+  if (!order) throw new Error('Pedido não encontrado.')
+  if (order.status === 'APPROVED') return
+  if (order.status === 'CANCELLED') throw new Error('Pedido cancelado não pode ser aprovado.')
+
+  await finalizeStorefrontOrderFromPayment({
+    id: `manual-${order.id}`,
+    status: 'approved',
+    external_reference: order.code,
+    payment_type_id: 'manual',
+    date_approved: new Date().toISOString(),
+  }, order.code)
+  revalidatePath('/loja/pedidos')
+  revalidatePath('/estoque')
+  revalidatePath('/vendas')
+}
+
+export async function cancelStoreOrder(orderId: string) {
+  const companyId = await getActiveCompanyId()
+  const result = await prisma.storeOrder.updateMany({
+    where: { id: orderId, companyId, status: { not: 'APPROVED' } },
+    data: { status: 'CANCELLED', mercadopagoStatus: 'cancelled' },
+  })
+  if (!result.count) throw new Error('Pedido não encontrado ou já aprovado.')
+  revalidatePath('/loja/pedidos')
+}
+
+export async function editStoreOrder(orderId: string, input: StoreOrderEditInput) {
+  const companyId = await getActiveCompanyId()
+  const order = await prisma.storeOrder.findFirst({ where: { id: orderId, companyId }, select: { id: true, deliveryMethod: true } })
+  if (!order) throw new Error('Pedido não encontrado.')
+
+  await prisma.storeOrder.update({
+    where: { id: order.id },
+    data: {
+      customerName: input.customerName?.trim() || null,
+      customerEmail: input.customerEmail?.trim() || null,
+      customerPhone: input.customerPhone?.trim() || null,
+      notes: input.notes?.trim() || null,
+      shippingAddress: order.deliveryMethod === 'DELIVERY' && input.shippingAddress ? input.shippingAddress : Prisma.JsonNull,
+    },
+  })
+  revalidatePath('/loja/pedidos')
+}
 
 export async function setStoreProductPublished(productId: string, published: boolean) {
   const companyId = await getActiveCompanyId()

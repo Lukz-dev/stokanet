@@ -7,6 +7,32 @@ import { Settings, PackagePlus, RotateCw, Store, ArrowRight, Webhook, Palette, C
 import { testNotificationWebhook, updateCompanyPreferences, updateThemePreference } from '@/lib/actions'
 import { THEME_ATTRIBUTE_MAP, type ThemePreference } from '@/lib/theme'
 
+function readAndResizeImage(file: File, maxWidth: number, maxHeight: number) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => {
+      const image = new Image()
+      image.onload = () => {
+        const scale = Math.min(1, maxWidth / image.width, maxHeight / image.height)
+        const canvas = document.createElement('canvas')
+        canvas.width = Math.max(1, Math.round(image.width * scale))
+        canvas.height = Math.max(1, Math.round(image.height * scale))
+        const context = canvas.getContext('2d')
+        if (!context) {
+          reject(new Error('Não foi possível processar a imagem.'))
+          return
+        }
+        context.drawImage(image, 0, 0, canvas.width, canvas.height)
+        resolve(canvas.toDataURL('image/jpeg', 0.82))
+      }
+      image.onerror = () => reject(new Error('Não foi possível abrir a imagem.'))
+      image.src = String(reader.result)
+    }
+    reader.onerror = () => reject(new Error('Não foi possível ler a imagem.'))
+    reader.readAsDataURL(file)
+  })
+}
+
 const THEME_COLOR_PRESETS: Record<ThemePreference, { primary: string; secondary: string }> = {
   SUNSET: { primary: '#e0a15f', secondary: '#cf6f7a' },
   OCEAN: { primary: '#3f8fbf', secondary: '#61add9' },
@@ -159,6 +185,24 @@ export function SettingsClient({
         setError(currentError.message || 'Não foi possível salvar as configurações.')
       }
     })
+  }
+
+  const handleStoreImageChange = async (field: 'storeBannerUrl' | 'storeLogoUrl', file: File | undefined) => {
+    if (!file) return
+    if (!file.type.startsWith('image/')) {
+      setError('Selecione um arquivo de imagem válido.')
+      return
+    }
+
+    setError('')
+    setSuccess('')
+    try {
+      const image = await readAndResizeImage(file, field === 'storeBannerUrl' ? 1800 : 700, field === 'storeBannerUrl' ? 900 : 700)
+      setForm((current) => ({ ...current, [field]: image }))
+      setSuccess(`${field === 'storeBannerUrl' ? 'Banner' : 'Logo'} carregado. Clique em Salvar configurações para publicar.`)
+    } catch (currentError) {
+      setError(currentError instanceof Error ? currentError.message : 'Não foi possível carregar a imagem.')
+    }
   }
 
   const disconnectMercadoPago = async () => {
@@ -447,24 +491,18 @@ export function SettingsClient({
 
               <label className="flex flex-col gap-2 md:col-span-2">
                 <span className="text-sm font-medium">Banner da loja</span>
-                <input
-                  type="url"
-                  value={form.storeBannerUrl}
-                  onChange={(event) => setForm((prev) => ({ ...prev, storeBannerUrl: event.target.value }))}
-                  placeholder="https://..."
-                  className="w-full rounded-lg border border-border bg-background px-4 py-2.5 text-sm outline-none focus:border-primary/60 focus:ring-2 focus:ring-primary/20"
-                />
+                <span className="flex flex-wrap items-center gap-3">
+                  <input type="file" accept="image/*" onChange={(event) => { void handleStoreImageChange('storeBannerUrl', event.target.files?.[0]); event.currentTarget.value = '' }} className="block w-full rounded-lg border border-border bg-background px-3 py-2 text-sm file:mr-3 file:rounded-md file:border-0 file:bg-primary file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-primary-foreground" />
+                </span>
+                {form.storeBannerUrl && <img src={form.storeBannerUrl} alt="Prévia do banner da loja" className="h-28 w-full rounded-lg border border-border object-cover" />}
+                <span className="text-xs text-muted-foreground">Escolha uma foto do computador. Ela será ajustada automaticamente.</span>
               </label>
 
               <label className="flex flex-col gap-2 md:col-span-2">
                 <span className="text-sm font-medium">Logo da loja</span>
-                <input
-                  type="url"
-                  value={form.storeLogoUrl}
-                  onChange={(event) => setForm((prev) => ({ ...prev, storeLogoUrl: event.target.value }))}
-                  placeholder="https://..."
-                  className="w-full rounded-lg border border-border bg-background px-4 py-2.5 text-sm outline-none focus:border-primary/60 focus:ring-2 focus:ring-primary/20"
-                />
+                <input type="file" accept="image/*" onChange={(event) => { void handleStoreImageChange('storeLogoUrl', event.target.files?.[0]); event.currentTarget.value = '' }} className="block w-full rounded-lg border border-border bg-background px-3 py-2 text-sm file:mr-3 file:rounded-md file:border-0 file:bg-primary file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-primary-foreground" />
+                {form.storeLogoUrl && <img src={form.storeLogoUrl} alt="Prévia da logo da loja" className="h-24 w-24 rounded-lg border border-border object-cover" />}
+                <span className="text-xs text-muted-foreground">Escolha uma foto do computador. Ela será ajustada automaticamente.</span>
               </label>
 
               <label className="flex flex-col gap-2 md:col-span-2">

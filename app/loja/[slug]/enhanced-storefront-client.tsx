@@ -1,6 +1,6 @@
 'use client'
 
-import { type CSSProperties, useMemo, useState } from 'react'
+import { type CSSProperties, useEffect, useMemo, useState } from 'react'
 import Image from 'next/image'
 import { useSearchParams } from 'next/navigation'
 import { BadgeCheck, Link2, Loader2, MessageCircle, Minus, Plus, ShoppingBag, Store, Ticket, Truck, X, Search, Filter, ChevronDown } from 'lucide-react'
@@ -151,6 +151,8 @@ export function EnhancedStorefrontClient({ storefront }: { storefront: Storefron
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
   const [sortBy, setSortBy] = useState<SortOption>('newest')
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null)
+  const [cartPulse, setCartPulse] = useState(false)
+  const [lastAddedProduct, setLastAddedProduct] = useState('')
   const checkoutStatus = searchParams.get('status')
   const checkoutOrderCode = searchParams.get('order')
   const showCheckoutResult = ['success', 'pending', 'failure'].includes(checkoutStatus ?? '')
@@ -200,6 +202,12 @@ export function EnhancedStorefrontClient({ storefront }: { storefront: Storefron
   const cartTotal = subtotal + cartShippingFee
   const whatsappUrl = formatPhoneLink(storefront.storeWhatsappNumber)
 
+  useEffect(() => {
+    if (!cartPulse) return
+    const timeout = window.setTimeout(() => setCartPulse(false), 650)
+    return () => window.clearTimeout(timeout)
+  }, [cartPulse])
+
   const filteredAndSortedProducts = useMemo(() => {
     let filtered = storefront.products
 
@@ -239,6 +247,9 @@ export function EnhancedStorefrontClient({ storefront }: { storefront: Storefron
   const addToCart = (product: StoreProduct) => {
     if (product.stockQty <= 0) return
     setCart((current) => ({ ...current, [product.id]: Math.min(product.stockQty, (current[product.id] ?? 0) + 1) }))
+    setLastAddedProduct(product.name)
+    setCartPulse(false)
+    window.requestAnimationFrame(() => setCartPulse(true))
   }
 
   const updateQuantity = (product: StoreProduct, nextQuantity: number) => {
@@ -303,6 +314,27 @@ export function EnhancedStorefrontClient({ storefront }: { storefront: Storefron
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.15),transparent_40%),linear-gradient(to_bottom,rgba(15,23,42,0.12),rgba(2,6,23,0.92))]" />
 
       <main className="relative mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+        <header className="sticky top-3 z-40 mb-6 flex items-center justify-between gap-3 rounded-2xl border border-white/15 bg-slate-950/80 px-3 py-3 shadow-2xl shadow-black/20 backdrop-blur-xl sm:px-4">
+          <a href="#topo" className="flex min-w-0 items-center gap-3">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-white/15 bg-white/10">
+              {storefront.storeLogoUrl ? <Image src={storefront.storeLogoUrl} alt="" width={40} height={40} unoptimized className="h-full w-full object-cover" /> : <Store className="h-5 w-5" />}
+            </span>
+            <span className="min-w-0">
+              <span className="block truncate text-sm font-semibold">{storefront.storeName}</span>
+              <span className="hidden text-xs text-white/55 sm:block">{storefront.storeShowShippingInfo ? 'Entrega e retirada disponíveis' : 'Loja online'}</span>
+            </span>
+          </a>
+          <div className="flex items-center gap-2">
+            <span className="hidden rounded-full border border-white/10 bg-white/5 px-3 py-2 text-xs text-white/65 md:inline-flex">
+              {cartItems.length ? `${cartItems.length} item${cartItems.length === 1 ? '' : 's'} no carrinho` : 'Carrinho vazio'}
+            </span>
+            <a href="#carrinho" className={clsx('inline-flex items-center gap-2 rounded-xl bg-white px-3 py-2 text-sm font-semibold text-slate-950 transition', cartPulse && 'animate-bounce ring-4 ring-white/30')}>
+              <ShoppingBag className="h-4 w-4" />
+              <span>{formatCurrency(cartTotal)}</span>
+            </a>
+          </div>
+        </header>
+        <div id="topo" />
         {showCheckoutResult && (
           <section className={clsx(
             'relative z-10 mb-6 rounded-3xl border p-5 shadow-xl backdrop-blur-xl',
@@ -393,8 +425,11 @@ export function EnhancedStorefrontClient({ storefront }: { storefront: Storefron
               </div>
             </div>
 
-            <aside className="border-t border-white/10 bg-slate-950/65 p-6 sm:p-8 lg:border-l lg:border-t-0">
+            <aside id="carrinho" className="border-t border-white/10 bg-slate-950/65 p-6 sm:p-8 lg:border-l lg:border-t-0">
               <h2 className="text-xl font-semibold">Carrinho</h2>
+              <div aria-live="polite" className={clsx('mt-3 min-h-5 text-xs text-emerald-300 transition-opacity', lastAddedProduct ? 'opacity-100' : 'opacity-0')}>
+                {lastAddedProduct ? `${lastAddedProduct} adicionado ao carrinho` : ' '}
+              </div>
               <div className="mt-4 space-y-3 max-h-[300px] overflow-y-auto">
                 {cartItems.length === 0 ? (
                   <div className="rounded-2xl border border-dashed border-white/10 bg-white/5 p-5 text-sm text-white/55">Adicione produtos para iniciar o checkout.</div>

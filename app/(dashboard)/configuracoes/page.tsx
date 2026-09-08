@@ -40,7 +40,9 @@ export default async function ConfiguracoesPage() {
     storeShowSocialLinks: boolean | null
     storeShowShippingInfo: boolean | null
     storeBannerUrl: string | null
+    storeBannerUrls: unknown
     storeLogoUrl: string | null
+    storeLayout: unknown
     storeTheme: string | null
     storeActive: boolean
     mercadopagoRefreshToken: string | null
@@ -79,7 +81,9 @@ export default async function ConfiguracoesPage() {
       storeShowSocialLinks={currentCompany.storeShowSocialLinks ?? true}
       storeShowShippingInfo={currentCompany.storeShowShippingInfo ?? true}
       storeBannerUrl={currentCompany.storeBannerUrl ?? ''}
+      storeBannerUrls={Array.isArray(currentCompany.storeBannerUrls) ? currentCompany.storeBannerUrls.filter((item): item is string => typeof item === 'string') : []}
       storeLogoUrl={currentCompany.storeLogoUrl ?? ''}
+      storeLayout={currentCompany.storeLayout && typeof currentCompany.storeLayout === 'object' && !Array.isArray(currentCompany.storeLayout) ? currentCompany.storeLayout as Record<string, unknown> : {}}
       storeTheme={storeTheme}
       storeActive={currentCompany.storeActive}
       mercadopagoConnected={Boolean(currentCompany.mercadopagoRefreshToken && currentCompany.mercadopagoConnectedAt)}

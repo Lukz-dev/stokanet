@@ -41,6 +41,22 @@ function normalizeTheme(value: string | null | undefined) {
   return 'ocean'
 }
 
+  function normalizeStoreLayout(value: unknown) {
+    const layout = value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {}
+    const validColumns = [2, 3, 4]
+    const productColumns = Number(layout.productColumns)
+
+    return {
+      logoPosition: layout.logoPosition === 'center' || layout.logoPosition === 'right' ? layout.logoPosition : 'left',
+      bannerStyle: layout.bannerStyle === 'compact' || layout.bannerStyle === 'split' ? layout.bannerStyle : 'hero',
+      bannerCarousel: layout.bannerCarousel !== false,
+      cartPosition: layout.cartPosition === 'left' ? 'left' : 'right',
+      productColumns: validColumns.includes(productColumns) ? productColumns : 3,
+      productCardStyle: layout.productCardStyle === 'minimal' || layout.productCardStyle === 'bordered' ? layout.productCardStyle : 'standard',
+      showCategories: layout.showCategories !== false,
+    }
+  }
+
 function formatStoreCode(prefix: string) {
   const randomPart = Math.random().toString(36).slice(2, 8).toUpperCase()
   return `${prefix}-${Date.now().toString().slice(-8)}-${randomPart}`
@@ -172,7 +188,9 @@ export async function getStorefrontBySlug(slug: string) {
       storeShowSocialLinks: true,
       storeShowShippingInfo: true,
       storeBannerUrl: true,
+      storeBannerUrls: true,
       storeLogoUrl: true,
+      storeLayout: true,
       storeTheme: true,
       storeActive: true,
       products: {
@@ -224,7 +242,11 @@ export async function getStorefrontBySlug(slug: string) {
     storeShowSocialLinks: company.storeShowSocialLinks,
     storeShowShippingInfo: company.storeShowShippingInfo,
     storeBannerUrl: company.storeBannerUrl,
+    storeBannerUrls: Array.isArray(company.storeBannerUrls) && company.storeBannerUrls.length > 0
+      ? company.storeBannerUrls.filter((item): item is string => typeof item === 'string')
+      : company.storeBannerUrl ? [company.storeBannerUrl] : [],
     storeLogoUrl: company.storeLogoUrl,
+    storeLayout: normalizeStoreLayout(company.storeLayout),
     storeTheme: normalizeTheme(company.storeTheme),
     products: company.products,
   }

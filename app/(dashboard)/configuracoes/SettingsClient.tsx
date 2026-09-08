@@ -64,7 +64,9 @@ interface Props {
   storeShowSocialLinks: boolean
   storeShowShippingInfo: boolean
   storeBannerUrl: string
+  storeBannerUrls: string[]
   storeLogoUrl: string
+  storeLayout: Record<string, unknown>
   storeTheme: ThemePreference
   storeActive: boolean
   mercadopagoConnected: boolean
@@ -95,7 +97,9 @@ export function SettingsClient({
   storeShowSocialLinks,
   storeShowShippingInfo,
   storeBannerUrl,
+  storeBannerUrls,
   storeLogoUrl,
+  storeLayout,
   storeTheme,
   storeActive,
   mercadopagoConnected,
@@ -132,7 +136,17 @@ export function SettingsClient({
     storeShowSocialLinks,
     storeShowShippingInfo,
     storeBannerUrl,
+    storeBannerUrls: Array.from(new Set([...storeBannerUrls, ...(storeBannerUrl ? [storeBannerUrl] : [])])),
     storeLogoUrl,
+    storeLayout: {
+      logoPosition: typeof storeLayout.logoPosition === 'string' ? storeLayout.logoPosition : 'left',
+      bannerStyle: typeof storeLayout.bannerStyle === 'string' ? storeLayout.bannerStyle : 'hero',
+      bannerCarousel: storeLayout.bannerCarousel !== false,
+      cartPosition: typeof storeLayout.cartPosition === 'string' ? storeLayout.cartPosition : 'right',
+      productColumns: Number(storeLayout.productColumns) || 3,
+      productCardStyle: typeof storeLayout.productCardStyle === 'string' ? storeLayout.productCardStyle : 'standard',
+      showCategories: storeLayout.showCategories !== false,
+    },
     storeTheme,
     storeActive: Boolean(storeActive),
   })
@@ -175,7 +189,9 @@ export function SettingsClient({
           storeShowSocialLinks: form.storeShowSocialLinks,
           storeShowShippingInfo: form.storeShowShippingInfo,
           storeBannerUrl: form.storeBannerUrl,
+          storeBannerUrls: form.storeBannerUrls,
           storeLogoUrl: form.storeLogoUrl,
+          storeLayout: form.storeLayout,
           storeTheme: form.storeTheme,
           storeActive: form.storeActive,
         } as Parameters<typeof updateCompanyPreferences>[0])
@@ -202,6 +218,24 @@ export function SettingsClient({
       setSuccess(`${field === 'storeBannerUrl' ? 'Banner' : 'Logo'} carregado. Clique em Salvar configurações para publicar.`)
     } catch (currentError) {
       setError(currentError instanceof Error ? currentError.message : 'Não foi possível carregar a imagem.')
+    }
+  }
+
+  const handleBannerGalleryChange = async (files: FileList | null) => {
+    if (!files?.length) return
+    const selectedFiles = Array.from(files).filter((file) => file.type.startsWith('image/')).slice(0, 8)
+    if (selectedFiles.length !== files.length) {
+      setError('Selecione somente arquivos de imagem.')
+      return
+    }
+    setError('')
+    setSuccess('')
+    try {
+      const images = await Promise.all(selectedFiles.map((file) => readAndResizeImage(file, 1800, 900)))
+      setForm((current) => ({ ...current, storeBannerUrls: Array.from(new Set([...current.storeBannerUrls, ...images])).slice(0, 8), storeBannerUrl: images[0] ?? current.storeBannerUrl }))
+      setSuccess('Banners carregados. Clique em Salvar configurações para publicar.')
+    } catch (currentError) {
+      setError(currentError instanceof Error ? currentError.message : 'Não foi possível carregar os banners.')
     }
   }
 
@@ -491,11 +525,11 @@ export function SettingsClient({
 
               <label className="flex flex-col gap-2 md:col-span-2">
                 <span className="text-sm font-medium">Banner da loja</span>
-                <span className="flex flex-wrap items-center gap-3">
-                  <input type="file" accept="image/*" onChange={(event) => { void handleStoreImageChange('storeBannerUrl', event.target.files?.[0]); event.currentTarget.value = '' }} className="block w-full rounded-lg border border-border bg-background px-3 py-2 text-sm file:mr-3 file:rounded-md file:border-0 file:bg-primary file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-primary-foreground" />
-                </span>
-                {form.storeBannerUrl && <img src={form.storeBannerUrl} alt="Prévia do banner da loja" className="h-28 w-full rounded-lg border border-border object-cover" />}
-                <span className="text-xs text-muted-foreground">Escolha uma foto do computador. Ela será ajustada automaticamente.</span>
+                <input type="file" accept="image/*" multiple onChange={(event) => { void handleBannerGalleryChange(event.target.files); event.currentTarget.value = '' }} className="block w-full rounded-lg border border-border bg-background px-3 py-2 text-sm file:mr-3 file:rounded-md file:border-0 file:bg-primary file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-primary-foreground" />
+                <div className="grid grid-cols-4 gap-2">
+                  {form.storeBannerUrls.map((image, index) => <div key={`${image.slice(0, 30)}-${index}`} className="relative aspect-video overflow-hidden rounded-lg border border-border"><img src={image} alt={`Banner ${index + 1}`} className="h-full w-full object-cover" /><button type="button" onClick={() => setForm((current) => ({ ...current, storeBannerUrls: current.storeBannerUrls.filter((_, itemIndex) => itemIndex !== index), storeBannerUrl: current.storeBannerUrls.filter((_, itemIndex) => itemIndex !== index)[0] ?? '' }))} className="absolute right-1 top-1 rounded bg-black/65 px-1.5 py-1 text-xs text-white">×</button></div>)}
+                </div>
+                <span className="text-xs text-muted-foreground">Selecione até 8 fotos para criar um banner único ou um carrossel.</span>
               </label>
 
               <label className="flex flex-col gap-2 md:col-span-2">
@@ -643,6 +677,15 @@ export function SettingsClient({
                   <option value="ROSE">Rose</option>
                 </select>
               </label>
+
+              <div className="grid gap-3 rounded-xl border border-border bg-background p-4 md:grid-cols-2">
+                <label className="flex flex-col gap-2"><span className="text-sm font-semibold">Logo</span><select value={form.storeLayout.logoPosition} onChange={(event) => setForm((prev) => ({ ...prev, storeLayout: { ...prev.storeLayout, logoPosition: event.target.value } }))} className="rounded-lg border border-border bg-card px-3 py-2 text-sm"><option value="left">Esquerda</option><option value="center">Centro</option><option value="right">Direita</option></select></label>
+                <label className="flex flex-col gap-2"><span className="text-sm font-semibold">Carrinho no topo</span><select value={form.storeLayout.cartPosition} onChange={(event) => setForm((prev) => ({ ...prev, storeLayout: { ...prev.storeLayout, cartPosition: event.target.value } }))} className="rounded-lg border border-border bg-card px-3 py-2 text-sm"><option value="left">Esquerda</option><option value="right">Direita</option></select></label>
+                <label className="flex flex-col gap-2"><span className="text-sm font-semibold">Banner</span><select value={form.storeLayout.bannerStyle} onChange={(event) => setForm((prev) => ({ ...prev, storeLayout: { ...prev.storeLayout, bannerStyle: event.target.value } }))} className="rounded-lg border border-border bg-card px-3 py-2 text-sm"><option value="hero">Hero amplo</option><option value="compact">Compacto</option><option value="split">Dividido</option></select></label>
+                <label className="flex flex-col gap-2"><span className="text-sm font-semibold">Grade de produtos</span><select value={form.storeLayout.productColumns} onChange={(event) => setForm((prev) => ({ ...prev, storeLayout: { ...prev.storeLayout, productColumns: Number(event.target.value) } }))} className="rounded-lg border border-border bg-card px-3 py-2 text-sm"><option value="2">2 colunas</option><option value="3">3 colunas</option><option value="4">4 colunas</option></select></label>
+                <label className="flex items-center justify-between gap-3 rounded-lg border border-border px-3 py-2 text-sm md:col-span-2"><span><strong>Carrossel automático</strong><small className="block text-xs text-muted-foreground">Alterna banners a cada 5 segundos</small></span><input type="checkbox" checked={form.storeLayout.bannerCarousel} onChange={(event) => setForm((prev) => ({ ...prev, storeLayout: { ...prev.storeLayout, bannerCarousel: event.target.checked } }))} className="h-4 w-4" /></label>
+                <label className="flex items-center justify-between gap-3 rounded-lg border border-border px-3 py-2 text-sm md:col-span-2"><span><strong>Exibir categorias</strong><small className="block text-xs text-muted-foreground">Mostra filtros de categoria na vitrine</small></span><input type="checkbox" checked={form.storeLayout.showCategories} onChange={(event) => setForm((prev) => ({ ...prev, storeLayout: { ...prev.storeLayout, showCategories: event.target.checked } }))} className="h-4 w-4" /></label>
+              </div>
 
               <label className="flex items-center justify-between gap-4 rounded-xl border border-border bg-background px-4 py-3">
                 <div>

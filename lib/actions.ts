@@ -1389,7 +1389,9 @@ export async function updateCompanyPreferences(data: {
   storeShowSocialLinks?: boolean
   storeShowShippingInfo?: boolean
   storeBannerUrl?: string
+  storeBannerUrls?: string[]
   storeLogoUrl?: string
+  storeLayout?: Record<string, unknown>
   storeTheme?: string
   storeActive?: boolean
   mercadopagoAccessToken?: string
@@ -1430,7 +1432,9 @@ export async function updateCompanyPreferences(data: {
       ...(Object.prototype.hasOwnProperty.call(data, 'storeShowSocialLinks') ? { storeShowSocialLinks: Boolean(data.storeShowSocialLinks) } : {}),
       ...(Object.prototype.hasOwnProperty.call(data, 'storeShowShippingInfo') ? { storeShowShippingInfo: Boolean(data.storeShowShippingInfo) } : {}),
       ...(Object.prototype.hasOwnProperty.call(data, 'storeBannerUrl') ? { storeBannerUrl: data.storeBannerUrl?.trim() || null } : {}),
+      ...(Object.prototype.hasOwnProperty.call(data, 'storeBannerUrls') ? { storeBannerUrls: data.storeBannerUrls?.filter(Boolean).slice(0, 8) ?? [] } : {}),
       ...(Object.prototype.hasOwnProperty.call(data, 'storeLogoUrl') ? { storeLogoUrl: data.storeLogoUrl?.trim() || null } : {}),
+      ...(Object.prototype.hasOwnProperty.call(data, 'storeLayout') ? { storeLayout: data.storeLayout as Prisma.InputJsonValue } : {}),
       ...(Object.prototype.hasOwnProperty.call(data, 'storeTheme') ? { storeTheme: data.storeTheme?.trim() || 'ocean' } : {}),
       ...(Object.prototype.hasOwnProperty.call(data, 'storeActive') ? { storeActive: Boolean(data.storeActive) } : {}),
       ...(Object.prototype.hasOwnProperty.call(data, 'mercadopagoAccessToken')

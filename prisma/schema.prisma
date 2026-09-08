@@ -143,7 +143,9 @@ model Company {
   storeShowSocialLinks Boolean @default(true)
   storeShowShippingInfo Boolean @default(true)
   storeBannerUrl String?
+  storeBannerUrls Json?
   storeLogoUrl String?
+  storeLayout Json?
   storeTheme  String      @default("ocean")
   storeActive Boolean     @default(true)
   mercadopagoAccessToken String?

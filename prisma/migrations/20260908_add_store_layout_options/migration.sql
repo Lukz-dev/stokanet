@@ -1,0 +1,3 @@
+ALTER TABLE "Company"
+  ADD COLUMN IF NOT EXISTS "storeBannerUrls" JSONB,
+  ADD COLUMN IF NOT EXISTS "storeLayout" JSONB;

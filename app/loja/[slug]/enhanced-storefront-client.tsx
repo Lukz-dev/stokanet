@@ -53,7 +53,17 @@ type Storefront = {
   storeShowSocialLinks: boolean
   storeShowShippingInfo: boolean
   storeBannerUrl: string | null
+  storeBannerUrls: string[]
   storeLogoUrl: string | null
+  storeLayout: {
+    logoPosition: string
+    bannerStyle: string
+    bannerCarousel: boolean
+    cartPosition: string
+    productColumns: number
+    productCardStyle: string
+    showCategories: boolean
+  }
   storeTheme: string
   products: StoreProduct[]
 }
@@ -155,6 +165,7 @@ export function EnhancedStorefrontClient({ storefront }: { storefront: Storefron
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null)
   const [cartPulse, setCartPulse] = useState(false)
   const [lastAddedProduct, setLastAddedProduct] = useState('')
+  const [activeBanner, setActiveBanner] = useState(0)
   const checkoutStatus = searchParams.get('status')
   const checkoutOrderCode = searchParams.get('order')
   const showCheckoutResult = ['success', 'pending', 'failure'].includes(checkoutStatus ?? '')
@@ -211,6 +222,17 @@ export function EnhancedStorefrontClient({ storefront }: { storefront: Storefron
     const timeout = window.setTimeout(() => setCartPulse(false), 650)
     return () => window.clearTimeout(timeout)
   }, [cartPulse])
+
+  useEffect(() => {
+    if (!storefront.storeLayout.bannerCarousel || storefront.storeBannerUrls.length < 2) return
+    const interval = window.setInterval(() => setActiveBanner((current) => (current + 1) % storefront.storeBannerUrls.length), 5000)
+    return () => window.clearInterval(interval)
+  }, [storefront.storeBannerUrls.length, storefront.storeLayout.bannerCarousel])
+
+  const bannerImages = storefront.storeBannerUrls.length > 0 ? storefront.storeBannerUrls : (storefront.storeBannerUrl ? [storefront.storeBannerUrl] : [])
+  const logoPositionClass = storefront.storeLayout.logoPosition === 'center' ? 'justify-center' : storefront.storeLayout.logoPosition === 'right' ? 'justify-end' : 'justify-start'
+  const cartPositionClass = storefront.storeLayout.cartPosition === 'left' ? 'lg:order-first' : 'lg:order-last'
+  const productGridClass = storefront.storeLayout.productColumns === 2 ? 'xl:grid-cols-2' : storefront.storeLayout.productColumns === 4 ? 'xl:grid-cols-4' : 'xl:grid-cols-3'
 
   const filteredAndSortedProducts = useMemo(() => {
     let filtered = storefront.products
@@ -327,7 +349,7 @@ export function EnhancedStorefrontClient({ storefront }: { storefront: Storefron
 
       <main className="relative mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
         <header className="sticky top-3 z-40 mb-6 flex items-center justify-between gap-3 rounded-2xl border border-white/15 bg-slate-950/80 px-3 py-3 shadow-2xl shadow-black/20 backdrop-blur-xl sm:px-4">
-          <a href="#topo" className="flex min-w-0 items-center gap-3">
+          <a href="#topo" className={clsx('flex min-w-0 items-center gap-3', logoPositionClass)}>
             <span className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-white/15 bg-white/10">
               {storefront.storeLogoUrl ? <Image src={storefront.storeLogoUrl} alt="" width={40} height={40} unoptimized className="h-full w-full object-cover" /> : <Store className="h-5 w-5" />}
             </span>
@@ -336,7 +358,7 @@ export function EnhancedStorefrontClient({ storefront }: { storefront: Storefron
               <span className="hidden text-xs text-white/55 sm:block">{storefront.storeShowShippingInfo ? 'Entrega e retirada disponíveis' : 'Loja online'}</span>
             </span>
           </a>
-          <div className="flex items-center gap-2">
+          <div className={clsx('flex items-center gap-2', cartPositionClass)}>
             <span className="hidden rounded-full border border-white/10 bg-white/5 px-3 py-2 text-xs text-white/65 md:inline-flex">
               {cartItems.length ? `${cartItems.length} item${cartItems.length === 1 ? '' : 's'} no carrinho` : 'Carrinho vazio'}
             </span>
@@ -368,11 +390,11 @@ export function EnhancedStorefrontClient({ storefront }: { storefront: Storefron
             {checkoutStatus !== 'failure' && <p className="mt-3 text-sm font-medium text-white/90">Guarde o código do pedido para falar com a loja.</p>}
           </section>
         )}
-        <section className="overflow-hidden rounded-[2rem] border border-white/10 bg-white/5 shadow-2xl shadow-black/20 backdrop-blur-xl">
+        <section className={clsx('overflow-hidden rounded-[2rem] border border-white/10 bg-white/5 shadow-2xl shadow-black/20 backdrop-blur-xl', storefront.storeLayout.bannerStyle === 'compact' && 'lg:max-w-5xl lg:mx-auto')}>
           <div className="grid gap-0 lg:grid-cols-[1.3fr_0.9fr]">
             <div className="relative min-h-[20rem] p-6 sm:p-10">
-              {storefront.storeBannerUrl ? (
-                <Image src={storefront.storeBannerUrl} alt={storefront.storeName} fill className="object-cover opacity-25" unoptimized />
+              {bannerImages[activeBanner] ? (
+                <Image src={bannerImages[activeBanner]} alt={storefront.storeName} fill className={clsx('object-cover opacity-25', storefront.storeLayout.bannerStyle === 'split' && 'object-right')} unoptimized />
               ) : null}
               <div className="relative z-10 flex h-full flex-col justify-between gap-8">
                 <div className="flex items-center gap-3">
@@ -437,7 +459,7 @@ export function EnhancedStorefrontClient({ storefront }: { storefront: Storefron
               </div>
             </div>
 
-            <aside id="carrinho" className="border-t border-white/10 bg-slate-950/65 p-6 sm:p-8 lg:border-l lg:border-t-0">
+            <aside id="carrinho" className={clsx('border-t border-white/10 bg-slate-950/65 p-6 sm:p-8 lg:border-l lg:border-t-0', cartPositionClass)}>
               <h2 className="text-xl font-semibold">Carrinho</h2>
               <div aria-live="polite" className={clsx('mt-3 min-h-5 text-xs text-emerald-300 transition-opacity', lastAddedProduct ? 'opacity-100' : 'opacity-0')}>
                 {lastAddedProduct ? `${lastAddedProduct} adicionado ao carrinho` : ' '}
@@ -590,7 +612,7 @@ export function EnhancedStorefrontClient({ storefront }: { storefront: Storefron
               </div>
 
               <div className="flex gap-2">
-                {categories.length > 0 && (
+                {storefront.storeLayout.showCategories && categories.length > 0 && (
                   <div className="relative">
                     <select
                       value={selectedCategory || ''}
@@ -637,7 +659,7 @@ export function EnhancedStorefrontClient({ storefront }: { storefront: Storefron
             </p>
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          <div className={clsx('grid gap-4 sm:grid-cols-2', productGridClass)}>
             {filteredAndSortedProducts.map((product) => {
               const isSoldOut = product.stockQty <= 0
               const firstImage = product.images[0]?.imageUrl

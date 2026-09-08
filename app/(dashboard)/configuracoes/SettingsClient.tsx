@@ -630,6 +630,20 @@ export function SettingsClient({
             </div>
 
             <div className="space-y-3">
+              <label className="flex flex-col gap-2 rounded-xl border border-border bg-background px-4 py-3">
+                <span className="text-sm font-semibold">Tema da vitrine</span>
+                <select
+                  value={form.storeTheme}
+                  onChange={(event) => setForm((prev) => ({ ...prev, storeTheme: event.target.value as ThemePreference }))}
+                  className="rounded-lg border border-border bg-card px-3 py-2 text-sm outline-none focus:border-primary/60 focus:ring-2 focus:ring-primary/20"
+                >
+                  <option value="OCEAN">Ocean</option>
+                  <option value="SUNSET">Sunset</option>
+                  <option value="FOREST">Forest</option>
+                  <option value="ROSE">Rose</option>
+                </select>
+              </label>
+
               <label className="flex items-center justify-between gap-4 rounded-xl border border-border bg-background px-4 py-3">
                 <div>
                   <p className="text-sm font-semibold">Exibir contatos e redes sociais</p>
@@ -701,6 +715,50 @@ export function SettingsClient({
         </div>
 
         <aside className="space-y-6">
+          <section className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
+            <div className="flex items-center justify-between gap-3 border-b border-border p-5">
+              <div>
+                <h2 className="text-lg font-semibold">Prévia da vitrine</h2>
+                <p className="text-xs text-muted-foreground">Atualiza enquanto você edita</p>
+              </div>
+              <Store className="h-5 w-5 text-primary" />
+            </div>
+            <div className="bg-slate-950 p-3">
+              <div className="overflow-hidden rounded-xl border border-white/10 bg-slate-900 text-white shadow-xl">
+                <div className="flex items-center justify-between gap-2 border-b border-white/10 px-3 py-2">
+                  <div className="flex min-w-0 items-center gap-2">
+                    {form.storeLogoUrl ? <img src={form.storeLogoUrl} alt="" className="h-7 w-7 rounded-lg object-cover" /> : <span className="h-7 w-7 rounded-lg bg-white/10" />}
+                    <span className="truncate text-xs font-semibold">{form.storeName || companyName}</span>
+                  </div>
+                  <span className="shrink-0 rounded-lg px-2 py-1 text-[10px] font-bold" style={{ backgroundColor: form.storePrimaryColor || storeThemePreset.primary }}>Carrinho</span>
+                </div>
+                <div className="relative min-h-36 overflow-hidden p-4" style={{ background: `linear-gradient(135deg, ${form.storePrimaryColor || storeThemePreset.primary}, ${form.storeSecondaryColor || storeThemePreset.secondary})` }}>
+                  {form.storeBannerUrl && <img src={form.storeBannerUrl} alt="" className="absolute inset-0 h-full w-full object-cover opacity-25" />}
+                  <div className="relative max-w-[85%]">
+                    <p className="text-[9px] uppercase tracking-[0.2em] text-white/70">Loja online</p>
+                    <p className="mt-2 text-xl font-bold leading-tight">{form.storeHeroTitle || form.storeName || companyName}</p>
+                    <p className="mt-2 line-clamp-2 text-[10px] leading-4 text-white/80">{form.storeHeroSubtitle || form.storeDescription || 'Produtos escolhidos para você.'}</p>
+                    <span className="mt-3 inline-flex rounded-lg bg-white px-2.5 py-1.5 text-[10px] font-bold text-slate-900">{form.storePrimaryButtonLabel || 'Comprar agora'}</span>
+                  </div>
+                </div>
+                <div className="p-3">
+                  <div className="mb-3 flex gap-1.5 overflow-hidden">
+                    {['Destaques', 'Novidades', 'Ofertas'].map((label, index) => <span key={label} className={`shrink-0 rounded-full px-2 py-1 text-[9px] ${index === 0 ? 'text-white' : 'bg-white/5 text-white/55'}`} style={index === 0 ? { backgroundColor: form.storePrimaryColor || storeThemePreset.primary } : undefined}>{label}</span>)}
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    {[1, 2].map((item) => <div key={item} className="overflow-hidden rounded-lg border border-white/10 bg-white/5"><div className="h-16 bg-white/10" /><div className="p-2"><p className="truncate text-[10px] font-medium">Produto em destaque</p><p className="mt-1 text-xs font-bold">R$ 49,90</p></div></div>)}
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="border-t border-border p-4">
+              <Link href={form.storeSlug ? `/loja/${form.storeSlug}` : '/loja'} target="_blank" className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground hover:bg-primary/90">
+                Abrir loja pública
+                <ArrowRight className="h-4 w-4" />
+              </Link>
+            </div>
+          </section>
+
           <section className="bg-card border border-border rounded-2xl shadow-sm p-6">
             <h2 className="text-lg font-semibold mb-4">Loja ativa</h2>
             <div className="space-y-3 text-sm">

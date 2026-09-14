@@ -3,7 +3,7 @@
 import { type CSSProperties, useEffect, useMemo, useState } from 'react'
 import Image from 'next/image'
 import { useSearchParams } from 'next/navigation'
-import { BadgeCheck, Link2, Loader2, MessageCircle, Minus, Plus, ShoppingBag, Store, Ticket, Truck, X, Search, Filter, ChevronDown } from 'lucide-react'
+import { BadgeCheck, Link2, Loader2, MessageCircle, Minus, Plus, ShoppingBag, ShoppingCart, Store, Ticket, Truck, X, Search, Filter, ChevronDown } from 'lucide-react'
 import clsx from 'clsx'
 import { THEME_COLOR_PRESETS, type ThemePreference } from '@/lib/theme'
 
@@ -175,6 +175,7 @@ export function EnhancedStorefrontClient({ storefront }: { storefront: Storefron
   const [cartPulse, setCartPulse] = useState(false)
   const [lastAddedProduct, setLastAddedProduct] = useState('')
   const [activeBanner, setActiveBanner] = useState(0)
+  const [cartOpen, setCartOpen] = useState(false)
   const checkoutStatus = searchParams.get('status')
   const checkoutOrderCode = searchParams.get('order')
   const showCheckoutResult = ['success', 'pending', 'failure'].includes(checkoutStatus ?? '')
@@ -237,6 +238,15 @@ export function EnhancedStorefrontClient({ storefront }: { storefront: Storefron
     const interval = window.setInterval(() => setActiveBanner((current) => (current + 1) % storefront.storeBannerUrls.length), 5000)
     return () => window.clearInterval(interval)
   }, [storefront.storeBannerUrls.length, storefront.storeLayout.bannerCarousel])
+
+  useEffect(() => {
+    if (!cartOpen) return
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setCartOpen(false)
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [cartOpen])
 
   const bannerImages = storefront.storeBannerUrls.length > 0 ? storefront.storeBannerUrls : (storefront.storeBannerUrl ? [storefront.storeBannerUrl] : [])
   const logoPositionClass = storefront.storeLayout.logoPosition === 'center' ? 'justify-center' : storefront.storeLayout.logoPosition === 'right' ? 'justify-end' : 'justify-start'
@@ -375,10 +385,10 @@ export function EnhancedStorefrontClient({ storefront }: { storefront: Storefron
             <span className="hidden rounded-full border border-white/10 bg-white/5 px-3 py-2 text-xs text-white/65 md:inline-flex">
               {cartItems.length ? `${cartItems.length} item${cartItems.length === 1 ? '' : 's'} no carrinho` : 'Carrinho vazio'}
             </span>
-            <a href="#carrinho" className={clsx('inline-flex items-center gap-2 rounded-xl bg-white px-3 py-2 text-sm font-semibold text-slate-950 transition', cartPulse && 'animate-bounce ring-4 ring-white/30')}>
-              <ShoppingBag className="h-4 w-4" />
-              <span>{formatCurrency(cartTotal)}</span>
-            </a>
+            <button type="button" aria-label="Abrir carrinho" title="Abrir carrinho" onClick={() => setCartOpen(true)} className={clsx('relative inline-flex h-10 w-10 items-center justify-center rounded-xl bg-white text-slate-950 transition', cartPulse && 'animate-bounce ring-4 ring-white/30')}>
+              <ShoppingCart className="h-5 w-5" />
+              {cartItems.length > 0 && <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-bold text-white">{cartItems.length}</span>}
+            </button>
           </div>
         </header>
         <div id="topo" />
@@ -477,7 +487,7 @@ export function EnhancedStorefrontClient({ storefront }: { storefront: Storefron
               </div>
             </div>
 
-            <aside id="carrinho" className={clsx('border-t border-white/10 bg-slate-950/65 p-6 sm:p-8 lg:border-l lg:border-t-0', cartPositionClass)}>
+            <aside id="carrinho" className="hidden">
               <h2 className="text-xl font-semibold">Carrinho</h2>
               <div aria-live="polite" className={clsx('mt-3 min-h-5 text-xs text-emerald-300 transition-opacity', lastAddedProduct ? 'opacity-100' : 'opacity-0')}>
                 {lastAddedProduct ? `${lastAddedProduct} adicionado ao carrinho` : ' '}
@@ -611,6 +621,45 @@ export function EnhancedStorefrontClient({ storefront }: { storefront: Storefron
             </aside>
           </div>
         </section>
+
+        {cartOpen && <>
+          <button type="button" aria-label="Fechar carrinho" onClick={() => setCartOpen(false)} className="fixed inset-0 z-40 cursor-default bg-black/60 backdrop-blur-sm" />
+          <aside id="carrinho-drawer" aria-label="Carrinho de compras" className="fixed inset-y-0 right-0 z-50 flex w-full max-w-md flex-col border-l border-white/15 bg-slate-950 p-5 text-white shadow-2xl shadow-black/40 sm:p-7">
+            <div className="flex items-center justify-between gap-4 border-b border-white/10 pb-4">
+              <div>
+                <p className="text-xs uppercase tracking-[0.24em] text-white/45">Sua compra</p>
+                <h2 className="mt-1 text-xl font-semibold">Carrinho</h2>
+              </div>
+              <button type="button" aria-label="Fechar carrinho" title="Fechar carrinho" onClick={() => setCartOpen(false)} className="rounded-full p-2 text-white/60 hover:bg-white/10 hover:text-white"><X className="h-5 w-5" /></button>
+            </div>
+            <div className="flex-1 overflow-y-auto pt-4">
+              <div aria-live="polite" className={clsx('min-h-5 text-xs text-emerald-300 transition-opacity', lastAddedProduct ? 'opacity-100' : 'opacity-0')}>
+                {lastAddedProduct ? `${lastAddedProduct} adicionado ao carrinho` : ' '}
+              </div>
+              <div className="mt-3 space-y-3">
+                {cartItems.length === 0 ? <div className="rounded-2xl border border-dashed border-white/10 bg-white/5 p-5 text-sm text-white/55">Adicione produtos para iniciar o checkout.</div> : cartItems.map(({ product, quantity }) => (
+                  <div key={product.id} className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                    <div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="truncate font-medium">{product.name}</p><p className="text-xs text-white/45">{product.sku}</p></div><button type="button" aria-label={`Remover ${product.name}`} onClick={() => updateQuantity(product, 0)} className="rounded-full p-1.5 text-white/45 hover:bg-white/10 hover:text-white"><X className="h-4 w-4" /></button></div>
+                    <div className="mt-3 flex items-center justify-between gap-3"><div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-slate-950/60 px-2 py-1"><button type="button" aria-label="Diminuir quantidade" onClick={() => updateQuantity(product, quantity - 1)} className="rounded-full p-1 hover:bg-white/10"><Minus className="h-3.5 w-3.5" /></button><span className="min-w-5 text-center text-sm font-semibold">{quantity}</span><button type="button" aria-label="Aumentar quantidade" onClick={() => updateQuantity(product, quantity + 1)} className="rounded-full p-1 hover:bg-white/10"><Plus className="h-3.5 w-3.5" /></button></div><span className="text-sm font-semibold">{formatCurrency(product.price * quantity)}</span></div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="mt-5 rounded-2xl border border-white/10 bg-white/5 p-4">
+                <div className="flex items-center justify-between text-sm text-white/70"><span>Subtotal</span><strong className="text-lg text-white">{formatCurrency(subtotal)}</strong></div>
+                {storefront.storeShowShippingInfo && <><div className="mt-2 flex items-center justify-between text-sm text-white/70"><span>Frete</span><strong className="text-white">{formatShippingAmount(cartShippingFee)}</strong></div><div className="mt-2 flex items-center justify-between text-sm text-white/70"><span>Total</span><strong className="text-lg text-white">{formatCurrency(cartTotal)}</strong></div></>}
+                <div className="mt-4 space-y-2"><label className="text-xs uppercase tracking-[0.24em] text-white/45">Dados do comprador</label><input value={customerName} onChange={(event) => setCustomerName(event.target.value)} placeholder="Nome" className="w-full rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3 text-sm outline-none placeholder:text-white/30" /><input value={customerEmail} onChange={(event) => setCustomerEmail(event.target.value)} placeholder="E-mail" type="email" className="w-full rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3 text-sm outline-none placeholder:text-white/30" /><input value={customerPhone} onChange={(event) => setCustomerPhone(event.target.value)} placeholder="Telefone" className="w-full rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3 text-sm outline-none placeholder:text-white/30" /></div>
+                <div className="mt-4 grid grid-cols-2 gap-2"><button type="button" onClick={() => setDeliveryMethod('DELIVERY')} className={clsx('rounded-2xl border px-3 py-2.5 text-sm font-semibold', deliveryMethod === 'DELIVERY' ? 'border-white bg-white text-slate-950' : 'border-white/10 bg-white/5 text-white/70')}>Entrega</button><button type="button" onClick={() => setDeliveryMethod('PICKUP')} className={clsx('rounded-2xl border px-3 py-2.5 text-sm font-semibold', deliveryMethod === 'PICKUP' ? 'border-white bg-white text-slate-950' : 'border-white/10 bg-white/5 text-white/70')}>Retirada</button></div>
+                {deliveryMethod === 'DELIVERY' && <div className="mt-3 space-y-2"><p className="text-xs uppercase tracking-[0.24em] text-white/45">Endereço de entrega</p><div className="grid grid-cols-[1fr_7rem] gap-2"><input value={address.street} onChange={(event) => setAddress((current) => ({ ...current, street: event.target.value }))} placeholder="Rua / avenida" className="w-full rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3 text-sm outline-none placeholder:text-white/30" /><input value={address.number} onChange={(event) => setAddress((current) => ({ ...current, number: event.target.value }))} placeholder="Número" className="w-full rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3 text-sm outline-none placeholder:text-white/30" /></div><input value={address.complement} onChange={(event) => setAddress((current) => ({ ...current, complement: event.target.value }))} placeholder="Complemento (opcional)" className="w-full rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3 text-sm outline-none placeholder:text-white/30" /><input value={address.neighborhood} onChange={(event) => setAddress((current) => ({ ...current, neighborhood: event.target.value }))} placeholder="Bairro" className="w-full rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3 text-sm outline-none placeholder:text-white/30" /><div className="grid grid-cols-[1fr_5rem] gap-2"><input value={address.city} onChange={(event) => setAddress((current) => ({ ...current, city: event.target.value }))} placeholder="Cidade" className="w-full rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3 text-sm outline-none placeholder:text-white/30" /><input value={address.state} onChange={(event) => setAddress((current) => ({ ...current, state: event.target.value.toUpperCase().slice(0, 2) }))} placeholder="UF" maxLength={2} className="w-full rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3 text-sm uppercase outline-none placeholder:text-white/30" /></div><input value={address.postalCode} onChange={(event) => setAddress((current) => ({ ...current, postalCode: event.target.value }))} placeholder="CEP" inputMode="numeric" className="w-full rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3 text-sm outline-none placeholder:text-white/30" /></div>}
+                <div className="mt-4 flex flex-wrap gap-2"><button type="button" onClick={() => setPaymentMethod('auto')} className={clsx('rounded-full px-3 py-2 text-xs font-semibold', paymentMethod === 'auto' ? 'bg-white text-slate-950' : 'bg-white/5 text-white/70')}>Automático</button><button type="button" onClick={() => setPaymentMethod('pix')} className={clsx('rounded-full px-3 py-2 text-xs font-semibold', paymentMethod === 'pix' ? 'bg-white text-slate-950' : 'bg-white/5 text-white/70')}>PIX</button><button type="button" onClick={() => setPaymentMethod('card')} className={clsx('rounded-full px-3 py-2 text-xs font-semibold', paymentMethod === 'card' ? 'bg-white text-slate-950' : 'bg-white/5 text-white/70')}>Cartão</button><button type="button" onClick={() => setPaymentMethod('cash')} className={clsx('rounded-full px-3 py-2 text-xs font-semibold', paymentMethod === 'cash' ? 'bg-white text-slate-950' : 'bg-white/5 text-white/70')}>Dinheiro</button></div>
+                {paymentMethod === 'cash' && <div className="mt-3 rounded-2xl border border-white/10 bg-white/5 p-3"><label className="text-xs uppercase tracking-[0.2em] text-white/45">Dinheiro para</label><input value={cashReceived} onChange={(event) => setCashReceived(event.target.value)} placeholder={formatCurrency(cartTotal)} inputMode="decimal" className="mt-2 w-full rounded-xl border border-white/10 bg-slate-950/60 px-4 py-3 text-sm outline-none placeholder:text-white/30" /><p className="mt-2 text-sm font-semibold text-emerald-300">{calculatedChange === null ? 'Informe um valor igual ou maior que o total.' : `Troco: ${formatCurrency(calculatedChange)}`}</p></div>}
+                {checkoutError && <p className="mt-3 rounded-2xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">{checkoutError}</p>}
+                {cashConfirmation && <div className="mt-3 rounded-2xl border border-emerald-400/30 bg-emerald-950/50 px-4 py-3 text-sm text-emerald-100"><strong>Pedido {cashConfirmation.orderCode} registrado.</strong><br />Troco: {formatCurrency(cashConfirmation.changeDue)}. Aguarde a confirmação da loja.</div>}
+                <button type="button" onClick={() => void handleCheckout()} disabled={loadingCheckout || cartItems.length === 0} className={clsx('mt-4 inline-flex w-full items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-semibold transition', loadingCheckout || cartItems.length === 0 ? 'cursor-not-allowed bg-white/10 text-white/40' : !customTheme && theme.button)} style={customTheme ? primaryButtonStyle : undefined}>{loadingCheckout ? <Loader2 className="h-4 w-4 animate-spin" /> : <Ticket className="h-4 w-4" />}{paymentMethod === 'cash' ? 'Registrar pedido em dinheiro' : 'Pagar com Mercado Pago'}</button>
+              </div>
+            </div>
+          </aside>
+        </>}
 
         <section id="catalogo" className="mt-8 space-y-6">
           <div className="space-y-4">

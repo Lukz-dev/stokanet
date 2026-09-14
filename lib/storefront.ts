@@ -41,7 +41,7 @@ function normalizeTheme(value: string | null | undefined) {
   return 'ocean'
 }
 
-  function normalizeStoreLayout(value: unknown) {
+function normalizeStoreLayout(value: unknown) {
     const layout = value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {}
     const validColumns = [2, 3, 4]
     const productColumns = Number(layout.productColumns)
@@ -50,10 +50,19 @@ function normalizeTheme(value: string | null | undefined) {
       logoPosition: layout.logoPosition === 'center' || layout.logoPosition === 'right' ? layout.logoPosition : 'left',
       bannerStyle: layout.bannerStyle === 'compact' || layout.bannerStyle === 'split' ? layout.bannerStyle : 'hero',
       bannerCarousel: layout.bannerCarousel !== false,
+      bannerHeight: layout.bannerHeight === 'short' || layout.bannerHeight === 'tall' ? layout.bannerHeight : 'medium',
+      bannerFit: layout.bannerFit === 'contain' ? 'contain' : 'cover',
+      showBannerArrows: layout.showBannerArrows !== false,
+      showBannerDots: layout.showBannerDots !== false,
       cartPosition: layout.cartPosition === 'left' ? 'left' : 'right',
+      headerStyle: layout.headerStyle === 'full' || layout.headerStyle === 'minimal' ? layout.headerStyle : 'floating',
+      contentWidth: layout.contentWidth === 'compact' || layout.contentWidth === 'wide' ? layout.contentWidth : 'standard',
       productColumns: validColumns.includes(productColumns) ? productColumns : 3,
       productCardStyle: layout.productCardStyle === 'minimal' || layout.productCardStyle === 'bordered' ? layout.productCardStyle : 'standard',
+      productGap: layout.productGap === 'tight' || layout.productGap === 'spacious' ? layout.productGap : 'normal',
       showCategories: layout.showCategories !== false,
+      showSearch: layout.showSearch !== false,
+      showSort: layout.showSort !== false,
     }
   }
 

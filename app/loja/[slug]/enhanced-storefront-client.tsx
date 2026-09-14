@@ -59,10 +59,19 @@ type Storefront = {
     logoPosition: string
     bannerStyle: string
     bannerCarousel: boolean
+    bannerHeight: string
+    bannerFit: string
+    showBannerArrows: boolean
+    showBannerDots: boolean
     cartPosition: string
+    headerStyle: string
+    contentWidth: string
     productColumns: number
     productCardStyle: string
+    productGap: string
     showCategories: boolean
+    showSearch: boolean
+    showSort: boolean
   }
   storeTheme: string
   products: StoreProduct[]
@@ -233,6 +242,10 @@ export function EnhancedStorefrontClient({ storefront }: { storefront: Storefron
   const logoPositionClass = storefront.storeLayout.logoPosition === 'center' ? 'justify-center' : storefront.storeLayout.logoPosition === 'right' ? 'justify-end' : 'justify-start'
   const cartPositionClass = storefront.storeLayout.cartPosition === 'left' ? 'lg:order-first' : 'lg:order-last'
   const productGridClass = storefront.storeLayout.productColumns === 2 ? 'xl:grid-cols-2' : storefront.storeLayout.productColumns === 4 ? 'xl:grid-cols-4' : 'xl:grid-cols-3'
+  const bannerHeightClass = storefront.storeLayout.bannerHeight === 'short' ? 'aspect-[4/1]' : storefront.storeLayout.bannerHeight === 'tall' ? 'aspect-[2/1]' : 'aspect-[3/1]'
+  const contentWidthClass = storefront.storeLayout.contentWidth === 'wide' ? 'max-w-[90rem]' : storefront.storeLayout.contentWidth === 'compact' ? 'max-w-5xl' : 'max-w-7xl'
+  const productGapClass = storefront.storeLayout.productGap === 'tight' ? 'gap-2' : storefront.storeLayout.productGap === 'spacious' ? 'gap-7' : 'gap-4'
+  const productCardClass = storefront.storeLayout.productCardStyle === 'minimal' ? 'border-transparent bg-transparent' : storefront.storeLayout.productCardStyle === 'bordered' ? 'border-white/25 bg-slate-900/80' : 'border-white/10 bg-white/5'
 
   const filteredAndSortedProducts = useMemo(() => {
     let filtered = storefront.products
@@ -347,8 +360,8 @@ export function EnhancedStorefrontClient({ storefront }: { storefront: Storefron
       <div className={clsx('absolute inset-x-0 top-0 h-[24rem] bg-gradient-to-br opacity-95', !customTheme && theme.gradient)} style={gradientStyle} />
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.15),transparent_40%),linear-gradient(to_bottom,rgba(15,23,42,0.12),rgba(2,6,23,0.92))]" />
 
-      <main className="relative mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
-        <header className="sticky top-3 z-40 mb-6 flex items-center justify-between gap-3 rounded-2xl border border-white/15 bg-slate-950/80 px-3 py-3 shadow-2xl shadow-black/20 backdrop-blur-xl sm:px-4">
+      <main className={clsx('relative mx-auto px-4 py-6 sm:px-6 lg:px-8', contentWidthClass)}>
+        <header className={clsx('sticky top-3 z-40 mb-6 flex items-center justify-between gap-3 border-white/15 bg-slate-950/80 px-3 py-3 backdrop-blur-xl sm:px-4', storefront.storeLayout.headerStyle === 'full' && 'rounded-none border-x-0 shadow-none', storefront.storeLayout.headerStyle === 'minimal' && 'rounded-lg border-b shadow-lg', storefront.storeLayout.headerStyle === 'floating' && 'rounded-2xl border shadow-2xl shadow-black/20')}>
           <a href="#topo" className={clsx('flex min-w-0 items-center gap-3', logoPositionClass)}>
             <span className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-white/15 bg-white/10">
               {storefront.storeLogoUrl ? <Image src={storefront.storeLogoUrl} alt="" width={40} height={40} unoptimized className="h-full w-full object-cover" /> : <Store className="h-5 w-5" />}
@@ -391,11 +404,16 @@ export function EnhancedStorefrontClient({ storefront }: { storefront: Storefron
           </section>
         )}
         <section className={clsx('overflow-hidden rounded-[2rem] border border-white/10 bg-white/5 shadow-2xl shadow-black/20 backdrop-blur-xl', storefront.storeLayout.bannerStyle === 'compact' && 'lg:max-w-5xl lg:mx-auto')}>
+          {bannerImages.length > 0 && <div className={clsx('relative overflow-hidden border-b border-white/10', bannerHeightClass, storefront.storeLayout.bannerStyle === 'split' && 'lg:aspect-[5/1]')}>
+            <Image src={bannerImages[activeBanner]} alt={storefront.storeName} fill className={storefront.storeLayout.bannerFit === 'contain' ? 'object-contain' : 'object-cover'} unoptimized />
+            {storefront.storeLayout.showBannerArrows && bannerImages.length > 1 && <>
+              <button type="button" aria-label="Banner anterior" onClick={() => setActiveBanner((activeBanner - 1 + bannerImages.length) % bannerImages.length)} className="absolute left-3 top-1/2 -translate-y-1/2 rounded-full bg-black/45 px-3 py-2 text-lg text-white backdrop-blur hover:bg-black/65">‹</button>
+              <button type="button" aria-label="Próximo banner" onClick={() => setActiveBanner((activeBanner + 1) % bannerImages.length)} className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full bg-black/45 px-3 py-2 text-lg text-white backdrop-blur hover:bg-black/65">›</button>
+            </>}
+            {storefront.storeLayout.showBannerDots && bannerImages.length > 1 && <div className="absolute bottom-3 left-1/2 flex -translate-x-1/2 gap-1.5">{bannerImages.map((_, index) => <button key={index} type="button" aria-label={`Ir para banner ${index + 1}`} onClick={() => setActiveBanner(index)} className={clsx('h-2 w-2 rounded-full transition', index === activeBanner ? 'w-6 bg-white' : 'bg-white/50')} />)}</div>}
+          </div>}
           <div className="grid gap-0 lg:grid-cols-[1.3fr_0.9fr]">
             <div className="relative min-h-[20rem] p-6 sm:p-10">
-              {bannerImages[activeBanner] ? (
-                <Image src={bannerImages[activeBanner]} alt={storefront.storeName} fill className={clsx('object-cover opacity-25', storefront.storeLayout.bannerStyle === 'split' && 'object-right')} unoptimized />
-              ) : null}
               <div className="relative z-10 flex h-full flex-col justify-between gap-8">
                 <div className="flex items-center gap-3">
                   <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-white/15 bg-white/10 overflow-hidden">
@@ -598,8 +616,8 @@ export function EnhancedStorefrontClient({ storefront }: { storefront: Storefron
           <div className="space-y-4">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
               <div className="flex-1">
-                <label className="text-xs uppercase tracking-[0.24em] text-white/45 mb-2 block">Buscar produtos</label>
-                <div className="relative">
+                {storefront.storeLayout.showSearch && <label className="text-xs uppercase tracking-[0.24em] text-white/45 mb-2 block">Buscar produtos</label>}
+                {storefront.storeLayout.showSearch && <div className="relative">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40" />
                   <input
                     type="text"
@@ -608,7 +626,7 @@ export function EnhancedStorefrontClient({ storefront }: { storefront: Storefron
                     placeholder="Nome, SKU ou descrição..."
                     className="w-full pl-10 pr-4 py-3 bg-white/5 border border-white/10 rounded-2xl text-sm outline-none focus:border-white/30 focus:ring-2 focus:ring-white/10 transition placeholder:text-white/30"
                   />
-                </div>
+                </div>}
               </div>
 
               <div className="flex gap-2">
@@ -630,7 +648,7 @@ export function EnhancedStorefrontClient({ storefront }: { storefront: Storefron
                   </div>
                 )}
 
-                <div className="relative">
+                {storefront.storeLayout.showSort && <div className="relative">
                   <select
                     value={sortBy}
                     onChange={(e) => setSortBy(e.target.value as SortOption)}
@@ -650,7 +668,7 @@ export function EnhancedStorefrontClient({ storefront }: { storefront: Storefron
                     </option>
                   </select>
                   <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40 pointer-events-none" />
-                </div>
+                </div>}
               </div>
             </div>
 
@@ -659,13 +677,13 @@ export function EnhancedStorefrontClient({ storefront }: { storefront: Storefron
             </p>
           </div>
 
-          <div className={clsx('grid gap-4 sm:grid-cols-2', productGridClass)}>
+          <div className={clsx('grid sm:grid-cols-2', productGapClass, productGridClass)}>
             {filteredAndSortedProducts.map((product) => {
               const isSoldOut = product.stockQty <= 0
               const firstImage = product.images[0]?.imageUrl
 
               return (
-                <article key={product.id} className="group rounded-3xl border border-white/10 bg-white/5 overflow-hidden backdrop-blur-xl transition hover:border-white/20 hover:bg-white/8">
+                <article key={product.id} className={clsx('group overflow-hidden rounded-3xl border backdrop-blur-xl transition hover:border-white/20 hover:bg-white/8', productCardClass)}>
                   <div className="relative h-40 bg-slate-900 overflow-hidden">
                     {firstImage ? (
                       <Image src={firstImage} alt={product.name} fill className="object-cover group-hover:scale-105 transition" unoptimized />

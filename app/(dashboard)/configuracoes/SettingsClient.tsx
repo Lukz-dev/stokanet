@@ -40,6 +40,16 @@ const THEME_COLOR_PRESETS: Record<ThemePreference, { primary: string; secondary:
   ROSE: { primary: '#cf6f7a', secondary: '#e0a15f' },
 }
 
+function asString(value: unknown) {
+  return typeof value === 'string' ? value : undefined
+}
+
+function asBannerList(value: unknown) {
+  if (!Array.isArray(value)) return undefined
+  const banners = value.filter((item): item is string => typeof item === 'string' && item.trim().length > 0).slice(0, 8)
+  return banners.length > 0 ? banners : undefined
+}
+
 interface Props {
   companyName: string
   defaultMinStock: number
@@ -111,6 +121,7 @@ export function SettingsClient({
   const [themePending, startThemeTransition] = useTransition()
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
+  const [importSummary, setImportSummary] = useState('')
   const [themePreference, setThemePreference] = useState<ThemePreference>(currentThemePreference)
   const oauthError = searchParams.get('mercadopago') === 'error' ? searchParams.get('message') : ''
   const [form, setForm] = useState({
@@ -228,6 +239,65 @@ export function SettingsClient({
     } catch (currentError) {
       setError(currentError instanceof Error ? currentError.message : 'Não foi possível carregar a imagem.')
     }
+  }
+
+  const handleLayoutImport = async (file: File | undefined) => {
+    if (!file) return
+    if (file.size > 5_000_000) {
+      setError('O arquivo de layout deve ter no máximo 5 MB.')
+      return
+    }
+
+    try {
+      const raw = JSON.parse(await file.text()) as Record<string, unknown>
+      const source = raw.store && typeof raw.store === 'object' && !Array.isArray(raw.store) ? raw.store as Record<string, unknown> : raw
+      const colors = source.colors && typeof source.colors === 'object' && !Array.isArray(source.colors) ? source.colors as Record<string, unknown> : {}
+      const layout = source.layout && typeof source.layout === 'object' && !Array.isArray(source.layout) ? source.layout as Record<string, unknown> : {}
+      const banners = asBannerList(source.banners ?? source.bannerImages ?? source.storeBannerUrls)
+      const imported: Partial<typeof form> = {}
+      const fields = ['storeName', 'storeDescription', 'storeHeroTitle', 'storeHeroSubtitle', 'storeBadgeText', 'storePrimaryButtonLabel', 'storeSecondaryButtonLabel', 'storeWhatsappNumber', 'storeInstagramUrl', 'storeFacebookUrl', 'storeTiktokUrl', 'storeShippingNote'] as const
+
+      fields.forEach((field) => {
+        const value = asString(source[field])
+        if (value) imported[field] = value
+      })
+
+      const primaryColor = asString(source.storePrimaryColor ?? colors.primary)
+      const secondaryColor = asString(source.storeSecondaryColor ?? colors.secondary)
+      const logo = asString(source.storeLogoUrl ?? source.logo)
+      const theme = asString(source.storeTheme ?? source.theme)?.toUpperCase()
+      const importedLayout = { ...form.storeLayout }
+      ;(Object.keys(importedLayout) as Array<keyof typeof importedLayout>).forEach((key) => {
+        if (key in layout) importedLayout[key] = layout[key] as never
+      })
+
+      setForm((current) => ({
+        ...current,
+        ...imported,
+        ...(primaryColor ? { storePrimaryColor: primaryColor } : {}),
+        ...(secondaryColor ? { storeSecondaryColor: secondaryColor } : {}),
+        ...(logo ? { storeLogoUrl: logo } : {}),
+        ...(theme && ['SUNSET', 'OCEAN', 'FOREST', 'ROSE'].includes(theme) ? { storeTheme: theme as ThemePreference } : {}),
+        ...(banners ? { storeBannerUrl: banners[0], storeBannerUrls: banners } : {}),
+        storeLayout: importedLayout,
+      }))
+      setError('')
+      setSuccess('Layout importado para a prévia. Revise as opções e clique em Salvar configurações.')
+      setImportSummary('Layout, identidade visual e banners carregados')
+    } catch {
+      setError('Arquivo inválido. Use um JSON de layout exportado da loja.')
+      setImportSummary('')
+    }
+  }
+
+  const downloadLayoutTemplate = () => {
+    const template = { version: 1, store: { storeName: 'Minha loja', storeDescription: 'Descrição da loja', storeHeroTitle: 'Bem-vindo à nossa loja', storeHeroSubtitle: 'Produtos escolhidos para você.', logo: '', banners: [], colors: { primary: '#3f8fbf', secondary: '#61add9' }, layout: { bannerHeight: 'medium', bannerFit: 'cover', bannerCarousel: true, showBannerArrows: true, showBannerDots: true, productColumns: 3, productCardStyle: 'standard', showCategories: true, showSearch: true, showSort: true } } }
+    const blobUrl = URL.createObjectURL(new Blob([JSON.stringify(template, null, 2)], { type: 'application/json' }))
+    const link = document.createElement('a')
+    link.href = blobUrl
+    link.download = 'modelo-layout-stokanet.json'
+    link.click()
+    URL.revokeObjectURL(blobUrl)
   }
 
   const handleBannerGalleryChange = async (files: FileList | null) => {
@@ -777,6 +847,23 @@ export function SettingsClient({
         </div>
 
         <aside className="space-y-6">
+          <section className="rounded-2xl border border-border bg-card p-6 shadow-sm">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <h2 className="text-lg font-semibold">Importar layout</h2>
+                <p className="mt-1 text-xs text-muted-foreground">Importe identidade visual, banners e estrutura em JSON.</p>
+              </div>
+              <Store className="h-5 w-5 text-primary" />
+            </div>
+            <label className="mt-4 flex cursor-pointer items-center justify-center rounded-lg border border-dashed border-primary/40 bg-primary/5 px-4 py-3 text-sm font-semibold text-primary hover:bg-primary/10">
+              Escolher arquivo JSON
+              <input type="file" accept="application/json,.json" className="sr-only" onChange={(event) => { void handleLayoutImport(event.target.files?.[0]); event.currentTarget.value = '' }} />
+            </label>
+            <button type="button" onClick={downloadLayoutTemplate} className="mt-2 w-full rounded-lg border border-border px-4 py-2 text-xs font-semibold hover:bg-muted">Baixar modelo de importação</button>
+            {importSummary && <p className="mt-3 rounded-lg bg-emerald-500/10 px-3 py-2 text-xs text-emerald-700">{importSummary}. A prévia já foi atualizada.</p>}
+            <p className="mt-3 text-[11px] leading-4 text-muted-foreground">Nada é salvo automaticamente. Imagens devem ser URLs públicas ou data:image.</p>
+          </section>
+
           <section className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
             <div className="flex items-center justify-between gap-3 border-b border-border p-5">
               <div>

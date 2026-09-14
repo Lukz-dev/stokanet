@@ -275,8 +275,11 @@ export async function createStorefrontCheckout(input: StorefrontCheckoutInput) {
     throw new Error('Loja não encontrada ou inativa.')
   }
 
-  const mercadopagoAccessToken = await getMercadoPagoAccessTokenForCompany(storefront.id)
-  if (!mercadopagoAccessToken) throw new Error('A loja ainda não está conectada ao Mercado Pago.')
+  const paymentMethod = input.paymentMethod === 'CASH' ? 'CASH' : 'MERCADOPAGO'
+  const mercadopagoAccessToken = paymentMethod === 'MERCADOPAGO'
+    ? await getMercadoPagoAccessTokenForCompany(storefront.id)
+    : null
+  if (paymentMethod === 'MERCADOPAGO' && !mercadopagoAccessToken) throw new Error('A loja ainda não está conectada ao Mercado Pago.')
 
   const sanitizedItems = input.items
     .map((item) => ({
@@ -332,7 +335,6 @@ export async function createStorefrontCheckout(input: StorefrontCheckoutInput) {
   const discount = Number.isFinite(input.discount) ? Math.max(0, Number(input.discount)) : 0
   const boundedDiscount = Math.min(discount, subtotal)
   const deliveryMethod = input.deliveryMethod === 'PICKUP' ? 'PICKUP' : 'DELIVERY'
-  const paymentMethod = input.paymentMethod === 'CASH' ? 'CASH' : 'MERCADOPAGO'
   const requiredAddressFields = ['street', 'number', 'neighborhood', 'city', 'state', 'postalCode']
   if (deliveryMethod === 'DELIVERY' && requiredAddressFields.some((field) => !String(input.customer?.address?.[field] ?? '').trim())) {
     throw new Error('Informe o endereço completo para receber o pedido.')
@@ -401,7 +403,7 @@ export async function createStorefrontCheckout(input: StorefrontCheckoutInput) {
 
   try {
     const preference = await createCheckoutPreference({
-      accessToken: mercadopagoAccessToken,
+      accessToken: mercadopagoAccessToken as string,
       items: [
         ...resolvedItems.map((item) => ({
           id: item.product.id,

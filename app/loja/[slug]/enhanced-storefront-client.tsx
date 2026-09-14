@@ -264,7 +264,7 @@ export function EnhancedStorefrontClient({ storefront }: { storefront: Storefron
       filtered = filtered.filter((p) => p.category?.id === selectedCategory)
     }
 
-    let sorted = [...filtered]
+    const sorted = [...filtered]
     switch (sortBy) {
       case 'price-low':
         sorted.sort((a, b) => a.price - b.price)

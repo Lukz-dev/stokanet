@@ -13,10 +13,6 @@ async function getSandboxStatus() {
   }
 }
 
-function formatCurrency(value: number) {
-  return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value)
-}
-
 function themeLabel(theme: string | null | undefined) {
   const normalized = String(theme ?? 'ocean').trim().toLowerCase()
   if (normalized === 'sunset') return 'Sunset'

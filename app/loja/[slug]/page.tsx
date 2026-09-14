@@ -1,4 +1,3 @@
-import prisma from '@/lib/prisma'
 import { getStorefrontBySlug } from '@/lib/storefront'
 import { EnhancedStorefrontClient } from './enhanced-storefront-client'
 

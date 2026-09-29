@@ -46,6 +46,13 @@ function normalizeStoreLayout(value: unknown) {
     const validColumns = [2, 3, 4]
     const productColumns = Number(layout.productColumns)
 
+    const rawCategoryImages = layout.categoryImages && typeof layout.categoryImages === 'object' && !Array.isArray(layout.categoryImages) ? layout.categoryImages as Record<string, unknown> : {}
+    const categoryImages = Object.fromEntries(Object.entries(rawCategoryImages).filter(([, image]) => typeof image === 'string' && image.trim())) as Record<string, string>
+    const rawVisibility = layout.sectionVisibility && typeof layout.sectionVisibility === 'object' && !Array.isArray(layout.sectionVisibility) ? layout.sectionVisibility as Record<string, unknown> : {}
+    const testimonials = Array.isArray(layout.testimonials)
+      ? layout.testimonials.filter((item): item is { name: string; text: string } => Boolean(item && typeof item === 'object' && typeof (item as { name?: unknown }).name === 'string' && typeof (item as { text?: unknown }).text === 'string')).slice(0, 8)
+      : []
+
     return {
       logoPosition: layout.logoPosition === 'center' || layout.logoPosition === 'right' ? layout.logoPosition : 'left',
       bannerStyle: layout.bannerStyle === 'compact' || layout.bannerStyle === 'split' ? layout.bannerStyle : 'hero',
@@ -63,6 +70,21 @@ function normalizeStoreLayout(value: unknown) {
       showCategories: layout.showCategories !== false,
       showSearch: layout.showSearch !== false,
       showSort: layout.showSort !== false,
+      categoryImages,
+      aboutImage: typeof layout.aboutImage === 'string' ? layout.aboutImage : null,
+      instagramImage: typeof layout.instagramImage === 'string' ? layout.instagramImage : null,
+      sectionVisibility: {
+        featured: rawVisibility.featured !== false,
+        catalog: rawVisibility.catalog !== false,
+        categories: rawVisibility.categories !== false,
+        brands: rawVisibility.brands !== false,
+        testimonials: rawVisibility.testimonials !== false,
+        about: rawVisibility.about !== false,
+        instagram: rawVisibility.instagram !== false,
+        benefits: rawVisibility.benefits !== false,
+        contact: rawVisibility.contact !== false,
+      },
+      testimonials,
     }
   }
 

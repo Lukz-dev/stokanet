@@ -130,4 +130,85 @@
       radial-gradient(circle at top right, var(--bg-glow-b), transparent 24%),
       linear-gradient(180deg, rgba(255, 255, 255, 0.03), transparent 24%);
   }
+
+  .storefront-reference {
+    background: #fff !important;
+    color: #302827 !important;
+  }
+
+  .storefront-hybrid > header,
+  .storefront-hybrid > nav,
+  .storefront-hybrid > section {
+    display: none !important;
+  }
+
+  .storefront-hybrid > .checkout-result {
+    display: block !important;
+  }
+
+  .storefront-reference .text-white,
+  .storefront-reference .text-white\/80,
+  .storefront-reference .text-white\/75,
+  .storefront-reference .text-white\/70,
+  .storefront-reference .text-white\/65,
+  .storefront-reference .text-white\/60,
+  .storefront-reference .text-white\/55,
+  .storefront-reference .text-white\/50,
+  .storefront-reference .text-white\/45,
+  .storefront-reference .text-white\/40 {
+    color: #302827 !important;
+  }
+
+  .storefront-reference .bg-slate-950,
+  .storefront-reference .bg-slate-950\/80,
+  .storefront-reference .bg-slate-950\/60,
+  .storefront-reference .bg-slate-900,
+  .storefront-reference .bg-slate-800 {
+    background-color: #fff !important;
+  }
+
+  .storefront-reference .bg-white\/5,
+  .storefront-reference .bg-white\/8,
+  .storefront-reference .bg-white\/10 {
+    background-color: #fff !important;
+  }
+
+  .storefront-reference [class*='border-white'] {
+    border-color: #eadfdb !important;
+  }
+
+  .storefront-reference header {
+    border-top: 1px solid #eadfdb;
+    border-bottom: 1px solid #eadfdb;
+    box-shadow: none !important;
+  }
+
+  .storefront-reference main {
+    background: #fff;
+  }
+
+  .storefront-reference input::placeholder,
+  .storefront-reference textarea::placeholder,
+  .storefront-reference select {
+    color: #665b57 !important;
+    opacity: 1 !important;
+  }
+
+  .storefront-reference input,
+  .storefront-reference textarea,
+  .storefront-reference select {
+    color: #302827 !important;
+    background-color: #fff !important;
+  }
+
+  .storefront-reference section[id='catalogo'] article,
+  .storefront-reference section[id='categorias'] button {
+    border-radius: 0.5rem !important;
+    box-shadow: 0 8px 24px rgba(70, 45, 38, 0.08);
+  }
+
+  .storefront-reference button[class*='bg-white'] {
+    background-color: #302827 !important;
+    color: #fff !important;
+  }
 }

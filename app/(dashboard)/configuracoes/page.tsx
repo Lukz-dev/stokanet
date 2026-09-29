@@ -13,6 +13,11 @@ const THEME_COLOR_PRESETS: Record<ThemePreference, { primary: string; secondary:
 export default async function ConfiguracoesPage() {
   const company = await getOrCreateDefaultCompany()
   const user = await getActiveUser()
+  const storeCategories = await prisma.category.findMany({
+    where: { companyId: company.id },
+    select: { id: true, name: true },
+    orderBy: { name: 'asc' },
+  })
 
   const currentCompany = (await prisma.company.findUnique({
     where: { id: company.id },
@@ -88,6 +93,7 @@ export default async function ConfiguracoesPage() {
       storeActive={currentCompany.storeActive}
       mercadopagoConnected={Boolean(currentCompany.mercadopagoRefreshToken && currentCompany.mercadopagoConnectedAt)}
       currentThemePreference={user.themePreference as ThemePreference}
+      storeCategories={storeCategories}
     />
   )
 }

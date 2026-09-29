@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { Settings, PackagePlus, RotateCw, Store, ArrowRight, Webhook, Palette, Check, Copy } from 'lucide-react'
 import { testNotificationWebhook, updateCompanyPreferences, updateThemePreference } from '@/lib/actions'
 import { THEME_ATTRIBUTE_MAP, type ThemePreference } from '@/lib/theme'
+import { StorefrontTemplate } from '@/app/loja/[slug]/storefront-template'
 
 function readAndResizeImage(file: File, maxWidth: number, maxHeight: number) {
   return new Promise<string>((resolve, reject) => {
@@ -50,6 +51,13 @@ function asBannerList(value: unknown) {
   return banners.length > 0 ? banners : undefined
 }
 
+const DEFAULT_TESTIMONIALS = [
+  { name: 'Cliente A', text: 'Produto original! Chegou direitinho e bem embalado! Estou super feliz com minha compra!' },
+  { name: 'Cliente B', text: 'Encomenda super bem embalada, chegou rápido, produto perfeito, vendedora super atenciosa. Recomendo!' },
+  { name: 'Cliente C', text: 'Produto recebido. Bem embalado, caixa perfumada e produto como o anúncio. Recomendo.' },
+  { name: 'Cliente D', text: 'O vendedor enviou super rápido. Chegou em poucos dias! É original. Estou super satisfeita.' },
+]
+
 interface Props {
   companyName: string
   defaultMinStock: number
@@ -81,6 +89,7 @@ interface Props {
   storeActive: boolean
   mercadopagoConnected: boolean
   currentThemePreference: ThemePreference
+  storeCategories: Array<{ id: string; name: string }>
 }
 
 export function SettingsClient({
@@ -114,6 +123,7 @@ export function SettingsClient({
   storeActive,
   mercadopagoConnected,
   currentThemePreference,
+  storeCategories,
 }: Props) {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -124,6 +134,11 @@ export function SettingsClient({
   const [importSummary, setImportSummary] = useState('')
   const [themePreference, setThemePreference] = useState<ThemePreference>(currentThemePreference)
   const oauthError = searchParams.get('mercadopago') === 'error' ? searchParams.get('message') : ''
+  const storedVisibility = storeLayout.sectionVisibility && typeof storeLayout.sectionVisibility === 'object' && !Array.isArray(storeLayout.sectionVisibility) ? storeLayout.sectionVisibility as Record<string, unknown> : {}
+  const storedCategoryImages = storeLayout.categoryImages && typeof storeLayout.categoryImages === 'object' && !Array.isArray(storeLayout.categoryImages) ? storeLayout.categoryImages as Record<string, unknown> : {}
+  const initialCategoryImages = Object.fromEntries(Object.entries(storedCategoryImages).filter(([, value]) => typeof value === 'string')) as Record<string, string>
+  const storedTestimonials = Array.isArray(storeLayout.testimonials) ? storeLayout.testimonials.filter((item): item is { name: string; text: string } => Boolean(item && typeof item === 'object' && typeof (item as { name?: unknown }).name === 'string' && typeof (item as { text?: unknown }).text === 'string')) : []
+  const initialTestimonials = storedTestimonials.length > 0 ? storedTestimonials : DEFAULT_TESTIMONIALS
   const [form, setForm] = useState({
     defaultMinStock: String(defaultMinStock),
     notificationWebhookUrl,
@@ -166,11 +181,55 @@ export function SettingsClient({
       showCategories: storeLayout.showCategories !== false,
       showSearch: storeLayout.showSearch !== false,
       showSort: storeLayout.showSort !== false,
+      categoryImages: initialCategoryImages,
+      aboutImage: typeof storeLayout.aboutImage === 'string' ? storeLayout.aboutImage : '',
+      instagramImage: typeof storeLayout.instagramImage === 'string' ? storeLayout.instagramImage : '',
+      testimonials: initialTestimonials,
+      sectionVisibility: {
+        featured: storedVisibility.featured !== false,
+        catalog: storedVisibility.catalog !== false,
+        categories: storedVisibility.categories !== false,
+        brands: storedVisibility.brands !== false,
+        testimonials: storedVisibility.testimonials !== false,
+        about: storedVisibility.about !== false,
+        instagram: storedVisibility.instagram !== false,
+        benefits: storedVisibility.benefits !== false,
+        contact: storedVisibility.contact !== false,
+      },
     },
     storeTheme,
     storeActive: Boolean(storeActive),
   })
   const storeThemePreset = THEME_COLOR_PRESETS[String(form.storeTheme ?? 'ocean').toUpperCase() as ThemePreference] ?? THEME_COLOR_PRESETS.OCEAN
+  const previewLayout = form.storeLayout.categoryImages
+  const previewStorefront = {
+    storeName: form.storeName || companyName,
+    legalName: null,
+    storeDescription: form.storeDescription,
+    storeHeroTitle: form.storeHeroTitle || form.storeName || companyName,
+    storeHeroSubtitle: form.storeHeroSubtitle,
+    storeBadgeText: form.storeBadgeText,
+    storePrimaryButtonLabel: form.storePrimaryButtonLabel,
+    storeSecondaryButtonLabel: form.storeSecondaryButtonLabel,
+    storeWhatsappNumber: form.storeWhatsappNumber || null,
+    storeInstagramUrl: form.storeInstagramUrl || null,
+    storeFacebookUrl: form.storeFacebookUrl || null,
+    storeTiktokUrl: form.storeTiktokUrl || null,
+    storeShippingNote: form.storeShippingNote || null,
+    storePrimaryColor: form.storePrimaryColor || null,
+    storeSecondaryColor: form.storeSecondaryColor || null,
+    storeBannerUrl: form.storeBannerUrl || null,
+    storeBannerUrls: form.storeBannerUrls,
+    storeLogoUrl: form.storeLogoUrl || null,
+    products: [],
+    storeLayout: {
+      categoryImages: previewLayout,
+      aboutImage: form.storeLayout.aboutImage || null,
+      instagramImage: form.storeLayout.instagramImage || null,
+      sectionVisibility: form.storeLayout.sectionVisibility,
+      testimonials: form.storeLayout.testimonials,
+    },
+  }
 
   const themeOptions: Array<{ value: ThemePreference; label: string; description: string; swatch: string }> = [
     { value: 'SUNSET', label: 'Sunset', description: 'Laranja quente (padrão)', swatch: 'bg-[#e0a15f]' },
@@ -211,7 +270,29 @@ export function SettingsClient({
           storeBannerUrl: form.storeBannerUrl,
           storeBannerUrls: form.storeBannerUrls,
           storeLogoUrl: form.storeLogoUrl,
-          storeLayout: form.storeLayout,
+          storeLayout: {
+            logoPosition: 'left',
+            bannerStyle: 'hero',
+            bannerCarousel: form.storeLayout.bannerCarousel,
+            bannerHeight: 'medium',
+            bannerFit: form.storeLayout.bannerFit,
+            showBannerArrows: form.storeLayout.showBannerArrows,
+            showBannerDots: form.storeLayout.showBannerDots,
+            cartPosition: 'right',
+            headerStyle: 'full',
+            contentWidth: 'wide',
+            productColumns: 4,
+            productCardStyle: 'standard',
+            productGap: 'normal',
+            showCategories: true,
+            showSearch: true,
+            showSort: true,
+            categoryImages: form.storeLayout.categoryImages,
+            aboutImage: form.storeLayout.aboutImage || null,
+            instagramImage: form.storeLayout.instagramImage || null,
+            testimonials: form.storeLayout.testimonials,
+            sectionVisibility: form.storeLayout.sectionVisibility,
+          },
           storeTheme: form.storeTheme,
           storeActive: form.storeActive,
         } as Parameters<typeof updateCompanyPreferences>[0])
@@ -238,6 +319,36 @@ export function SettingsClient({
       setSuccess(`${field === 'storeBannerUrl' ? 'Banner' : 'Logo'} carregado. Clique em Salvar configurações para publicar.`)
     } catch (currentError) {
       setError(currentError instanceof Error ? currentError.message : 'Não foi possível carregar a imagem.')
+    }
+  }
+
+  const handleContentImageChange = async (field: 'aboutImage' | 'instagramImage', file: File | undefined) => {
+    if (!file) return
+    if (!file.type.startsWith('image/')) {
+      setError('Selecione um arquivo de imagem válido.')
+      return
+    }
+    try {
+      const image = await readAndResizeImage(file, 1600, 900)
+      setForm((current) => ({ ...current, storeLayout: { ...current.storeLayout, [field]: image } }))
+      setSuccess('Imagem carregada. Clique em Salvar configurações para publicar.')
+    } catch (currentError) {
+      setError(currentError instanceof Error ? currentError.message : 'Não foi possível carregar a imagem.')
+    }
+  }
+
+  const handleCategoryImageChange = async (categoryId: string, file: File | undefined) => {
+    if (!file) return
+    if (!file.type.startsWith('image/')) {
+      setError('Selecione um arquivo de imagem válido.')
+      return
+    }
+    try {
+      const image = await readAndResizeImage(file, 900, 900)
+      setForm((current) => ({ ...current, storeLayout: { ...current.storeLayout, categoryImages: { ...current.storeLayout.categoryImages, [categoryId]: image } } }))
+      setSuccess('Imagem da categoria carregada. Clique em Salvar configurações para publicar.')
+    } catch (currentError) {
+      setError(currentError instanceof Error ? currentError.message : 'Não foi possível carregar a imagem da categoria.')
     }
   }
 
@@ -618,6 +729,31 @@ export function SettingsClient({
                 <span className="text-xs text-muted-foreground">Escolha uma foto do computador. Ela será ajustada automaticamente.</span>
               </label>
 
+              <label className="flex flex-col gap-2">
+                <span className="text-sm font-medium">Imagem da seção Sobre</span>
+                <input type="file" accept="image/*" onChange={(event) => { void handleContentImageChange('aboutImage', event.target.files?.[0]); event.currentTarget.value = '' }} className="block w-full rounded-lg border border-border bg-background px-3 py-2 text-sm file:mr-3 file:rounded-md file:border-0 file:bg-primary file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-primary-foreground" />
+                {form.storeLayout.aboutImage && <img src={form.storeLayout.aboutImage} alt="Prévia da seção Sobre" className="h-24 w-full rounded-lg border border-border object-cover" />}
+              </label>
+
+              <label className="flex flex-col gap-2">
+                <span className="text-sm font-medium">Imagem do Instagram</span>
+                <input type="file" accept="image/*" onChange={(event) => { void handleContentImageChange('instagramImage', event.target.files?.[0]); event.currentTarget.value = '' }} className="block w-full rounded-lg border border-border bg-background px-3 py-2 text-sm file:mr-3 file:rounded-md file:border-0 file:bg-primary file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-primary-foreground" />
+                {form.storeLayout.instagramImage && <img src={form.storeLayout.instagramImage} alt="Prévia do Instagram" className="h-24 w-full rounded-lg border border-border object-cover" />}
+              </label>
+
+              <div className="md:col-span-2 rounded-xl border border-border bg-background p-4">
+                <div className="mb-3"><span className="text-sm font-medium">Imagens das categorias</span><p className="text-xs text-muted-foreground">Cada categoria aparece aqui com sua própria imagem, como os produtos.</p></div>
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  {storeCategories.map((category) => <div key={category.id} className="rounded-lg border border-border bg-card p-3"><p className="mb-2 truncate text-sm font-semibold">{category.name}</p><input type="file" accept="image/*" onChange={(event) => { void handleCategoryImageChange(category.id, event.target.files?.[0]); event.currentTarget.value = '' }} className="block w-full text-xs file:mr-2 file:rounded-md file:border-0 file:bg-primary file:px-2 file:py-1 file:font-semibold file:text-primary-foreground" />{form.storeLayout.categoryImages[category.id] && <img src={form.storeLayout.categoryImages[category.id]} alt={`Imagem de ${category.name}`} className="mt-2 aspect-square w-full rounded-md object-cover" />}</div>)}
+                </div>
+                {storeCategories.length === 0 && <p className="text-xs text-muted-foreground">Cadastre categorias para escolher imagens.</p>}
+              </div>
+
+              <div className="md:col-span-2 rounded-xl border border-border bg-background p-4">
+                <div className="mb-3 flex items-center justify-between gap-3"><div><span className="text-sm font-medium">Depoimentos</span><p className="text-xs text-muted-foreground">Edite cada depoimento diretamente nesta tela.</p></div><button type="button" onClick={() => setForm((current) => ({ ...current, storeLayout: { ...current.storeLayout, testimonials: [...current.storeLayout.testimonials, { name: '', text: '' }] } }))} className="rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground">Adicionar depoimento</button></div>
+                <div className="space-y-3">{form.storeLayout.testimonials.map((testimonial, index) => <div key={index} className="grid gap-2 rounded-lg border border-border bg-card p-3 md:grid-cols-[12rem_1fr_auto]"><input value={testimonial.name} onChange={(event) => setForm((current) => ({ ...current, storeLayout: { ...current.storeLayout, testimonials: current.storeLayout.testimonials.map((item, itemIndex) => itemIndex === index ? { ...item, name: event.target.value } : item) } }))} placeholder="Nome do cliente" className="rounded-lg border border-border bg-background px-3 py-2 text-sm" /><textarea value={testimonial.text} onChange={(event) => setForm((current) => ({ ...current, storeLayout: { ...current.storeLayout, testimonials: current.storeLayout.testimonials.map((item, itemIndex) => itemIndex === index ? { ...item, text: event.target.value } : item) } }))} placeholder="Texto do depoimento" rows={2} className="rounded-lg border border-border bg-background px-3 py-2 text-sm" /><button type="button" onClick={() => setForm((current) => ({ ...current, storeLayout: { ...current.storeLayout, testimonials: current.storeLayout.testimonials.filter((_, itemIndex) => itemIndex !== index) } }))} className="self-start rounded-lg border border-destructive/30 px-3 py-2 text-xs text-destructive">Remover</button></div>)}</div>
+              </div>
+
               <label className="flex flex-col gap-2 md:col-span-2">
                 <span className="text-sm font-medium">WhatsApp da loja</span>
                 <input
@@ -734,6 +870,18 @@ export function SettingsClient({
           </section>
 
           <section className="bg-card border border-border rounded-2xl shadow-sm p-6">
+            <div className="mb-5 flex items-center justify-between gap-4">
+              <div><h2 className="text-lg font-semibold">Seções visíveis</h2><p className="text-sm text-muted-foreground">Escolha quais blocos aparecem na loja. A posição permanece fixa.</p></div>
+              <Store className="h-5 w-5 text-primary" />
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              {([['featured', 'Produtos em destaque'], ['catalog', 'Catálogo completo'], ['categories', 'Categorias'], ['brands', 'Marcas'], ['testimonials', 'Depoimentos'], ['about', 'Sobre a loja'], ['instagram', 'Instagram'], ['benefits', 'Benefícios'], ['contact', 'Contato']] as const).map(([key, label]) => (
+                <label key={key} className="flex items-center justify-between gap-3 rounded-lg border border-border bg-background px-3 py-2 text-sm"><span>{label}</span><input type="checkbox" checked={form.storeLayout.sectionVisibility[key]} onChange={(event) => setForm((prev) => ({ ...prev, storeLayout: { ...prev.storeLayout, sectionVisibility: { ...prev.storeLayout.sectionVisibility, [key]: event.target.checked } } }))} className="h-4 w-4" /></label>
+              ))}
+            </div>
+          </section>
+
+          <section className="hidden bg-card border border-border rounded-2xl shadow-sm p-6" aria-hidden="true">
             <div className="flex items-center justify-between gap-4 mb-6">
               <div>
                 <h2 className="text-lg font-semibold">Layout avançado</h2>
@@ -865,6 +1013,11 @@ export function SettingsClient({
           </section>
 
           <section className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
+            <div className="flex items-center justify-between gap-3 border-b border-border p-5"><div><h2 className="text-lg font-semibold">Prévia real da vitrine</h2><p className="text-xs text-muted-foreground">Usa o mesmo template publicado na loja online</p></div><Store className="h-5 w-5 text-primary" /></div>
+            <div className="max-h-[900px] overflow-y-auto bg-white"><StorefrontTemplate storefront={previewStorefront} cartItems={[]} onAddToCart={() => undefined} onRemoveFromCart={() => undefined} onUpdateQuantity={() => undefined} onCheckout={() => undefined} /></div>
+          </section>
+
+          <section className="hidden overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
             <div className="flex items-center justify-between gap-3 border-b border-border p-5">
               <div>
                 <h2 className="text-lg font-semibold">Prévia da vitrine</h2>

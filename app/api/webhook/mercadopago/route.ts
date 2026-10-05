@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { verifyMercadoPagoWebhookSignature } from "@/lib/mercadopago";
 
 function getMercadoPagoAccessToken() {
   return (
@@ -53,13 +54,25 @@ async function fetchMercadoPagoResource(path: string) {
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json().catch(async () => ({ raw: await request.text() }));
+    const rawBody = await request.text();
+    const signatureResult = verifyMercadoPagoWebhookSignature(
+      request.headers.get("x-signature"),
+      rawBody,
+      process.env.MERCADOPAGO_WEBHOOK_SECRET,
+      request.headers.get("x-request-id"),
+    );
+
+    if (!signatureResult.ok) {
+      return NextResponse.json({ success: false, error: "Assinatura inválida" }, { status: 401 });
+    }
+
+    const body = JSON.parse(rawBody || "{}");
     const topic = body.topic ?? body.type ?? body.action ?? body?.data?.type;
     const resourceId = normalizeMercadoPagoResourceId(
       body?.data?.id ?? body?.resource?.id ?? body?.id ?? body?.resource
     );
 
-    console.log("Webhook MercadoPago recebido:", { topic, resourceId, body });
+    console.log("Webhook MercadoPago recebido:", { topic, resourceId });
 
     if (!topic || !resourceId) {
       return NextResponse.json({ success: true, ignored: true });

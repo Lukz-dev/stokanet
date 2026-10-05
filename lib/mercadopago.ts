@@ -107,21 +107,21 @@ export const mercadopagoClient = null;
 
 export type WebhookSignatureResult = {
   ok: boolean;
-  skipped: boolean;
   reason?: string;
 };
 
 export function verifyMercadoPagoWebhookSignature(
   signatureHeader: string | null | undefined,
   body: string,
-  secret: string | null | undefined
+  secret: string | null | undefined,
+  requestId?: string | null
 ): WebhookSignatureResult {
-  if (!secret) {
-    return { ok: true, skipped: true, reason: "No secret configured" };
+  if (!secret?.trim()) {
+    return { ok: false, reason: "Webhook secret não configurado" };
   }
 
   if (!signatureHeader) {
-    return { ok: false, skipped: false, reason: "Missing signature header" };
+    return { ok: false, reason: "Cabeçalho x-signature ausente" };
   }
 
   const parts = signatureHeader.split(",").reduce<Record<string, string>>((acc, chunk) => {
@@ -136,21 +136,34 @@ export function verifyMercadoPagoWebhookSignature(
   const version = parts.v1;
 
   if (!timestamp || !version) {
-    return { ok: false, skipped: false, reason: "Malformed signature header" };
+    return { ok: false, reason: "Formato de assinatura inválido" };
   }
 
-  const expected = createHmac("sha256", secret).update(`${timestamp}.${body}`).digest("hex");
+  const eventTimestamp = Number(timestamp);
+  if (!Number.isSafeInteger(eventTimestamp) || Math.abs(Math.floor(Date.now() / 1000) - eventTimestamp) > 300) {
+    return { ok: false, reason: "Assinatura expirada" };
+  }
+
+  let dataId = "";
+  try {
+    dataId = String(JSON.parse(body)?.data?.id ?? "").trim().toLowerCase();
+  } catch {
+    return { ok: false, reason: "Payload inválido" };
+  }
+
+  const manifest = `id:${dataId};request-id:${requestId ?? ""};ts:${timestamp};`;
+  const expected = createHmac("sha256", secret).update(manifest).digest("hex");
   const received = version;
 
   const expectedBuffer = Buffer.from(expected);
   const receivedBuffer = Buffer.from(received);
 
   if (expectedBuffer.length !== receivedBuffer.length) {
-    return { ok: false, skipped: false, reason: "Signature mismatch" };
+    return { ok: false, reason: "Assinatura incompatível" };
   }
 
   const isValid = timingSafeEqual(expectedBuffer, receivedBuffer);
-  return { ok: isValid, skipped: false, reason: isValid ? undefined : "Signature mismatch" };
+  return { ok: isValid, reason: isValid ? undefined : "Assinatura incompatível" };
 }
 
 export const PLANS = {

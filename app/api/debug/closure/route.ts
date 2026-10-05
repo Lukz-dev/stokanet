@@ -23,6 +23,9 @@ function dayBoundsBrt(day: Date) {
 
 export async function GET(request: Request) {
   try {
+    if (process.env.NODE_ENV === 'production') {
+      return NextResponse.json({ error: 'Endpoint indisponível' }, { status: 404 })
+    }
     const companyId = await getActiveCompanyId()
     const url = new URL(request.url)
     const day = parseDateParam(url.searchParams.get('date'))

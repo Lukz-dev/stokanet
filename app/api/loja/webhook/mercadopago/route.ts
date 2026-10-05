@@ -50,10 +50,11 @@ export async function POST(request: NextRequest) {
     const signatureResult = verifyMercadoPagoWebhookSignature(
       signatureHeader,
       rawBody,
-      process.env.MERCADOPAGO_WEBHOOK_SECRET || process.env.MERCADOPAGO_ACCESS_TOKEN || ''
+      process.env.MERCADOPAGO_WEBHOOK_SECRET,
+      request.headers.get('x-request-id')
     )
 
-    if (!signatureResult.ok && !signatureResult.skipped) {
+    if (!signatureResult.ok) {
       console.warn('Webhook Mercado Pago rejeitado por assinatura inválida', { signatureResult })
       return NextResponse.json({ success: false, error: 'Assinatura inválida' }, { status: 401 })
     }
@@ -64,7 +65,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: true, ignored: true })
     }
 
-    console.log('Webhook Mercado Pago processando pagamento', { paymentId, signatureResult })
+    console.log('Webhook Mercado Pago processando pagamento', { paymentId })
     const payment = await fetchPayment(paymentId, companyId, orderCode)
     const result = await finalizeStorefrontOrderFromPayment(payment, orderCode)
 
@@ -76,5 +77,5 @@ export async function POST(request: NextRequest) {
 }
 
 export async function GET() {
-  return NextResponse.json({ status: 'webhook da loja ativo' })
+  return NextResponse.json({ status: 'ok' })
 }

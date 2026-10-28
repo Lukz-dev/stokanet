@@ -98,6 +98,7 @@ export type StorefrontTemplateProps = {
   onRemoveFromCart: (productId: string) => void
   onUpdateQuantity: (productId: string, quantity: number) => void
   onCheckout: () => void
+  onViewProduct?: (product: StoreProduct) => void
 }
 
 // ------------------------------------------------------------
@@ -658,17 +659,30 @@ const ProductCard = ({
   product,
   shippingNote,
   onAddToCart,
+  onViewProduct,
 }: {
   product: StoreProduct
   shippingNote: string | null
   onAddToCart: (product: StoreProduct) => void
+  onViewProduct?: (product: StoreProduct) => void
 }) => {
   const available = isAvailable(product)
   const installments = installmentLine(product)
 
   return (
     <article className="sf-card">
-      <div className="sf-card__media">
+      <div
+        className="sf-card__media"
+        role={onViewProduct ? 'button' : undefined}
+        tabIndex={onViewProduct ? 0 : undefined}
+        onClick={() => onViewProduct?.(product)}
+        onKeyDown={(e) => {
+          if (onViewProduct && (e.key === 'Enter' || e.key === ' ')) {
+            e.preventDefault()
+            onViewProduct(product)
+          }
+        }}
+      >
         {!available ? (
           <span className="sf-card__badge sf-card__badge--out">Esgotado</span>
         ) : (
@@ -682,7 +696,20 @@ const ProductCard = ({
         {product.category && (
           <span className="sf-card__brand">{product.category.name}</span>
         )}
-        <h3 className="sf-card__name">{product.name}</h3>
+        <h3
+          className="sf-card__name"
+          role={onViewProduct ? 'button' : undefined}
+          tabIndex={onViewProduct ? 0 : undefined}
+          onClick={() => onViewProduct?.(product)}
+          onKeyDown={(e) => {
+            if (onViewProduct && (e.key === 'Enter' || e.key === ' ')) {
+              e.preventDefault()
+              onViewProduct(product)
+            }
+          }}
+        >
+          {product.name}
+        </h3>
         <span className="sf-card__price">{fmtPrice(product.price)}</span>
         {installments && (
           <span className="sf-card__installments">{installments}</span>
@@ -705,12 +732,14 @@ const ProductSection = ({
   id,
   shippingNote,
   onAddToCart,
+  onViewProduct,
 }: {
   title: string | ReactNode
   products: StoreProduct[]
   id?: string
   shippingNote: string | null
   onAddToCart: (product: StoreProduct) => void
+  onViewProduct?: (product: StoreProduct) => void
 }) => {
   if (!products.length) return null
   return (
@@ -723,6 +752,7 @@ const ProductSection = ({
             product={p}
             shippingNote={shippingNote}
             onAddToCart={onAddToCart}
+            onViewProduct={onViewProduct}
           />
         ))}
       </div>
@@ -968,6 +998,7 @@ export function StorefrontTemplate({
   onRemoveFromCart,
   onUpdateQuantity,
   onCheckout,
+  onViewProduct,
 }: StorefrontTemplateProps) {
   // Busca interna sobre storefront.products — nenhum estado paralelo de carrinho
   const [searchQuery, setSearchQuery] = useState("")
@@ -1055,6 +1086,7 @@ export function StorefrontTemplate({
           products={filtered}
           shippingNote={storefront.storeShippingNote}
           onAddToCart={onAddToCart}
+          onViewProduct={onViewProduct}
         />
       ) : (
         <>
@@ -1068,6 +1100,7 @@ export function StorefrontTemplate({
             products={featured}
             shippingNote={storefront.storeShippingNote}
             onAddToCart={onAddToCart}
+            onViewProduct={onViewProduct}
           />}
 
           <MidBanner
@@ -1080,6 +1113,7 @@ export function StorefrontTemplate({
             products={filtered}
             shippingNote={storefront.storeShippingNote}
             onAddToCart={onAddToCart}
+            onViewProduct={onViewProduct}
           />}
 
           {visibility.categories !== false && <CategoryCards items={cats} products={storefront.products} images={storefront.storeLayout?.categoryImages ?? {}} onSelect={selectCategory} />}

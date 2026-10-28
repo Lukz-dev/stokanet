@@ -180,6 +180,9 @@ export function EnhancedStorefrontClient({ storefront }: { storefront: Storefron
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null)
   const [cartPulse, setCartPulse] = useState(false)
   const [lastAddedProduct, setLastAddedProduct] = useState('')
+  const [toast, setToast] = useState<{ id: number; name: string } | null>(null)
+  const [activeImageIndex, setActiveImageIndex] = useState(0)
+  const [modalQty, setModalQty] = useState(1)
   const [activeBanner, setActiveBanner] = useState(0)
   const [cartOpen, setCartOpen] = useState(false)
   const checkoutStatus = searchParams.get('status')
@@ -239,6 +242,23 @@ export function EnhancedStorefrontClient({ storefront }: { storefront: Storefron
     const timeout = window.setTimeout(() => setCartPulse(false), 650)
     return () => window.clearTimeout(timeout)
   }, [cartPulse])
+
+  useEffect(() => {
+    if (!toast) return
+    const timeout = window.setTimeout(() => setToast(null), 2600)
+    return () => window.clearTimeout(timeout)
+  }, [toast])
+
+  useEffect(() => {
+    if (selectedProductId === null) return
+    setActiveImageIndex(0)
+    setModalQty(1)
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setSelectedProductId(null)
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [selectedProductId])
 
   useEffect(() => {
     if (storefront.storeBannerUrls.length < 2) return
@@ -304,6 +324,7 @@ export function EnhancedStorefrontClient({ storefront }: { storefront: Storefron
     if (product.stockQty <= 0) return
     setCart((current) => ({ ...current, [product.id]: Math.min(product.stockQty, (current[product.id] ?? 0) + 1) }))
     setLastAddedProduct(product.name)
+    setToast({ id: Date.now(), name: product.name })
     setCartPulse(false)
     window.requestAnimationFrame(() => setCartPulse(true))
   }
@@ -377,6 +398,20 @@ export function EnhancedStorefrontClient({ storefront }: { storefront: Storefron
       <div className="hidden" aria-hidden="true" />
       <div className="hidden" aria-hidden="true" />
 
+      {toast && (
+        <div key={toast.id} aria-live="polite" role="status" className="fixed left-1/2 top-20 z-[60] -translate-x-1/2 sf-toast">
+          <div className={clsx('flex items-center gap-3 rounded-2xl border border-emerald-400/30 bg-emerald-950/90 px-4 py-3 text-sm text-emerald-50 shadow-2xl shadow-black/40 backdrop-blur-xl', !customTheme && '')} style={customTheme ? { borderColor: rgbaFromHex(customTheme.primary, 0.4) } : undefined}>
+            <span className={clsx('flex h-8 w-8 items-center justify-center rounded-full text-white', !customTheme && 'bg-emerald-500')} style={customTheme ? customTheme.buttonStyle : undefined}>
+              <ShoppingBag className="h-4 w-4" />
+            </span>
+            <span>
+              <strong className="block">{toast.name}</strong>
+              <span className="text-emerald-200/80">adicionado ao carrinho</span>
+            </span>
+          </div>
+        </div>
+      )}
+
       <main className={clsx('storefront-hybrid relative mx-auto px-4 py-6 sm:px-6 lg:px-8', contentWidthClass)}>
         <header className="sticky top-3 z-40 mb-6 flex items-center justify-between gap-3 border-white/15 bg-slate-950/80 px-3 py-3 shadow-2xl shadow-black/20 backdrop-blur-xl sm:px-4">
           <a href="#topo" className={clsx('flex min-w-0 items-center gap-3', logoPositionClass)}>
@@ -416,6 +451,7 @@ export function EnhancedStorefrontClient({ storefront }: { storefront: Storefron
             if (product) updateQuantity(product, quantity)
           }}
           onCheckout={() => setCartOpen(true)}
+          onViewProduct={(product) => setSelectedProductId(product.id)}
         />
         {showCheckoutResult && (
           <section className={clsx(
@@ -849,42 +885,54 @@ export function EnhancedStorefrontClient({ storefront }: { storefront: Storefron
       </main>
 
       {selectedProduct && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-          <div className="bg-slate-900 rounded-3xl border border-white/10 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="sticky top-0 flex items-center justify-between gap-3 border-b border-white/10 bg-slate-900/95 p-6 backdrop-blur-sm">
-              <h2 className="text-2xl font-semibold">{selectedProduct.name}</h2>
-              <button type="button" onClick={() => setSelectedProductId(null)} className="rounded-full p-2 hover:bg-white/10 transition">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 sf-fade-in" onClick={() => setSelectedProductId(null)}>
+          <div className="sf-modal-in bg-slate-900 rounded-3xl border border-white/10 max-w-3xl w-full max-h-[90vh] overflow-y-auto text-white" onClick={(event) => event.stopPropagation()}>
+            <div className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-white/10 bg-slate-900/95 p-6 backdrop-blur-sm">
+              <div className="min-w-0">
+                <p className="text-xs uppercase tracking-[0.24em] text-white/45">{selectedProduct.category?.name ?? 'Produto'}</p>
+                <h2 className="truncate text-2xl font-semibold">{selectedProduct.name}</h2>
+              </div>
+              <button type="button" aria-label="Fechar detalhes" onClick={() => setSelectedProductId(null)} className="rounded-full p-2 hover:bg-white/10 transition">
                 <X className="h-6 w-6" />
               </button>
             </div>
 
             <div className="p-6 space-y-6">
-              {selectedProduct.images.length > 0 && (
-                <div className="space-y-2">
-                  <label className="text-xs uppercase tracking-[0.24em] text-white/45">Imagens</label>
-                  <div className="grid grid-cols-3 gap-2">
-                    {selectedProduct.images.map((img) => (
-                      <div key={img.id} className="relative aspect-square rounded-2xl overflow-hidden border border-white/10 bg-slate-800">
-                        <Image src={img.imageUrl} alt={`${selectedProduct.name} - Imagem ${img.displayOrder + 1}`} fill className="object-cover" unoptimized />
-                      </div>
+              <div className="grid gap-4 sm:grid-cols-[1.4fr_1fr]">
+                <div className="relative aspect-square overflow-hidden rounded-2xl border border-white/10 bg-slate-800">
+                  {selectedProduct.images[activeImageIndex]?.imageUrl ? (
+                    <Image src={selectedProduct.images[activeImageIndex].imageUrl} alt={`${selectedProduct.name} - Foto ${activeImageIndex + 1}`} fill className="object-cover" unoptimized />
+                  ) : selectedProduct.images[0]?.imageUrl ? (
+                    <Image src={selectedProduct.images[0].imageUrl} alt={selectedProduct.name} fill className="object-cover" unoptimized />
+                  ) : (
+                    <div className="flex h-full items-center justify-center"><ShoppingBag className="h-14 w-14 text-white/20" /></div>
+                  )}
+                  {selectedProduct.stockQty <= 0 && <div className="absolute inset-0 flex items-center justify-center bg-black/50"><span className="rounded-full bg-black/70 px-4 py-2 text-sm font-semibold">Esgotado</span></div>}
+                </div>
+
+                {selectedProduct.images.length > 1 && (
+                  <div className="grid grid-cols-3 gap-2 sm:grid-cols-2 sm:content-start">
+                    {selectedProduct.images.map((img, index) => (
+                      <button key={img.id} type="button" data-active={index === activeImageIndex} onClick={() => setActiveImageIndex(index)} className="sf-gallery-thumb relative aspect-square overflow-hidden rounded-xl border border-white/10 bg-slate-800">
+                        <Image src={img.imageUrl} alt={`Miniatura ${index + 1}`} fill className="object-cover" unoptimized />
+                      </button>
                     ))}
                   </div>
+                )}
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <label className="text-xs uppercase tracking-[0.24em] text-white/45">Preço</label>
+                  <p className="text-3xl font-semibold">{formatCurrency(selectedProduct.price)}</p>
+                  <p className="text-xs text-white/50">SKU {selectedProduct.sku} {selectedProduct.size ? `• ${selectedProduct.size}` : ''} {selectedProduct.color ? `• ${selectedProduct.color}` : ''}</p>
                 </div>
-              )}
-
-              <div className="space-y-2">
-                <label className="text-xs uppercase tracking-[0.24em] text-white/45">Categoria</label>
-                <p className="text-sm">{selectedProduct.category?.name ?? 'Sem categoria'}</p>
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-xs uppercase tracking-[0.24em] text-white/45">SKU</label>
-                <p className="text-sm font-mono">{selectedProduct.sku}</p>
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-xs uppercase tracking-[0.24em] text-white/45">Preço</label>
-                <p className="text-3xl font-semibold">{formatCurrency(selectedProduct.price)}</p>
+                <div className="space-y-2">
+                  <label className="text-xs uppercase tracking-[0.24em] text-white/45">Estoque</label>
+                  <p className={clsx('text-sm font-semibold', selectedProduct.stockQty > 0 ? 'text-emerald-300' : 'text-rose-300')}>
+                    {selectedProduct.stockQty > 0 ? `${selectedProduct.stockQty} unidade${selectedProduct.stockQty === 1 ? '' : 's'} disponível${selectedProduct.stockQty === 1 ? '' : 'is'}` : 'Sem estoque'}
+                  </p>
+                </div>
               </div>
 
               {selectedProduct.description && (
@@ -904,18 +952,24 @@ export function EnhancedStorefrontClient({ storefront }: { storefront: Storefron
               <div className="space-y-2">
                 <label className="text-xs uppercase tracking-[0.24em] text-white/45">Variações</label>
                 <div className="flex gap-2 flex-wrap">
-                  {selectedProduct.size && <span className="rounded-full border border-white/20 bg-white/5 px-3 py-1 text-xs">{selectedProduct.size}</span>}
-                  {selectedProduct.color && <span className="rounded-full border border-white/20 bg-white/5 px-3 py-1 text-xs">{selectedProduct.color}</span>}
+                  {selectedProduct.size && <span className="rounded-full border border-white/20 bg-white/5 px-3 py-1 text-xs">Tamanho: {selectedProduct.size}</span>}
+                  {selectedProduct.color && <span className="rounded-full border border-white/20 bg-white/5 px-3 py-1 text-xs">Cor: {selectedProduct.color}</span>}
+                  {!selectedProduct.size && !selectedProduct.color && <span className="text-sm text-white/50">Produto sem variações.</span>}
                 </div>
               </div>
 
-              <div className="border-t border-white/10 pt-6 flex gap-2">
+              <div className="border-t border-white/10 pt-6 flex flex-wrap items-center gap-2">
+                <div className="inline-flex items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-2 py-1.5">
+                  <button type="button" aria-label="Diminuir quantidade" onClick={() => setModalQty((q) => Math.max(1, q - 1))} className="rounded-full p-1.5 hover:bg-white/10"><Minus className="h-4 w-4" /></button>
+                  <span className="min-w-6 text-center text-sm font-semibold">{modalQty}</span>
+                  <button type="button" aria-label="Aumentar quantidade" onClick={() => setModalQty((q) => Math.min(selectedProduct.stockQty, q + 1))} disabled={selectedProduct.stockQty <= 0} className="rounded-full p-1.5 hover:bg-white/10 disabled:opacity-40"><Plus className="h-4 w-4" /></button>
+                </div>
                 <button type="button" onClick={() => setSelectedProductId(null)} className="flex-1 rounded-2xl border border-white/10 px-4 py-3 text-sm font-semibold hover:bg-white/10 transition">
                   Fechar
                 </button>
-                <button type="button" onClick={() => { addToCart(selectedProduct); setSelectedProductId(null) }} disabled={selectedProduct.stockQty <= 0} className={clsx('flex-1 inline-flex items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-semibold transition', selectedProduct.stockQty <= 0 ? 'cursor-not-allowed bg-white/10 text-white/40' : !customTheme && theme.button)} style={customTheme ? primaryButtonStyle : undefined}>
+                <button type="button" onClick={() => { for (let i = 0; i < modalQty; i += 1) addToCart(selectedProduct); setSelectedProductId(null) }} disabled={selectedProduct.stockQty <= 0} className={clsx('flex-1 inline-flex items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-semibold transition', selectedProduct.stockQty <= 0 ? 'cursor-not-allowed bg-white/10 text-white/40' : !customTheme && theme.button)} style={customTheme ? primaryButtonStyle : undefined}>
                   <ShoppingBag className="h-4 w-4" />
-                  Adicionar ao carrinho
+                  Adicionar {modalQty > 1 ? `${modalQty} ` : ''}ao carrinho
                 </button>
               </div>
             </div>

@@ -138,6 +138,7 @@
   .storefront-hybrid > .checkout-result {
     display: block !important;
   }
+}
 
 /* Toast "adicionado ao carrinho" */
 @keyframes sf-toast-in {

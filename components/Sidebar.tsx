@@ -77,8 +77,8 @@ export function Sidebar() {
             className={cn(
               'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all group/sidebar',
               isActive
-                ? 'bg-primary text-primary-foreground shadow-sm shadow-primary/20'
-                : 'text-muted-foreground hover:bg-muted hover:text-foreground',
+                ? 'bg-accent text-accent-foreground font-medium'
+                : 'text-muted-foreground hover:bg-accent hover:text-foreground',
             )}
           >
             <Icon className="h-4 w-4 shrink-0" />
@@ -95,9 +95,9 @@ export function Sidebar() {
   )
 
   const userBlock = (
-    <div className="space-y-2 border-t border-border p-3">
-      <div className="flex items-center gap-3 rounded-lg bg-muted/40 px-3 py-2">
-        <div className="h-8 w-8 shrink-0 overflow-hidden rounded-full border border-primary/30 bg-primary/20 text-xs font-bold text-primary flex items-center justify-center">
+    <div className="space-y-1 border-t border-border p-3">
+      <div className="flex items-center gap-3 rounded-md px-3 py-2">
+        <div className="h-8 w-8 shrink-0 overflow-hidden rounded-full bg-primary text-primary-foreground text-xs font-semibold flex items-center justify-center">
           {avatarUrl ? (
             <Image src={avatarUrl} alt="Foto de perfil" width={32} height={32} unoptimized className="h-full w-full object-cover" />
           ) : (
@@ -125,10 +125,10 @@ export function Sidebar() {
   return (
     <>
       {/* Mobile: topo fixo com hambúrguer + drawer */}
-      <div className="sticky top-0 z-30 flex h-12 w-full items-center justify-between border-b border-border bg-card/90 px-4 backdrop-blur-md md:hidden">
+      <div className="sticky top-0 z-30 flex h-12 w-full items-center justify-between border-b border-border bg-background px-4 md:hidden">
         <div className="flex items-center gap-2">
-          <div className="flex h-7 w-7 items-center justify-center rounded-lg border border-primary/20 bg-primary/10">
-            <Box className="h-4 w-4 text-primary" />
+          <div className="flex h-7 w-7 items-center justify-center rounded-md bg-primary text-primary-foreground">
+            <Box className="h-4 w-4" />
           </div>
           <span className="text-sm font-bold tracking-tight">StokaNet</span>
         </div>
@@ -146,8 +146,8 @@ export function Sidebar() {
                 <X />
               </div>
               <div className="mt-8 flex items-center gap-3">
-                <div className="flex h-9 w-9 items-center justify-center rounded-lg border border-primary/20 bg-primary/10">
-                  <Box className="h-5 w-5 text-primary" />
+                <div className="flex h-9 w-9 items-center justify-center rounded-md bg-primary text-primary-foreground">
+                  <Box className="h-5 w-5" />
                 </div>
                 <div>
                   <span className="block text-sm font-bold tracking-tight">StokaNet</span>
@@ -166,24 +166,24 @@ export function Sidebar() {
 
       {/* Desktop: sidebar que expande no hover (modelo Aceternity) */}
       <motion.aside
-        className="hidden h-screen flex-shrink-0 flex-col overflow-hidden border-r border-border bg-card/80 backdrop-blur-md md:flex"
+        className="hidden h-screen flex-shrink-0 flex-col overflow-hidden border-r border-border bg-sidebar md:flex"
         animate={{ width: open ? '300px' : '72px' }}
         onMouseEnter={() => setOpen(true)}
         onMouseLeave={() => setOpen(false)}
         transition={{ duration: 0.25, ease: 'easeInOut' }}
       >
-        <div className="flex h-16 shrink-0 items-center gap-3 border-b border-border px-4">
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-primary/20 bg-primary/10">
-            <Box className="h-4 w-4 text-primary" />
+        <div className="flex h-14 shrink-0 items-center gap-3 px-4">
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-primary text-primary-foreground">
+            <Box className="h-4 w-4" />
           </div>
           <motion.div animate={{ display: open ? 'block' : 'none', opacity: open ? 1 : 0 }} className="min-w-0">
-            <span className="block text-sm font-bold tracking-tight">StokaNet</span>
+            <span className="block text-sm font-semibold tracking-tight">StokaNet</span>
             <span className="block truncate text-xs text-muted-foreground">Controle de estoque</span>
           </motion.div>
         </div>
 
-        <div className="shrink-0 px-4 pt-4">
-          <div className="flex items-center gap-2 rounded-lg border border-border/50 bg-muted/50 px-3 py-2">
+        <div className="shrink-0 px-3 pt-3">
+          <div className="flex items-center gap-2 rounded-md bg-muted px-3 py-2">
             <Building2 className="h-4 w-4 shrink-0 text-muted-foreground" />
             <motion.span animate={{ display: open ? 'inline-block' : 'none', opacity: open ? 1 : 0 }} className="truncate text-xs text-muted-foreground whitespace-pre inline-block !p-0 !m-0">
               {companyName}
@@ -191,7 +191,7 @@ export function Sidebar() {
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto overflow-x-hidden px-3 py-4">
+        <div className="flex-1 overflow-y-auto overflow-x-hidden px-3 py-3">
           <motion.p animate={{ display: open ? 'block' : 'none', opacity: open ? 1 : 0 }} className="px-3 pb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
             Operação
           </motion.p>

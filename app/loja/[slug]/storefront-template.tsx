@@ -8,7 +8,7 @@
 // controlados pelo app via props (nenhum estado paralelo).
 // ============================================================
 
-import { useMemo, useState, useEffect, useRef, type ReactNode } from "react"
+import { useMemo, useState, useEffect, useRef, Fragment, type ReactNode } from "react"
 import {
   Search,
   User,
@@ -83,6 +83,8 @@ export type StorefrontData = {
     instagramImage?: string | null
     sectionVisibility?: Record<string, boolean>
     testimonials?: Array<{ name: string; text: string }>
+    sections?: string[]
+    bannerCarousels?: Array<{ id: string; images: string[] }>
   }
 }
 
@@ -215,6 +217,10 @@ const CSS = `
 .sf-midbanner__img { width: 100%; height: 260px; object-fit: cover; display: block; }
 .sf-midbanner__fallback { width: 100%; height: 260px; background: linear-gradient(135deg, var(--sf-primary), var(--sf-secondary)); position: relative; overflow: hidden; }
 .sf-midbanner__fallback::after { content: ""; position: absolute; left: -60px; bottom: -100px; width: 280px; height: 280px; border-radius: 50%; background: rgba(255,255,255,.12); }
+.sf-carousel { margin: 40px auto; max-width: 1200px; }
+.sf-carousel .sf-midbanner__frame { position: relative; overflow: hidden; height: 260px; }
+.sf-carousel .sf-midbanner__slides { display: flex; height: 100%; transition: transform .6s ease; }
+.sf-carousel .sf-midbanner__slide { min-width: 100%; height: 100%; background-size: cover; background-position: center; display: block; }
 
 .sf-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; }
 
@@ -655,6 +661,73 @@ const MidBanner = ({ url, alt }: { url: string | null; alt: string }) => (
   </section>
 )
 
+/** Carrossel de banner individual (cada camada tem suas próprias imagens). */
+const BannerCarousel = ({ images, alt }: { images: string[]; alt: string }) => {
+  const [idx, setIdx] = useState(0)
+  const timer = useRef<number | null>(null)
+
+  useEffect(() => {
+    if (images.length <= 1) return
+    timer.current = window.setInterval(
+      () => setIdx((i) => (i + 1) % images.length),
+      5000
+    )
+    return () => {
+      if (timer.current) window.clearInterval(timer.current)
+    }
+  }, [images.length])
+
+  return (
+    <section className="sf-midbanner sf-carousel" aria-label={alt}>
+      <div className="sf-midbanner__frame">
+        <div
+          className="sf-midbanner__slides"
+          style={{ transform: `translateX(-${idx * 100}%)` }}
+        >
+          {images.map((url, i) => (
+            <a
+              key={i}
+              href="#produtos"
+              className="sf-midbanner__slide"
+              style={{ backgroundImage: `url(${url})` }}
+              role="img"
+              aria-label={`${alt} — imagem ${i + 1}`}
+            />
+          ))}
+        </div>
+        {images.length > 1 && (
+          <>
+            <button
+              className="sf-hero__arrow sf-hero__arrow--left"
+              onClick={() => setIdx((i) => (i - 1 + images.length) % images.length)}
+              aria-label="Imagem anterior"
+            >
+              <ChevronLeft size={20} />
+            </button>
+            <button
+              className="sf-hero__arrow sf-hero__arrow--right"
+              onClick={() => setIdx((i) => (i + 1) % images.length)}
+              aria-label="Próxima imagem"
+            >
+              <ChevronRight size={20} />
+            </button>
+            <div className="sf-hero__dots">
+              {images.map((_, i) => (
+                <button
+                  key={i}
+                  className={i === idx ? "sf-dot sf-dot--active" : "sf-dot"}
+                  onClick={() => setIdx(i)}
+                  aria-label={`Ir para imagem ${i + 1}`}
+                />
+              ))}
+            </div>
+          </>
+        )}
+      </div>
+    </section>
+  )
+}
+
 const ProductCard = ({
   product,
   shippingNote,
@@ -1058,6 +1131,80 @@ export function StorefrontTemplate({
     document.getElementById('produtos')?.scrollIntoView({ behavior: 'smooth' })
   }
 
+  // Sistema de camadas: ordem configurável das seções + carrosséis intercalados
+  const sectionsOrder = storefront.storeLayout?.sections ?? []
+  const bannerCarousels = storefront.storeLayout?.bannerCarousels ?? []
+  const carouselAfter: Record<string, string[]> = {}
+  bannerCarousels.forEach((carousel) => {
+    const anchor = carousel.id.startsWith('after-') ? carousel.id.slice(6) : ''
+    if (anchor) carouselAfter[anchor] = carousel.images
+  })
+  const carouselList = bannerCarousels.filter((carousel) => !carousel.id.startsWith('after-'))
+  const sectionLabels: Record<string, string> = {
+    featured: 'Produtos em destaque',
+    catalog: 'Catálogo completo',
+    categories: 'Categorias',
+    brands: 'Marcas',
+    testimonials: 'Depoimentos',
+    about: 'Sobre a loja',
+    instagram: 'Instagram',
+    benefits: 'Benefícios',
+    contact: 'Contato',
+  }
+
+  const renderSection = (key: string) => {
+    switch (key) {
+      case 'featured':
+        return visibility.featured !== false ? (
+          <ProductSection
+            id="produtos"
+            title={<>Produtos em <strong>destaque</strong></>}
+            products={featured}
+            shippingNote={storefront.storeShippingNote}
+            onAddToCart={onAddToCart}
+            onViewProduct={onViewProduct}
+          />
+        ) : null
+      case 'catalog':
+        return visibility.catalog !== false ? (
+          <ProductSection
+            title="Catálogo completo"
+            products={filtered}
+            shippingNote={storefront.storeShippingNote}
+            onAddToCart={onAddToCart}
+            onViewProduct={onViewProduct}
+          />
+        ) : null
+      case 'categories':
+        return visibility.categories !== false ? <CategoryCards items={cats} products={storefront.products} images={storefront.storeLayout?.categoryImages ?? {}} onSelect={selectCategory} /> : null
+      case 'brands':
+        return visibility.brands !== false ? <BrandsSection items={cats} products={storefront.products} /> : null
+      case 'testimonials':
+        return visibility.testimonials !== false ? <Testimonials items={storefront.storeLayout?.testimonials ?? []} /> : null
+      case 'about':
+        return visibility.about !== false ? <About data={storefront} /> : null
+      case 'instagram':
+        return visibility.instagram !== false ? <InstagramBanner data={storefront} /> : null
+      case 'benefits':
+        return visibility.benefits !== false ? <BenefitsStrip shippingNote={storefront.storeShippingNote} /> : null
+      case 'contact':
+        return visibility.contact !== false ? <Contact data={storefront} /> : null
+      default:
+        return null
+    }
+  }
+
+  const renderLayer = (key: string, index: number) => {
+    const nodes: ReactNode[] = []
+    const section = renderSection(key)
+    if (section) nodes.push(<Fragment key={`layer-${key}-${index}`}>{section}</Fragment>)
+    const after = carouselAfter[key]
+    if (after?.length) {
+      nodes.push(<BannerCarousel key={`carousel-${key}-${index}`} images={after} alt={`Banner após ${sectionLabels[key] ?? key}`} />)
+    }
+    return nodes
+  }
+
   return (
     <div className="sf-root" ref={rootRef}>
       <style>{CSS}</style>
@@ -1090,41 +1237,28 @@ export function StorefrontTemplate({
         />
       ) : (
         <>
-          {visibility.featured !== false && <ProductSection
-            id="produtos"
-            title={
-              <>
-                Produtos em <strong>destaque</strong>
-              </>
-            }
-            products={featured}
-            shippingNote={storefront.storeShippingNote}
-            onAddToCart={onAddToCart}
-            onViewProduct={onViewProduct}
-          />}
-
-          <MidBanner
-            url={storefront.storeBannerUrl}
-            alt={`Banner de ${storefront.storeName}`}
-          />
-
-          {visibility.catalog !== false && <ProductSection
-            title="Catálogo completo"
-            products={filtered}
-            shippingNote={storefront.storeShippingNote}
-            onAddToCart={onAddToCart}
-            onViewProduct={onViewProduct}
-          />}
-
-          {visibility.categories !== false && <CategoryCards items={cats} products={storefront.products} images={storefront.storeLayout?.categoryImages ?? {}} onSelect={selectCategory} />}
-
-          {visibility.brands !== false && <BrandsSection items={cats} products={storefront.products} />}
-
-          {visibility.testimonials !== false && <Testimonials items={storefront.storeLayout?.testimonials ?? []} />}
-
-          {visibility.about !== false && <About data={storefront} />}
-
-          {visibility.instagram !== false && <InstagramBanner data={storefront} />}
+          {sectionsOrder.length > 0 ? (
+            <>
+              {sectionsOrder.flatMap((key, index) => renderLayer(key, index))}
+              {carouselList.filter((carousel) => carousel.images.length > 0).map((carousel) => (
+                <BannerCarousel key={carousel.id} images={carousel.images} alt="Banner da loja" />
+              ))}
+            </>
+          ) : (
+            <>
+              {renderLayer('featured', 0)}
+              <MidBanner
+                url={storefront.storeBannerUrl}
+                alt={`Banner de ${storefront.storeName}`}
+              />
+              {renderLayer('catalog', 1)}
+              {renderLayer('categories', 2)}
+              {renderLayer('brands', 3)}
+              {renderLayer('testimonials', 4)}
+              {renderLayer('about', 5)}
+              {renderLayer('instagram', 6)}
+            </>
+          )}
         </>
       )}
 

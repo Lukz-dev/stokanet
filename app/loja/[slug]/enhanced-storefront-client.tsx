@@ -885,9 +885,9 @@ export function EnhancedStorefrontClient({ storefront }: { storefront: Storefron
       </main>
 
       {selectedProduct && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 sf-fade-in" onClick={() => setSelectedProductId(null)}>
-          <div className="sf-modal-in bg-slate-900 rounded-3xl border border-white/10 max-w-3xl w-full max-h-[90vh] overflow-y-auto text-white" onClick={(event) => event.stopPropagation()}>
-            <div className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-white/10 bg-slate-900/95 p-6 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#2b2118]/70 sf-fade-in" onClick={() => setSelectedProductId(null)}>
+          <div className="sf-modal-in bg-[#fdfaf3] border border-[#b08d57] max-w-3xl w-full max-h-[90vh] overflow-y-auto text-[#2b2118]" style={{ fontFamily: "Georgia, serif" }} onClick={(event) => event.stopPropagation()}>
+            <div className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-[#e3d5bd] bg-[#fdfaf3]/95 p-6 backdrop-blur-sm">
               <div className="min-w-0">
                 <p className="text-xs uppercase tracking-[0.24em] text-white/45">{selectedProduct.category?.name ?? 'Produto'}</p>
                 <h2 className="truncate text-2xl font-semibold">{selectedProduct.name}</h2>

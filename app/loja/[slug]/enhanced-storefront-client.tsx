@@ -399,8 +399,8 @@ export function EnhancedStorefrontClient({ storefront }: { storefront: Storefron
       <div className="hidden" aria-hidden="true" />
 
       {toast && (
-        <div key={toast.id} aria-live="polite" role="status" className="fixed left-1/2 top-20 z-[60] -translate-x-1/2 sf-toast">
-          <div className={clsx('flex items-center gap-3 rounded-2xl border border-emerald-400/30 bg-emerald-950/90 px-4 py-3 text-sm text-emerald-50 shadow-2xl shadow-black/40 backdrop-blur-xl', !customTheme && '')} style={customTheme ? { borderColor: rgbaFromHex(customTheme.primary, 0.4) } : undefined}>
+        <div key={toast.id} aria-live="polite" role="status" className="sf-toast pointer-events-none fixed inset-x-0 top-20 z-[60] flex justify-center px-4">
+          <div className="flex items-center gap-3 rounded-2xl border border-emerald-400/30 bg-emerald-950/90 px-4 py-3 text-sm text-emerald-50 shadow-2xl shadow-black/40 backdrop-blur-xl" style={customTheme ? { borderColor: rgbaFromHex(customTheme.primary, 0.4) } : undefined}>
             <span className={clsx('flex h-8 w-8 items-center justify-center rounded-full text-white', !customTheme && 'bg-emerald-500')} style={customTheme ? customTheme.buttonStyle : undefined}>
               <ShoppingBag className="h-4 w-4" />
             </span>

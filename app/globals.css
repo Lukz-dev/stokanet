@@ -241,3 +241,4 @@
 .sf-gallery-thumb { cursor: pointer; transition: border-color 0.15s ease, transform 0.15s ease; }
 .sf-gallery-thumb:hover { transform: translateY(-2px); }
 .sf-gallery-thumb[data-active='true'] { border-color: rgba(255, 255, 255, 0.7) !important; }
+

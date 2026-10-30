@@ -130,12 +130,12 @@ export function Header() {
   }
 
   return (
-    <header className="h-16 border-b border-border bg-background/80 backdrop-blur-md sticky top-0 z-10 flex items-center justify-between px-8">
+    <header className="h-14 border-b border-border bg-background sticky top-0 z-10 flex items-center justify-between px-6 gap-4">
       <div className="flex items-center gap-4">
-        <Link href="/" className="flex items-center text-lg font-bold">
+        <Link href="/" className="flex items-center text-[15px] font-semibold tracking-tight">
           StokaNet
         </Link>
-        <div className="flex items-center bg-muted/50 rounded-full px-3 py-1.5 w-80 border border-border/50 focus-within:border-primary/50 focus-within:ring-1 focus-within:ring-primary/20 transition-all">
+        <div className="flex items-center bg-muted/60 rounded-md px-3 py-1.5 w-80 border border-transparent focus-within:border-border focus-within:bg-background transition-all">
         <Search className="w-4 h-4 text-muted-foreground mr-2 shrink-0" />
         <input
           type="text"
@@ -150,7 +150,7 @@ export function Header() {
           <button
             type="button"
             onClick={() => setNotificationsOpen((value) => !value)}
-            className="relative p-2 text-muted-foreground hover:text-foreground transition-colors rounded-full hover:bg-muted"
+            className="relative p-2 text-muted-foreground hover:text-foreground transition-colors rounded-md hover:bg-muted"
             aria-label="Abrir notificações"
           >
             <Bell className="w-5 h-5" />
@@ -162,7 +162,7 @@ export function Header() {
           </button>
 
           {notificationsOpen && (
-            <div className="absolute right-0 top-[calc(100%+0.75rem)] w-[360px] rounded-xl border border-border bg-card shadow-xl shadow-black/10 overflow-hidden z-30">
+            <div className="absolute right-0 top-[calc(100%+0.75rem)] w-[360px] rounded-lg border border-border bg-card shadow-lg shadow-black/5 overflow-hidden z-30">
               <div className="px-4 py-3 border-b border-border bg-muted/20">
                 <p className="text-sm font-semibold">Notificações</p>
                 <p className="text-xs text-muted-foreground mt-1">
@@ -210,7 +210,7 @@ export function Header() {
               <p className="text-sm font-medium leading-none">{userName}</p>
               {companyName && <p className="text-xs text-muted-foreground mt-0.5">{companyName}</p>}
             </div>
-            <div className="w-9 h-9 rounded-full bg-primary/20 border-2 border-primary/30 flex items-center justify-center text-primary font-bold text-sm cursor-pointer hover:bg-primary/30 transition-colors overflow-hidden">
+            <div className="w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center font-semibold text-xs cursor-pointer transition-opacity hover:opacity-90 overflow-hidden">
               {avatarUrl ? (
                 <Image
                   src={avatarUrl}
@@ -228,7 +228,7 @@ export function Header() {
           </button>
 
           {menuOpen && (
-            <div className="absolute right-0 top-[calc(100%+0.75rem)] w-64 rounded-xl border border-border bg-card shadow-xl shadow-black/10 overflow-hidden z-30">
+            <div className="absolute right-0 top-[calc(100%+0.75rem)] w-64 rounded-lg border border-border bg-card shadow-lg shadow-black/5 overflow-hidden z-30">
               <div className="p-4 border-b border-border bg-muted/20">
                 <p className="text-sm font-semibold truncate">{userName}</p>
                 {companyName && <p className="text-xs text-primary mt-1 font-medium truncate">{companyName}</p>}

@@ -53,6 +53,29 @@ function normalizeStoreLayout(value: unknown) {
       ? layout.testimonials.filter((item): item is { name: string; text: string } => Boolean(item && typeof item === 'object' && typeof (item as { name?: unknown }).name === 'string' && typeof (item as { text?: unknown }).text === 'string')).slice(0, 8)
       : []
 
+    // Sistema de camadas: ordem das seções + carrosséis de banner individuais
+    const rawSections = Array.isArray(layout.sections) ? layout.sections : []
+    const knownSections = new Set(['featured', 'catalog', 'categories', 'brands', 'testimonials', 'about', 'instagram', 'benefits', 'contact'])
+    const sections = rawSections
+      .filter((item): item is string => typeof item === 'string' && knownSections.has(item))
+      .filter((item, index, all) => all.indexOf(item) === index)
+    knownSections.forEach((key) => { if (!sections.includes(key)) sections.push(key) })
+
+    const rawCarouselList = Array.isArray(layout.bannerCarousels) ? layout.bannerCarousels : []
+    const bannerCarousels = rawCarouselList
+      .map((item) => {
+        if (!item || typeof item !== 'object' || Array.isArray(item)) return null
+        const carousel = item as Record<string, unknown>
+        const images = Array.isArray(carousel.images) ? carousel.images.filter((img): img is string => typeof img === 'string' && img.trim().length > 0).slice(0, 8) : []
+        if (images.length === 0) return null
+        return {
+          id: typeof carousel.id === 'string' && carousel.id.trim() ? carousel.id.trim() : `carousel-${Math.random().toString(36).slice(2, 10)}`,
+          images,
+        }
+      })
+      .filter((item): item is { id: string; images: string[] } => item !== null)
+      .slice(0, 6)
+
     return {
       logoPosition: layout.logoPosition === 'center' || layout.logoPosition === 'right' ? layout.logoPosition : 'left',
       bannerStyle: layout.bannerStyle === 'compact' || layout.bannerStyle === 'split' ? layout.bannerStyle : 'hero',
@@ -84,6 +107,8 @@ function normalizeStoreLayout(value: unknown) {
         benefits: rawVisibility.benefits !== false,
         contact: rawVisibility.contact !== false,
       },
+      sections,
+      bannerCarousels,
       testimonials,
     }
   }

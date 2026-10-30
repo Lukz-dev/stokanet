@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "npm exec prisma -- migrate deploy && npm exec prisma -- generate && npm exec next -- build",
+    "build": "node scripts/vercel-build.js && next build",
     "db:push": "npm exec prisma -- db push",
     "db:push:reset": "npm exec prisma -- db push --force-reset",
     "start": "next start",
@@ -12,7 +12,7 @@
     "lint": "eslint",
     "test:e2e": "playwright test",
     "seed": "npm exec ts-node -- --esm prisma/seed.ts",
-    "postinstall": "npm exec prisma -- generate"
+    "postinstall": "node scripts/prisma-generate-if-env.js"
   },
   "dependencies": {
     "@libsql/client": "^0.17.2",

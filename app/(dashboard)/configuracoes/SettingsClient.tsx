@@ -139,6 +139,31 @@ export function SettingsClient({
   const initialCategoryImages = Object.fromEntries(Object.entries(storedCategoryImages).filter(([, value]) => typeof value === 'string')) as Record<string, string>
   const storedTestimonials = Array.isArray(storeLayout.testimonials) ? storeLayout.testimonials.filter((item): item is { name: string; text: string } => Boolean(item && typeof item === 'object' && typeof (item as { name?: unknown }).name === 'string' && typeof (item as { text?: unknown }).text === 'string')) : []
   const initialTestimonials = storedTestimonials.length > 0 ? storedTestimonials : DEFAULT_TESTIMONIALS
+  const SECTION_LABELS: Record<string, string> = {
+    featured: 'Produtos em destaque',
+    catalog: 'Catálogo completo',
+    categories: 'Categorias',
+    brands: 'Marcas',
+    testimonials: 'Depoimentos',
+    about: 'Sobre a loja',
+    instagram: 'Instagram',
+    benefits: 'Benefícios',
+    contact: 'Contato',
+  }
+  const storedSections = Array.isArray(storeLayout.sections) ? storeLayout.sections.filter((item): item is string => typeof item === 'string' && item in SECTION_LABELS) : []
+  const initialSections = storedSections.length > 0
+    ? [...storedSections]
+    : ['featured', 'catalog', 'categories', 'brands', 'testimonials', 'about', 'instagram']
+  const storedCarousels = Array.isArray(storeLayout.bannerCarousels) ? storeLayout.bannerCarousels : []
+  const initialCarousels = storedCarousels
+    .map((item, index) => {
+      if (!item || typeof item !== 'object' || Array.isArray(item)) return null
+      const carousel = item as Record<string, unknown>
+      const images = Array.isArray(carousel.images) ? carousel.images.filter((img): img is string => typeof img === 'string' && img.trim().length > 0).slice(0, 8) : []
+      if (images.length === 0) return null
+      return { id: typeof carousel.id === 'string' && carousel.id.trim() ? carousel.id.trim() : `after-${initialSections[index] ?? 'catalog'}`, images }
+    })
+    .filter((item): item is { id: string; images: string[] } => item !== null)
   const [form, setForm] = useState({
     defaultMinStock: String(defaultMinStock),
     notificationWebhookUrl,
@@ -196,6 +221,8 @@ export function SettingsClient({
         benefits: storedVisibility.benefits !== false,
         contact: storedVisibility.contact !== false,
       },
+      sections: initialSections,
+      bannerCarousels: initialCarousels,
     },
     storeTheme,
     storeActive: Boolean(storeActive),
@@ -228,6 +255,8 @@ export function SettingsClient({
       instagramImage: form.storeLayout.instagramImage || null,
       sectionVisibility: form.storeLayout.sectionVisibility,
       testimonials: form.storeLayout.testimonials,
+      sections: form.storeLayout.sections,
+      bannerCarousels: form.storeLayout.bannerCarousels,
     },
   }
 
@@ -292,6 +321,8 @@ export function SettingsClient({
             instagramImage: form.storeLayout.instagramImage || null,
             testimonials: form.storeLayout.testimonials,
             sectionVisibility: form.storeLayout.sectionVisibility,
+            sections: form.storeLayout.sections,
+            bannerCarousels: form.storeLayout.bannerCarousels,
           },
           storeTheme: form.storeTheme,
           storeActive: form.storeActive,
@@ -871,12 +902,54 @@ export function SettingsClient({
 
           <section className="bg-card border border-border rounded-2xl shadow-sm p-6">
             <div className="mb-5 flex items-center justify-between gap-4">
-              <div><h2 className="text-lg font-semibold">Seções visíveis</h2><p className="text-sm text-muted-foreground">Escolha quais blocos aparecem na loja. A posição permanece fixa.</p></div>
+              <div><h2 className="text-lg font-semibold">Camadas da loja</h2><p className="text-sm text-muted-foreground">Organize a ordem das seções e intercale carrosséis de banner. Cada carrossel tem as próprias imagens.</p></div>
               <Store className="h-5 w-5 text-primary" />
             </div>
-            <div className="grid gap-3 sm:grid-cols-2">
-              {([['featured', 'Produtos em destaque'], ['catalog', 'Catálogo completo'], ['categories', 'Categorias'], ['brands', 'Marcas'], ['testimonials', 'Depoimentos'], ['about', 'Sobre a loja'], ['instagram', 'Instagram'], ['benefits', 'Benefícios'], ['contact', 'Contato']] as const).map(([key, label]) => (
-                <label key={key} className="flex items-center justify-between gap-3 rounded-lg border border-border bg-background px-3 py-2 text-sm"><span>{label}</span><input type="checkbox" checked={form.storeLayout.sectionVisibility[key]} onChange={(event) => setForm((prev) => ({ ...prev, storeLayout: { ...prev.storeLayout, sectionVisibility: { ...prev.storeLayout.sectionVisibility, [key]: event.target.checked } } }))} className="h-4 w-4" /></label>
+
+            <div className="space-y-2">
+              {form.storeLayout.sections.map((key, index) => {
+                const carousel = form.storeLayout.bannerCarousels.find((item) => item.id === `after-${key}`)
+                return (
+                  <div key={key} className="rounded-xl border border-border bg-background">
+                    <div className="flex items-center gap-2 px-3 py-2.5">
+                      <div className="flex flex-col">
+                        <button type="button" aria-label="Subir" disabled={index === 0} onClick={() => setForm((prev) => { const next = [...prev.storeLayout.sections]; const [moved] = next.splice(index, 1); next.splice(index - 1, 0, moved); return { ...prev, storeLayout: { ...prev.storeLayout, sections: next } } })} className="rounded p-0.5 text-muted-foreground hover:bg-muted disabled:opacity-30">▲</button>
+                        <button type="button" aria-label="Descer" disabled={index === form.storeLayout.sections.length - 1} onClick={() => setForm((prev) => { const next = [...prev.storeLayout.sections]; const [moved] = next.splice(index, 1); next.splice(index + 1, 0, moved); return { ...prev, storeLayout: { ...prev.storeLayout, sections: next } } })} className="rounded p-0.5 text-muted-foreground hover:bg-muted disabled:opacity-30">▼</button>
+                      </div>
+                      <span className="flex-1 text-sm font-medium">{SECTION_LABELS[key] ?? key}</span>
+                      <span className="text-xs text-muted-foreground">{index + 1}º</span>
+                      <label className="flex items-center gap-1.5 text-xs text-muted-foreground"><input type="checkbox" checked={form.storeLayout.sectionVisibility[key as keyof typeof form.storeLayout.sectionVisibility] !== false} onChange={(event) => setForm((prev) => ({ ...prev, storeLayout: { ...prev.storeLayout, sectionVisibility: { ...prev.storeLayout.sectionVisibility, [key]: event.target.checked } } }))} className="h-4 w-4" />visível</label>
+                    </div>
+                    <div className="border-t border-border/60 px-3 py-2">
+                      {carousel ? (
+                        <div className="flex flex-wrap items-center gap-2">
+                          <div className="flex flex-1 flex-wrap gap-1.5">{carousel.images.map((image, imageIndex) => <span key={imageIndex} className="relative"><img src={image} alt="" className="h-10 w-16 rounded border border-border object-cover" /><button type="button" aria-label="Remover imagem" onClick={() => setForm((prev) => ({ ...prev, storeLayout: { ...prev.storeLayout, bannerCarousels: prev.storeLayout.bannerCarousels.map((item) => item.id === `after-${key}` ? { ...item, images: item.images.filter((_, i) => i !== imageIndex) } : item).filter((item) => item.images.length > 0) } }))} className="absolute -right-1 -top-1 rounded-full bg-black/70 px-1 text-[10px] text-white">×</button></span>)}</div>
+                          <label className="cursor-pointer rounded-md border border-border bg-card px-2 py-1.5 text-xs font-semibold hover:bg-muted"><input type="file" accept="image/*" multiple className="sr-only" onChange={(event) => { const files = event.target.files; if (!files?.length) return; void (async () => { try { const images = await Promise.all(Array.from(files).filter((file) => file.type.startsWith('image/')).slice(0, 8).map((file) => readAndResizeImage(file, 1800, 900))); setForm((prev) => ({ ...prev, storeLayout: { ...prev.storeLayout, bannerCarousels: prev.storeLayout.bannerCarousels.map((item) => item.id === `after-${key}` ? { ...item, images: [...item.images, ...images].slice(0, 8) } : item) } })); setSuccess('Imagens carregadas no carrossel. Salve para publicar.'); } catch { setError('Não foi possível carregar as imagens.'); } })(); event.currentTarget.value = '' }} />+ fotos</label>
+                          <button type="button" onClick={() => setForm((prev) => ({ ...prev, storeLayout: { ...prev.storeLayout, bannerCarousels: prev.storeLayout.bannerCarousels.filter((item) => item.id !== `after-${key}`) } }))} className="rounded-md border border-destructive/30 px-2 py-1.5 text-xs text-destructive">Remover carrossel</button>
+                        </div>
+                      ) : (
+                        <button type="button" onClick={() => setForm((prev) => ({ ...prev, storeLayout: { ...prev.storeLayout, bannerCarousels: [...prev.storeLayout.bannerCarousels, { id: `after-${key}`, images: [] }] } }))} className="text-xs font-semibold text-primary hover:underline">+ Adicionar carrossel de banner após esta seção</button>
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+            <p className="mt-3 text-xs text-muted-foreground">Use ▲▼ para reordenar. O carrossel aparece imediatamente após a seção, com as fotos que você escolher — cada um é independente.</p>
+            <div className="mt-3 rounded-xl border border-dashed border-border bg-background px-3 py-2.5">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-sm font-medium">Rodapé da vitrine</span>
+                {form.storeLayout.bannerCarousels.some((item) => item.id === 'after-footer') ? (
+                  <button type="button" onClick={() => setForm((prev) => ({ ...prev, storeLayout: { ...prev.storeLayout, bannerCarousels: prev.storeLayout.bannerCarousels.filter((item) => item.id !== 'after-footer') } }))} className="rounded-md border border-destructive/30 px-2 py-1.5 text-xs text-destructive">Remover carrossel final</button>
+                ) : (
+                  <button type="button" onClick={() => setForm((prev) => ({ ...prev, storeLayout: { ...prev.storeLayout, bannerCarousels: [...prev.storeLayout.bannerCarousels, { id: 'after-footer', images: [] }] } }))} className="text-xs font-semibold text-primary hover:underline">+ Adicionar carrossel no final da loja</button>
+                )}
+              </div>
+              {form.storeLayout.bannerCarousels.filter((item) => item.id === 'after-footer').map((carousel) => (
+                <div key={carousel.id} className="mt-2 flex flex-wrap items-center gap-2">
+                  <div className="flex flex-1 flex-wrap gap-1.5">{carousel.images.map((image, imageIndex) => <span key={imageIndex} className="relative"><img src={image} alt="" className="h-10 w-16 rounded border border-border object-cover" /><button type="button" aria-label="Remover imagem" onClick={() => setForm((prev) => ({ ...prev, storeLayout: { ...prev.storeLayout, bannerCarousels: prev.storeLayout.bannerCarousels.map((item) => item.id === 'after-footer' ? { ...item, images: item.images.filter((_, i) => i !== imageIndex) } : item).filter((item) => item.images.length > 0) } }))} className="absolute -right-1 -top-1 rounded-full bg-black/70 px-1 text-[10px] text-white">×</button></span>)}</div>
+                  <label className="cursor-pointer rounded-md border border-border bg-card px-2 py-1.5 text-xs font-semibold hover:bg-muted"><input type="file" accept="image/*" multiple className="sr-only" onChange={(event) => { const files = event.target.files; if (!files?.length) return; void (async () => { try { const images = await Promise.all(Array.from(files).filter((file) => file.type.startsWith('image/')).slice(0, 8).map((file) => readAndResizeImage(file, 1800, 900))); setForm((prev) => ({ ...prev, storeLayout: { ...prev.storeLayout, bannerCarousels: prev.storeLayout.bannerCarousels.map((item) => item.id === 'after-footer' ? { ...item, images: [...item.images, ...images].slice(0, 8) } : item) } })); setSuccess('Imagens carregadas no carrossel. Salve para publicar.'); } catch { setError('Não foi possível carregar as imagens.'); } })(); event.currentTarget.value = '' }} />+ fotos</label>
+                </div>
               ))}
             </div>
           </section>

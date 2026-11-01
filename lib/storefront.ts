@@ -2,6 +2,7 @@ import { Prisma } from '@prisma/client'
 import { revalidatePath } from 'next/cache'
 import prisma from '@/lib/prisma'
 import { createCheckoutPreference, refreshMercadoPagoOAuthToken } from '@/lib/mercadopago'
+import { isProAmount } from '@/lib/plans'
 
 export type StorefrontCheckoutItemInput = {
   productId: string
@@ -275,6 +276,13 @@ export async function getStorefrontBySlug(slug: string) {
   })
 
   if (!company || !company.storeActive) return null
+
+  // Loja online é exclusiva do plano PRO (planos legados 100/1020 mantêm acesso)
+  const subscription = await prisma.subscription.findUnique({
+    where: { companyId: company.id },
+    select: { amount: true, status: true },
+  })
+  if (!(subscription?.status === 'ACTIVE' && isProAmount(subscription.amount))) return null
 
   return {
     ...company,

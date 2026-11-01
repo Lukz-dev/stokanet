@@ -831,7 +831,14 @@ export async function getDashboardStats() {
     take: 6,
   })
 
-  return { totalProducts, lowStockProducts, criticalProducts, totalValue, totalQty, criticalList }
+  const recentMovements = await prisma.movement.findMany({
+    where: { companyId },
+    orderBy: { createdAt: 'desc' },
+    take: 8,
+    include: { product: { select: { name: true, sku: true } } },
+  })
+
+  return { totalProducts, lowStockProducts, criticalProducts, totalValue, totalQty, criticalList, recentMovements }
 }
 
 type BossProductStat = {

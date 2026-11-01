@@ -271,6 +271,12 @@ const CSS = `
 .sf-testimonial__stars { color: #f5a623; display: flex; gap: 2px; }
 .sf-testimonial p { margin: 0; font-size: 13px; font-style: italic; color: #555; flex: 1; }
 .sf-testimonial footer { font-weight: 700; font-size: 12px; color: var(--sf-primary); }
+.sf-testimonials__frame { position: relative; }
+.sf-testimonials__viewport { overflow: hidden; padding-bottom: 28px; }
+.sf-testimonials__track { display: flex; transition: transform .5s ease; }
+.sf-testimonials__page { min-width: 100%; display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; box-sizing: border-box; }
+@media (max-width: 1024px) { .sf-testimonials__page { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 640px) { .sf-testimonials__page { grid-template-columns: 1fr; } }
 
 /* sobre a loja */
 .sf-about { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; align-items: center; }
@@ -902,27 +908,64 @@ const BrandsSection = ({ items, products }: {
 }
 
 const Testimonials = ({ items: configured }: { items: Array<{ name: string; text: string }> }) => {
+  const [page, setPage] = useState(0)
+  const testTimer = useRef<number | null>(null)
   const items = configured.length > 0 ? configured : [
     { name: "Cliente A", text: "Produto original! Chegou direitinho e bem embalado! Estou super feliz com minha compra! 🥰" },
     { name: "Cliente B", text: "Encomenda super bem embalada, chegou rápido, produto perfeito, vendedora super atenciosa. Recomendo!" },
     { name: "Cliente C", text: "Produto recebido. Bem embalado, caixa perfumada e produto como o anúncio. Recomendo." },
     { name: "Cliente D", text: "O vendedor enviou super rápido. Chegou em poucos dias! É original. Tô super satisfeita." },
   ]
+  const testPages: Array<Array<{ name: string; text: string }>> = []
+  for (let i = 0; i < items.length; i += 3) testPages.push(items.slice(i, i + 3))
+  const testPageCount = testPages.length
+
+  useEffect(() => {
+    if (testPageCount <= 1) return
+    testTimer.current = window.setInterval(() => setPage((p) => (p + 1) % testPageCount), 6000)
+    return () => {
+      if (testTimer.current) window.clearInterval(testTimer.current)
+    }
+  }, [testPageCount])
+
   return (
     <section className="sf-section sf-container">
       <h2 className="sf-section__title">Depoimentos</h2>
-      <div className="sf-testimonials__row">
-        {items.map((t, i) => (
-          <blockquote key={i} className="sf-testimonial">
-            <div className="sf-testimonial__stars">
-              {Array.from({ length: 5 }).map((_, s) => (
-                <Star key={s} size={14} fill="currentColor" />
+      <div className="sf-testimonials__frame">
+        <div className="sf-testimonials__viewport">
+          <div className="sf-testimonials__track" style={{ transform: `translateX(-${page * 100}%)` }}>
+            {testPages.map((group, gi) => (
+              <div key={gi} className="sf-testimonials__page">
+                {group.map((t, i) => (
+                  <blockquote key={i} className="sf-testimonial">
+                    <div className="sf-testimonial__stars">
+                      {Array.from({ length: 5 }).map((_, s) => (
+                        <Star key={s} size={14} fill="currentColor" />
+                      ))}
+                    </div>
+                    <p>“{t.text}”</p>
+                    <footer>Cliente: {t.name}</footer>
+                  </blockquote>
+                ))}
+              </div>
+            ))}
+          </div>
+        </div>
+        {testPageCount > 1 && (
+          <>
+            <button className="sf-hero__arrow sf-hero__arrow--left" onClick={() => setPage((p) => (p - 1 + testPageCount) % testPageCount)} aria-label="Depoimentos anteriores">
+              <ChevronLeft size={20} />
+            </button>
+            <button className="sf-hero__arrow sf-hero__arrow--right" onClick={() => setPage((p) => (p + 1) % testPageCount)} aria-label="Próximos depoimentos">
+              <ChevronRight size={20} />
+            </button>
+            <div className="sf-hero__dots">
+              {testPages.map((_, i) => (
+                <button key={i} className={i === page ? "sf-dot sf-dot--active" : "sf-dot"} onClick={() => setPage(i)} aria-label={`Ir para depoimentos ${i + 1}`} />
               ))}
             </div>
-            <p>“{t.text}”</p>
-            <footer>Cliente: {t.name}</footer>
-          </blockquote>
-        ))}
+          </>
+        )}
       </div>
     </section>
   )

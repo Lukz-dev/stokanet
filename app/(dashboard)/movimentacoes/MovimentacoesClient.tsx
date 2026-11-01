@@ -4,6 +4,7 @@ import { useState, useCallback, useEffect, useMemo, useRef, useTransition } from
 import dynamic from 'next/dynamic'
 import { Plus, ArrowUpCircle, ArrowDownCircle, SlidersHorizontal, Package, Search, ChevronLeft, ChevronRight } from 'lucide-react'
 import { createSaleByCode } from '@/lib/actions'
+import { EmptyState } from '@/components/ui/empty-state'
 import { useRouter } from 'next/navigation'
 
 const MovementModal = dynamic(() => import('@/components/MovementModal').then((module) => module.MovementModal))
@@ -324,11 +325,12 @@ export function MovimentacoesClient({
           {/* Lista */}
           <div className="overflow-x-auto flex-1">
             {paginated.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
-                <Package className="w-16 h-16 mb-4 opacity-20" />
-                <p className="text-lg font-medium">Nenhuma movimentação encontrada</p>
-                <p className="text-sm mt-1">Registre uma movimentação clicando em &quot;Nova movimentação&quot;.</p>
-              </div>
+              <EmptyState
+                icon={Package}
+                title="Nenhuma movimentação encontrada"
+                description="Registre uma movimentação para controlar entradas, saídas e ajustes de estoque."
+                action={{ label: 'Nova movimentação', onClick: () => setShowModal(true) }}
+              />
             ) : (
               <table className="w-full text-sm text-left">
                 <thead className="text-xs uppercase bg-muted/30 text-muted-foreground border-b border-border">

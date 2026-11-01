@@ -2,6 +2,8 @@ import Link from 'next/link'
 import { createElement } from 'react'
 import { getDashboardStats } from '@/lib/actions'
 import { PackageSearch, TrendingUp, AlertTriangle, Package, ArrowUpRight, ArrowDownRight, BadgePercent } from "lucide-react"
+import { NumberTicker } from '@/components/ui/number-ticker'
+import { RecentMovementsFeed } from '@/components/ui/recent-movements'
 
 function formatCurrency(value: number) {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value)
@@ -17,6 +19,8 @@ function DashboardContent({ stats }: { stats: Awaited<ReturnType<typeof getDashb
     {
       label: 'Produtos ativos',
       value: stats.totalProducts.toString(),
+      ticker: stats.totalProducts,
+      tickerVariant: 'int',
       sub: `${stats.totalQty.toLocaleString('pt-BR')} unidades somadas no estoque ativo`,
       icon: Package,
       color: 'primary',
@@ -25,6 +29,8 @@ function DashboardContent({ stats }: { stats: Awaited<ReturnType<typeof getDashb
     {
       label: 'Valor em estoque',
       value: formatCurrency(stats.totalValue),
+      ticker: stats.totalValue,
+      tickerVariant: 'currency',
       sub: 'Considera apenas produtos ativos',
       icon: TrendingUp,
       color: 'indigo',
@@ -33,6 +39,8 @@ function DashboardContent({ stats }: { stats: Awaited<ReturnType<typeof getDashb
     {
       label: 'Produtos com atenção',
       value: stats.lowStockProducts.toString(),
+      ticker: stats.lowStockProducts,
+      tickerVariant: 'int',
       sub: 'Itens abaixo do ponto ideal',
       icon: AlertTriangle,
       color: 'amber',
@@ -41,6 +49,8 @@ function DashboardContent({ stats }: { stats: Awaited<ReturnType<typeof getDashb
     {
       label: 'Reposição urgente',
       value: stats.criticalProducts.toString(),
+      ticker: stats.criticalProducts,
+      tickerVariant: 'int',
       sub: 'Itens críticos ou zerados',
       icon: PackageSearch,
       color: 'destructive',
@@ -77,7 +87,9 @@ function DashboardContent({ stats }: { stats: Awaited<ReturnType<typeof getDashb
               <div className="flex justify-between items-start z-10">
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">{card.label}</p>
-                  <h2 className="text-2xl font-bold mt-1 truncate">{card.value}</h2>
+                  <h2 className="text-2xl font-bold mt-1 truncate">
+                    <NumberTicker value={card.ticker} variant={card.tickerVariant} />
+                  </h2>
                 </div>
                 <div className={`p-3 rounded-lg ${colorMap[card.color]} shrink-0`}>
                   <Icon className="w-5 h-5" />
@@ -163,6 +175,25 @@ function DashboardContent({ stats }: { stats: Awaited<ReturnType<typeof getDashb
           )}
         </div>
     </div>
+
+    {stats.recentMovements.length > 0 && (
+      <div className="bg-card border border-border rounded-xl shadow-sm p-6">
+        <div className="flex items-start justify-between gap-4 mb-4">
+          <div>
+            <h3 className="text-lg font-semibold">Movimentações recentes</h3>
+            <p className="text-sm text-muted-foreground">Últimas entradas, saídas e ajustes do estoque.</p>
+          </div>
+          <PackageSearch className="w-4 h-4 text-primary" />
+        </div>
+        <RecentMovementsFeed
+          items={stats.recentMovements.map((m) => ({
+            id: m.id,
+            name: `${m.type === 'ENTRADA' ? 'Entrada' : m.type === 'SAIDA' ? 'Saída' : 'Ajuste'} — ${m.quantity}x ${m.product.name}`,
+            description: `${m.product.sku} • ${new Date(m.createdAt).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}`,
+          }))}
+        />
+      </div>
+    )}
     </div>
   )
 }

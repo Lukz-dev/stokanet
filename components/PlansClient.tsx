@@ -55,6 +55,12 @@ export function PlansClient({ hasActiveSubscription }: PlansClientProps) {
   const [loading, setLoading] = useState<string | null>(null)
   const [error, setError] = useState<string>('')
   const [period, setPeriod] = useState<BillingPeriod>('MONTHLY')
+  const [autoRenew, setAutoRenew] = useState(false)
+
+  const switchPeriod = (next: BillingPeriod) => {
+    setPeriod(next)
+    setAutoRenew(next === 'ANNUAL')
+  }
 
   const handleCheckout = async (planId: 'BASIC' | 'PRO') => {
     setLoading(planId)
@@ -66,7 +72,7 @@ export function PlansClient({ hasActiveSubscription }: PlansClientProps) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           planId: `${planId}_${period}`,
-          billingMode: period === 'ANNUAL' ? 'RECURRING' : 'ONE_TIME',
+          billingMode: autoRenew ? 'RECURRING' : 'ONE_TIME',
         }),
       })
 
@@ -103,7 +109,7 @@ export function PlansClient({ hasActiveSubscription }: PlansClientProps) {
           <div className="mt-6 inline-flex rounded-full border border-border bg-muted/40 p-1">
             <button
               type="button"
-              onClick={() => setPeriod('MONTHLY')}
+              onClick={() => switchPeriod('MONTHLY')}
               className={clsx(
                 'rounded-full px-5 py-2 text-sm font-semibold transition-colors',
                 period === 'MONTHLY' ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
@@ -113,7 +119,7 @@ export function PlansClient({ hasActiveSubscription }: PlansClientProps) {
             </button>
             <button
               type="button"
-              onClick={() => setPeriod('ANNUAL')}
+              onClick={() => switchPeriod('ANNUAL')}
               className={clsx(
                 'rounded-full px-5 py-2 text-sm font-semibold transition-colors',
                 period === 'ANNUAL' ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
@@ -161,6 +167,34 @@ export function PlansClient({ hasActiveSubscription }: PlansClientProps) {
                     </li>
                   ))}
                 </ul>
+
+                <label className="mt-6 flex items-center justify-between gap-3 rounded-xl border border-border bg-muted/30 px-4 py-3">
+                  <span className="flex items-start gap-2">
+                    <span className="text-sm font-medium text-foreground">Renovação automática</span>
+                    <span className="block text-xs text-muted-foreground">
+                      {period === 'MONTHLY'
+                        ? 'Renova todo mês no Mercado Pago'
+                        : 'Renova automaticamente a cada ano'}
+                    </span>
+                  </span>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={autoRenew}
+                    onClick={() => setAutoRenew((v) => !v)}
+                    className={clsx(
+                      'relative h-6 w-11 shrink-0 rounded-full transition-colors',
+                      autoRenew ? 'bg-primary' : 'bg-muted-foreground/30'
+                    )}
+                  >
+                    <span
+                      className={clsx(
+                        'absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform',
+                        autoRenew ? 'translate-x-5' : 'translate-x-0'
+                      )}
+                    />
+                  </button>
+                </label>
 
                 <button
                   type="button"

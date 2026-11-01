@@ -80,6 +80,8 @@ enum NfeTaxRegime {
 enum PlanType {
   MONTHLY
   ANNUAL
+  BASIC
+  PRO
 }
 
 enum SubscriptionStatus {

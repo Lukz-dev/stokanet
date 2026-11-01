@@ -1,8 +1,11 @@
 import { getDashboardReport } from '@/lib/actions'
+import { requireFeature } from '@/lib/subscription-features'
+import { getActiveCompanyId } from '@/lib/access'
 import { BarChart3, AlertTriangle, Package2, ShoppingBag, ReceiptText, Clock3 } from 'lucide-react'
 
 export default async function RelatoriosPage() {
   try {
+    await requireFeature(await getActiveCompanyId(), 'reports')
     const report = await getDashboardReport()
 
     const marginColor = report.grossProfitMonth >= 0 ? 'text-emerald-600' : 'text-destructive'

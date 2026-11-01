@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { BadgeCheck, ExternalLink, Globe, LayoutGrid, Megaphone, Package, Sparkles, Store, Ticket, Truck } from 'lucide-react'
 import { buildStorefrontUrl } from '../../../lib/storefront'
 import { StoreProductsManager } from './StoreProductsManager'
+import { requireFeature } from '@/lib/subscription-features'
 
 async function getSandboxStatus() {
   return {
@@ -23,6 +24,7 @@ function themeLabel(theme: string | null | undefined) {
 
 export default async function LojaPage() {
   const companyId = await getActiveCompanyId()
+  await requireFeature(companyId, 'store')
 
   const [company, products] = await Promise.all([
     prisma.company.findUnique({ where: { id: companyId } }),

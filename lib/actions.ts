@@ -864,6 +864,8 @@ export async function getBossProfileStats() {
 }
 
 export async function getBossProfileStatsForRange(from: Date, to: Date) {
+  const { requireFeature } = await import('@/lib/subscription-features')
+  await requireFeature(await getCompanyId(), 'boss')
   const companyId = await getCompanyId()
   const toExclusive = new Date(to)
   toExclusive.setMilliseconds(toExclusive.getMilliseconds() + 1)
@@ -2876,6 +2878,8 @@ export async function getBatches(params?: { expiresInDays?: number; limit?: numb
 export async function getAuditLogs(limit = 200) {
   await requireRole(['ADMIN', 'MANAGER', 'OPERATOR'])
   const companyId = await getCompanyId()
+  const { requireFeature } = await import('@/lib/subscription-features')
+  await requireFeature(companyId, 'audit')
 
   return prisma.auditLog.findMany({
     where: { companyId },

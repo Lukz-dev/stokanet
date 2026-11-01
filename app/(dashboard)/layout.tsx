@@ -4,12 +4,15 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { redirect } from "next/navigation";
 import { getSubscriptionStatus } from "@/lib/subscription";
+import { isProAmount } from "@/lib/plans";
 
 export default async function DashboardLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  let isPro = false;
+
   try {
     const session = await getServerSession(authOptions);
     const sessionUser = session?.user as { companyId?: string; role?: string; isSystemAdmin?: boolean; isApproved?: boolean } | undefined;
@@ -26,6 +29,9 @@ export default async function DashboardLayout({
 
       try {
         subscription = await getSubscriptionStatus(companyId);
+        if (subscription.isActive && isProAmount(subscription.amount)) {
+          isPro = true;
+        }
       } catch (error) {
         console.error('[DashboardLayout] Failed to load subscription status', error);
       }
@@ -44,7 +50,7 @@ export default async function DashboardLayout({
 
   return (
     <div className="flex w-full min-h-full flex-row">
-      <Sidebar />
+      <Sidebar isPro={isPro} />
       <div className="flex-1 flex flex-col min-h-screen bg-background min-w-0">
         <Header />
         <main className="flex-1 p-8 overflow-auto">

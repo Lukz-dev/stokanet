@@ -10,18 +10,18 @@ import { Package, LayoutDashboard, ArrowRightLeft, Box, Building2, UserRound, Se
 import { cn } from '@/lib/utils'
 import { loadAvatarCached } from '@/lib/client-avatar'
 
-const navItems = [
+const navItems: Array<{ name: string; href: string; icon: any; adminOnly?: boolean; systemAdminOnly?: boolean; proOnly?: boolean }> = [
   { name: 'Visão geral', href: '/', icon: LayoutDashboard },
   { name: 'Produtos', href: '/estoque', icon: Package },
   { name: 'Caixa', href: '/caixa', icon: ScanLine },
   { name: 'Vendas', href: '/vendas', icon: Receipt },
-  { name: 'Loja online', href: '/loja', icon: Store },
-  { name: 'Pedidos online', href: '/loja/pedidos', icon: ShoppingCart },
+  { name: 'Loja online', href: '/loja', icon: Store, proOnly: true },
+  { name: 'Pedidos online', href: '/loja/pedidos', icon: ShoppingCart, proOnly: true },
   { name: 'Fornecedores', href: '/fornecedores', icon: Truck },
   { name: 'Compras', href: '/compras', icon: ClipboardList },
   { name: 'Fechamento', href: '/fechamento', icon: CalendarCheck2 },
-  { name: 'Relatórios', href: '/relatorios', icon: BarChart3 },
-  { name: 'Auditoria', href: '/auditoria', icon: ShieldCheck },
+  { name: 'Relatórios', href: '/relatorios', icon: BarChart3, proOnly: true },
+  { name: 'Auditoria', href: '/auditoria', icon: ShieldCheck, proOnly: true },
   { name: 'Reposições', href: '/movimentacoes', icon: ArrowRightLeft },
   { name: 'Perfil', href: '/perfil', icon: UserRound },
   { name: 'Assinatura', href: '/subscription', icon: BadgeDollarSign },
@@ -29,7 +29,7 @@ const navItems = [
   { name: 'Painel Admin', href: '/admin', icon: ShieldCheck, systemAdminOnly: true },
 ]
 
-export function Sidebar() {
+export function Sidebar({ isPro = false }: { isPro?: boolean }) {
   const { data: session } = useSession()
   const pathname = usePathname()
   const [open, setOpen] = useState(false)
@@ -63,6 +63,7 @@ export function Sidebar() {
   const visibleItems = navItems
     .filter((item) => !item.adminOnly || role === 'ADMIN' || role === 'MANAGER')
     .filter((item) => !item.systemAdminOnly || isSystemAdmin)
+    .filter((item) => !item.proOnly || isPro || isSystemAdmin)
 
   const navLinks = (
     <nav className="flex flex-col gap-1">

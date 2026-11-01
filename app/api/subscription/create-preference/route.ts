@@ -24,6 +24,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // planId agora é a combinação plano × período (BASIC_MONTHLY, PRO_ANNUAL, ...)
+    const billingKey = planId as keyof typeof PLANS;
+    const isProPlan = billingKey.startsWith("PRO_");
+    const isAnnual = billingKey.endsWith("_ANNUAL");
+
     if (!["ONE_TIME", "RECURRING"].includes(billingMode)) {
       return NextResponse.json(
         { error: "Modo de cobrança inválido" },
@@ -58,7 +63,7 @@ export async function POST(request: NextRequest) {
 
     // Criar preferência no MercadoPago
     const preference = await createPreference(
-      planId as keyof typeof PLANS,
+      billingKey,
       user.companyId,
       user.company.name,
       getMercadoPagoPayerEmail(session.user.email),
@@ -66,7 +71,9 @@ export async function POST(request: NextRequest) {
       billingMode
     );
 
-    const planType: "MONTHLY" | "ANNUAL" = planId === "MONTHLY" ? "MONTHLY" : "ANNUAL";
+    // planType continua sendo o PERÍODO (MONTHLY/ANNUAL); o plano em si (BASIC/PRO)
+    // fica no amount, que identifica a combinação no catálogo PLANS.
+    const planType: "MONTHLY" | "ANNUAL" = isAnnual ? "ANNUAL" : "MONTHLY";
     const billingModeValue: "ONE_TIME" | "RECURRING" = billingMode;
     const preferenceId = String(preference.id ?? "");
     const subscriptionId = String(preference.id ?? "");
@@ -85,7 +92,8 @@ export async function POST(request: NextRequest) {
       companyId: user.companyId,
       planType,
       billingMode: billingModeValue,
-      amount: PLANS[planId as keyof typeof PLANS].price,
+      amount: PLANS[billingKey].price,
+      // marca o plano (BASIC/PRO) via amount — ver lib/plans.ts
       status: "PENDING" as const,
       autoRenew: isRecurring,
       mercadopagoPreferenceId: isRecurring ? null : preferenceId,

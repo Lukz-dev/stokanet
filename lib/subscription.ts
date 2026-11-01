@@ -32,6 +32,7 @@ export async function getSubscriptionStatus(companyId: string) {
     isActive: subscription.status === "ACTIVE" && !isExpired,
     planType: subscription.planType,
     billingMode: subscription.billingMode,
+    amount: subscription.amount,
     nextBillingDate: subscription.nextBillingDate,
     cancelledAt: subscription.cancelledAt,
     expiresAt: subscription.expiresAt,

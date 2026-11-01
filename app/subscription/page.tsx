@@ -127,7 +127,11 @@ export default async function SubscriptionPage() {
             <div>
               <p className="text-sm text-muted-foreground">Plano atual</p>
               <h2 className="mt-1 text-2xl font-bold">
-                {subscription.planType === "MONTHLY" ? "Mensal" : "Anual"}
+                {(() => {
+                  const isPro = [250, 2550, 100, 1020].includes(subscription.amount);
+                  const period = subscription.planType === "MONTHLY" ? "Mensal" : "Anual";
+                  return `${isPro ? "PRO" : "Básico"} ${period}`;
+                })()}
               </h2>
             </div>
             <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">

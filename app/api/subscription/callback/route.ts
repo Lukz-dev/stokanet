@@ -24,6 +24,21 @@ export async function GET(request: NextRequest) {
       );
 
       const mpReferenceId = preferenceId || preapprovalId || paymentId;
+      // amount identifica a combinação plano × período (ver lib/plans.ts)
+      const amount = subscription.amount;
+      const isProPlan = [250, 2550, 100, 1020].includes(amount);
+      // Guarda o plano no layout de storeLayout? Não — plano fica no amount + activePlan.
+      // Atualiza activePlan do primeiro usuário ADMIN da empresa.
+      const adminUser = await prisma.user.findFirst({
+        where: { companyId: externalReference, role: "ADMIN" },
+        orderBy: { createdAt: "asc" },
+      });
+      if (adminUser) {
+        await prisma.user.update({
+          where: { id: adminUser.id },
+          data: { activePlan: isProPlan ? "PRO" : "BASIC" },
+        });
+      }
 
       await prisma.subscription.update({
         where: { id: subscription.id },

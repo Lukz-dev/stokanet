@@ -111,8 +111,8 @@ export function AdminSubscriptionEditor({ userId, userEmail, subscription, userA
           <label className="text-xs text-muted-foreground">Plano do usuário</label>
           <select value={userActivePlan ?? ''} onChange={(e) => setUserActivePlan(e.target.value as any)} className="px-2 py-1 rounded border border-border bg-background text-sm">
             <option value="">Nenhum</option>
-            <option value="MONTHLY">Mensal</option>
-            <option value="ANNUAL">Anual</option>
+            <option value="BASIC">Básico</option>
+            <option value="PRO">PRO</option>
           </select>
           <button onClick={handleSetUserActivePlan} disabled={settingActivePlan} className="text-xs rounded px-2 py-1 bg-primary text-primary-foreground">{settingActivePlan ? 'Salvando...' : 'Definir'}</button>
           {activePlanMessage && <p className="text-xs text-foreground">{activePlanMessage}</p>}
@@ -310,8 +310,8 @@ export function AdminSubscriptionEditor({ userId, userEmail, subscription, userA
         <label className="text-xs text-muted-foreground">Plano do usuário</label>
         <select value={userActivePlan ?? ''} onChange={(e) => setUserActivePlan(e.target.value as any)} className="px-2 py-1 rounded border border-border bg-background text-sm">
           <option value="">Nenhum</option>
-          <option value="MONTHLY">Mensal</option>
-          <option value="ANNUAL">Anual</option>
+          <option value="BASIC">Básico</option>
+          <option value="PRO">PRO</option>
         </select>
         <button onClick={handleSetUserActivePlan} disabled={settingActivePlan} className="text-xs rounded px-2 py-1 bg-primary text-primary-foreground">{settingActivePlan ? 'Salvando...' : 'Definir'}</button>
         {activePlanMessage && <p className="text-xs text-foreground ml-2">{activePlanMessage}</p>}

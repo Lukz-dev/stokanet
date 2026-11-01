@@ -76,6 +76,22 @@ export async function POST(req: NextRequest) {
 
     const hashedPassword = await bcrypt.hash(password, 12)
 
+    // Limite de usuários por plano: Básico = 2, PRO (e legados) = ilimitado
+    const companySubscription = await prisma.subscription.findUnique({
+      where: { companyId: activeUser.companyId },
+      select: { amount: true, status: true },
+    })
+    const isProPlan = companySubscription?.status === 'ACTIVE' && [250, 2550, 100, 1020].includes(companySubscription.amount)
+    if (!isProPlan) {
+      const userCount = await prisma.user.count({ where: { companyId: activeUser.companyId } })
+      if (userCount >= 2) {
+        return NextResponse.json(
+          { error: 'Limite de 2 usuários do plano Básico atingido. Faça upgrade para o PRO para adicionar mais.' },
+          { status: 403 }
+        )
+      }
+    }
+
     const employee = await prisma.user.create({
       data: {
         name,

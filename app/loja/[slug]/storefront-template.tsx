@@ -1257,14 +1257,12 @@ export function StorefrontTemplate({
               {renderLayer('testimonials', 4)}
               {renderLayer('about', 5)}
               {renderLayer('instagram', 6)}
+              {visibility.benefits !== false && <BenefitsStrip shippingNote={storefront.storeShippingNote} />}
+              {visibility.contact !== false && <Contact data={storefront} />}
             </>
           )}
         </>
       )}
-
-      {visibility.benefits !== false && <BenefitsStrip shippingNote={storefront.storeShippingNote} />}
-
-      {visibility.contact !== false && <Contact data={storefront} />}
 
       <Footer data={storefront} />
 

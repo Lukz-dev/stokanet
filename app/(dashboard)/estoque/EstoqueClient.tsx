@@ -5,6 +5,7 @@ import dynamic from 'next/dynamic'
 import { Plus, Search, Filter, Edit2, Package, ChevronLeft, ChevronRight, RotateCcw, Trash2 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { archiveProduct, deleteProduct, unarchiveProduct } from '@/lib/actions'
+import { EmptyState } from '@/components/ui/empty-state'
 
 const ProductModal = dynamic(() => import('@/components/ProductModal').then((module) => module.ProductModal))
 const EditProductModal = dynamic(() => import('@/components/EditProductModal').then((module) => module.EditProductModal))
@@ -362,11 +363,16 @@ export function EstoqueClient({ initialProducts, categories, defaultMinStock }: 
           {/* Tabela */}
           <div className="overflow-x-auto flex-1">
             {paginated.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
-                <Package className="w-16 h-16 mb-4 opacity-20" />
-                <p className="text-lg font-medium">Nenhum produto encontrado</p>
-                <p className="text-sm mt-1">Tente ajustar os filtros ou cadastre um novo produto.</p>
-              </div>
+              <EmptyState
+                icon={Package}
+                title={search || statusFilter !== 'todos' ? 'Nenhum produto encontrado' : 'Seu estoque está vazio'}
+                description={
+                  search || statusFilter !== 'todos'
+                    ? 'Tente ajustar os filtros ou cadastre um novo produto.'
+                    : 'Cadastre o primeiro produto para começar a controlar entradas, saídas e vendas.'
+                }
+                action={search || statusFilter !== 'todos' ? undefined : { label: 'Cadastrar produto', onClick: () => setShowCreate(true) }}
+              />
             ) : (
               <table className="w-full text-sm text-left">
                 <thead className="text-xs uppercase bg-muted/30 text-muted-foreground border-b border-border">

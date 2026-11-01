@@ -74,7 +74,7 @@ export async function updateUserSubscription(
 
   // If planType changed but amount not provided, apply default amounts
   if (data.planType && data.amount === undefined) {
-    data.amount = data.planType === 'ANNUAL' ? 1020 : 100
+    data.amount = data.planType === 'ANNUAL' ? 1530 : 150
   }
 
   await prisma.subscription.update({
@@ -107,7 +107,7 @@ export async function createUserSubscription(
     throw new Error('Assinatura já existe para esta empresa')
   }
 
-  const amount = data.amount ?? (data.planType === 'MONTHLY' ? 100 : 1020)
+  const amount = data.amount ?? (data.planType === 'MONTHLY' ? 150 : 1530)
 
   await prisma.subscription.create({
     data: {
@@ -123,13 +123,14 @@ export async function createUserSubscription(
   revalidatePath('/admin')
 }
 
-export async function setUserActivePlan(userId: string, planType: 'MONTHLY' | 'ANNUAL' | null) {
+export async function setUserActivePlan(userId: string, planType: 'BASIC' | 'PRO' | null) {
   await getApprovalAdminUser()
 
   const target = await prisma.user.findUnique({ where: { id: userId }, select: { id: true, isSystemAdmin: true } })
   if (!target) throw new Error('Usuário não encontrado')
   if (target.isSystemAdmin) throw new Error('Não é possível alterar o plano do administrador do sistema')
 
-  await prisma.user.update({ where: { id: userId }, data: { activePlan: planType } })
+  const normalizedPlan = planType === 'BASIC' || planType === 'PRO' ? planType : null
+  await prisma.user.update({ where: { id: userId }, data: { activePlan: normalizedPlan } })
   revalidatePath('/admin')
 }

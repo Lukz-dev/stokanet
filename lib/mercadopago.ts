@@ -166,21 +166,38 @@ export function verifyMercadoPagoWebhookSignature(
   return { ok: isValid, reason: isValid ? undefined : "Assinatura incompatível" };
 }
 
+// Catálogo de cobrança (4 combinações plano × período) — preços em lib/plans.ts
 export const PLANS = {
-  MONTHLY: {
-    id: "monthly",
-    name: "Plano Mensal",
-    price: 100,
+  BASIC_MONTHLY: {
+    id: "basic-monthly",
+    name: "Básico Mensal",
+    price: 150,
     currency: "BRL",
     description: "Acesso mensal ao sistema de estoque",
     billingCycle: "month",
   },
-  ANNUAL: {
-    id: "annual",
-    name: "Plano Anual",
-    price: 1020, // R$ 100/mês com 15% de desconto = R$ 1.020/ano
+  BASIC_ANNUAL: {
+    id: "basic-annual",
+    name: "Básico Anual",
+    price: 1530, // R$ 150/mês com 15% de desconto = R$ 1.530/ano
     currency: "BRL",
     description: "Acesso anual ao sistema de estoque com 15% de desconto",
+    billingCycle: "year",
+  },
+  PRO_MONTHLY: {
+    id: "pro-monthly",
+    name: "PRO Mensal",
+    price: 250,
+    currency: "BRL",
+    description: "Acesso mensal com loja online, relatórios e auditoria",
+    billingCycle: "month",
+  },
+  PRO_ANNUAL: {
+    id: "pro-annual",
+    name: "PRO Anual",
+    price: 2550, // R$ 250/mês com 15% de desconto = R$ 2.550/ano
+    currency: "BRL",
+    description: "Acesso anual com loja online e 15% de desconto",
     billingCycle: "year",
   },
 };

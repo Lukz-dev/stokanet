@@ -3,6 +3,7 @@
 import { useMemo, useState, useTransition } from 'react'
 import { Ban, Pencil, Receipt, Search } from 'lucide-react'
 import { cancelSale, completePendingSale } from '@/lib/actions'
+import { EmptyState } from '@/components/ui/empty-state'
 import { useRouter } from 'next/navigation'
 import { SaleEditModal } from '@/components/SaleEditModal'
 
@@ -173,10 +174,11 @@ export function VendasClient({ initialSales }: { initialSales: Sale[] }) {
         <div className="px-4 py-3 border-b border-border text-sm font-medium">Vendas encontradas ({filteredSales.length})</div>
         <div className="divide-y divide-border">
           {filteredSales.length === 0 ? (
-            <div className="px-4 py-10 text-center text-muted-foreground">
-              <Receipt className="w-10 h-10 mx-auto mb-3 opacity-30" />
-              <p>Nenhuma venda encontrada para o filtro atual.</p>
-            </div>
+            <EmptyState
+              icon={Receipt}
+              title="Nenhuma venda encontrada"
+              description="As vendas registradas no caixa aparecem aqui, com status e nota fiscal."
+            />
           ) : filteredSales.map((sale) => {
             const cancelled = isCancelled(sale.notes)
             const pending = isPendingSale(sale)

@@ -130,12 +130,12 @@ export function Header() {
   }
 
   return (
-    <header className="h-14 border-b border-border bg-background sticky top-0 z-10 flex items-center justify-between px-6 gap-4">
+    <header className="sticky top-0 z-10 flex min-h-14 items-center justify-between gap-3 border-b border-border bg-background px-3 sm:gap-4 sm:px-6">
       <div className="flex items-center gap-4">
         <Link href="/" className="flex items-center text-[15px] font-semibold tracking-tight">
           StokaNet
         </Link>
-        <div className="flex items-center bg-muted/60 rounded-md px-3 py-1.5 w-80 border border-transparent focus-within:border-border focus-within:bg-background transition-all">
+        <div className="hidden w-80 items-center rounded-md border border-transparent bg-muted/60 px-3 py-1.5 transition-all focus-within:border-border focus-within:bg-background sm:flex">
         <Search className="w-4 h-4 text-muted-foreground mr-2 shrink-0" />
         <input
           type="text"
@@ -162,7 +162,7 @@ export function Header() {
           </button>
 
           {notificationsOpen && (
-            <div className="absolute right-0 top-[calc(100%+0.75rem)] w-[360px] rounded-lg border border-border bg-card shadow-lg shadow-black/5 overflow-hidden z-30">
+            <div className="absolute right-0 top-[calc(100%+0.75rem)] z-30 w-[calc(100vw-1.5rem)] max-w-[360px] overflow-hidden rounded-lg border border-border bg-card shadow-lg shadow-black/5">
               <div className="px-4 py-3 border-b border-border bg-muted/20">
                 <p className="text-sm font-semibold">Notificações</p>
                 <p className="text-xs text-muted-foreground mt-1">

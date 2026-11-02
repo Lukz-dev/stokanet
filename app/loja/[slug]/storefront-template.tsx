@@ -142,9 +142,13 @@ const CSS = `
   --sf-text: #333;
   --sf-bg: #fff;
   --sf-radius: 10px;
+  --sf-columns: 4;
+  --sf-hero-height: 380px;
+  --sf-banner-fit: cover;
   font-family: system-ui, -apple-system, sans-serif;
   color: var(--sf-text);
   background: var(--sf-bg);
+  overflow-x: hidden;
 }
 .sf-container { max-width: 1200px; margin: 0 auto; padding: 0 16px; }
 
@@ -196,9 +200,14 @@ const CSS = `
 /* carrossel full-bleed — sem overlay, banners clicáveis */
 .sf-hero { position: relative; overflow: hidden; width: 100%; }
 .sf-hero__slides { display: flex; height: 100%; transition: transform .6s ease; }
-.sf-hero__viewport { height: 380px; }
+.sf-hero__viewport { height: var(--sf-hero-height); }
 .sf-hero__slide { min-width: 100%; background-size: cover; background-position: center; display: block; height: 100%; }
+.sf-hero__slide { background-size: var(--sf-banner-fit); }
 .sf-hero__slide--fallback { background: linear-gradient(135deg, var(--sf-primary), var(--sf-secondary)); position: relative; overflow: hidden; }
+.sf-hero__fallback-content { position: relative; z-index: 1; display: flex; height: 100%; flex-direction: column; justify-content: center; gap: 12px; max-width: 680px; padding: 32px max(24px, calc((100% - 1200px) / 2)); color: #fff; }
+.sf-hero__fallback-content h1 { margin: 0; font-size: clamp(28px, 5vw, 56px); line-height: 1.05; }
+.sf-hero__fallback-content p { margin: 0; max-width: 560px; font-size: clamp(15px, 2vw, 20px); }
+.sf-hero__fallback-content span { width: fit-content; border-radius: 999px; background: #fff; color: var(--sf-primary); padding: 12px 22px; font-size: 14px; font-weight: 700; }
 .sf-hero__slide--fallback::after { content: ""; position: absolute; right: -80px; top: -80px; width: 320px; height: 320px; border-radius: 50%; background: rgba(255,255,255,.12); }
 .sf-hero__arrow { position: absolute; top: 50%; transform: translateY(-50%); width: 40px; height: 40px; border-radius: 50%; border: 0; background: rgba(255,255,255,.85); color: var(--sf-primary); display: flex; align-items: center; justify-content: center; cursor: pointer; z-index: 5; }
 .sf-hero__arrow--left { left: 16px; }
@@ -222,7 +231,7 @@ const CSS = `
 .sf-carousel .sf-midbanner__slides { display: flex; height: 100%; transition: transform .6s ease; }
 .sf-carousel .sf-midbanner__slide { min-width: 100%; height: 100%; background-size: cover; background-position: center; display: block; }
 
-.sf-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; }
+.sf-grid { display: grid; grid-template-columns: repeat(var(--sf-columns), minmax(0, 1fr)); gap: 20px; }
 
 /* card de produto no estilo da referência */
 .sf-card { border: 1px solid #eee; border-radius: var(--sf-radius); overflow: hidden; background: #fff; display: flex; flex-direction: column; transition: box-shadow .2s; }
@@ -314,7 +323,7 @@ const CSS = `
 .sf-empty-search { color: #777; font-size: 15px; text-align: center; padding: 24px 0; }
 
 @media (max-width: 1024px) {
-  .sf-grid { grid-template-columns: repeat(3, 1fr); }
+  .sf-grid { grid-template-columns: repeat(min(var(--sf-columns), 3), minmax(0, 1fr)); }
   .sf-benefits__list { grid-template-columns: repeat(2, 1fr); }
   .sf-cats__row { grid-template-columns: repeat(3, 1fr); }
   .sf-testimonials__row { grid-template-columns: repeat(2, 1fr); }
@@ -322,8 +331,8 @@ const CSS = `
 @media (max-width: 720px) {
   .sf-header__inner { flex-wrap: wrap; }
   .sf-search { order: 3; min-width: 100%; }
-  .sf-hero__viewport { height: 220px; }
-  .sf-grid { grid-template-columns: repeat(2, 1fr); gap: 12px; }
+  .sf-hero__viewport { height: min(var(--sf-hero-height), 220px); }
+  .sf-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
   .sf-benefits__list { grid-template-columns: 1fr; }
   .sf-testimonials__row { grid-template-columns: 1fr; }
   .sf-about { grid-template-columns: 1fr; }
@@ -362,14 +371,15 @@ const SafeImage = ({ src, alt }: { src: string | null; alt: string }) => {
 
 /** Faixa promocional com marquee infinito (texto repetido, como na referência). */
 const PromoBar = ({ text }: { text: string }) => {
+  const promoText = text.trim() || "Frete grátis para compras acima do valor mínimo"
   const items = Array.from({ length: 10 })
   return (
     <div className="sf-promo">
       <div className="sf-promo__track">
         {items.map((_, i) => (
           <span key={i} className="sf-promo__item">
-            <strong>{text.split("|")[0]?.trim() ?? text}</strong>
-            {text.includes("|") && <> | {text.split("|")[1]?.trim()}</>}
+            <strong>{promoText.split("|")[0]?.trim() ?? promoText}</strong>
+            {promoText.includes("|") && <> | {promoText.split("|")[1]?.trim()}</>}
           </span>
         ))}
       </div>
@@ -481,6 +491,7 @@ const Header = ({
   onRemoveFromCart,
   onUpdateQuantity,
   onCheckout,
+  showSearch,
 }: {
   data: StorefrontData
   searchQuery: string
@@ -490,6 +501,7 @@ const Header = ({
   onRemoveFromCart: (productId: string) => void
   onUpdateQuantity: (productId: string, quantity: number) => void
   onCheckout: () => void
+  showSearch: boolean
 }) => {
   const [cartOpen, setCartOpen] = useState(false)
   const wrapRef = useRef<HTMLDivElement | null>(null)
@@ -514,22 +526,24 @@ const Header = ({
             : <span>{data.storeName}</span>}
         </a>
         {/* Busca interna: filtra storefront.products via onSearchChange */}
-        <form
-          className="sf-search"
-          role="search"
-          onSubmit={(e) => e.preventDefault()}
-        >
-          <input
-            type="search"
-            value={searchQuery}
-            onChange={(e) => onSearchChange(e.target.value)}
-            placeholder="Buscar produtos..."
-            aria-label="Buscar produtos"
-          />
-          <button type="submit" aria-label="Buscar">
-            <Search size={18} />
-          </button>
-        </form>
+        {showSearch && (
+          <form
+            className="sf-search"
+            role="search"
+            onSubmit={(e) => e.preventDefault()}
+          >
+            <input
+              type="search"
+              value={searchQuery}
+              onChange={(e) => onSearchChange(e.target.value)}
+              placeholder="Buscar produtos..."
+              aria-label="Buscar produtos"
+            />
+            <button type="submit" aria-label="Buscar">
+              <Search size={18} />
+            </button>
+          </form>
+        )}
         <nav className="sf-header__actions">
           <a href="#conta" aria-label="Minha conta">
             <User size={20} />
@@ -563,7 +577,8 @@ const Header = ({
   )
 }
 
-const CategoryNav = ({ items, onSelect }: { items: { id: string; name: string }[]; onSelect: (id: string) => void }) => (
+const CategoryNav = ({ items, onSelect, visible }: { items: { id: string; name: string }[]; onSelect: (id: string) => void; visible: boolean }) => (
+  visible ? (
   <nav className="sf-catnav">
     <ul className="sf-container sf-catnav__list">
       <li><button type="button" onClick={() => onSelect('')} className="sf-catnav__button">Todos</button></li>
@@ -574,10 +589,20 @@ const CategoryNav = ({ items, onSelect }: { items: { id: string; name: string }[
       ))}
     </ul>
   </nav>
-)
+) : null)
 
-/** Carrossel full-bleed — apenas banners clicáveis, sem texto sobreposto. */
-const HeroCarousel = ({ banners }: { banners: string[] }) => {
+/** Carrossel full-bleed. Banners podem trazer o texto na própria arte; o fallback usa os textos configuráveis da loja. */
+const HeroCarousel = ({
+  banners,
+  title,
+  subtitle,
+  buttonLabel,
+}: {
+  banners: string[]
+  title: string
+  subtitle: string
+  buttonLabel: string
+}) => {
   const [idx, setIdx] = useState(0)
   const timer = useRef<number | null>(null)
 
@@ -616,7 +641,13 @@ const HeroCarousel = ({ banners }: { banners: string[] }) => {
                 className="sf-hero__slide sf-hero__slide--fallback"
                 role="img"
                 aria-label={`Banner ${i + 1}`}
-              />
+              >
+                <span className="sf-hero__fallback-content">
+                  <h1>{title || "Bem-vindo à nossa loja"}</h1>
+                  <p>{subtitle || "Produtos escolhidos para você."}</p>
+                  <span>{buttonLabel || "Comprar agora"}</span>
+                </span>
+              </a>
             )
           )}
         </div>
@@ -1161,11 +1192,19 @@ export function StorefrontTemplate({
   useEffect(() => {
     const root = rootRef.current
     if (!root) return
-    if (storefront.storePrimaryColor)
-      root.style.setProperty("--sf-primary", storefront.storePrimaryColor)
-    if (storefront.storeSecondaryColor)
-      root.style.setProperty("--sf-secondary", storefront.storeSecondaryColor)
-  }, [storefront.storePrimaryColor, storefront.storeSecondaryColor])
+    root.style.setProperty("--sf-primary", storefront.storePrimaryColor || "#5b2a7a")
+    root.style.setProperty("--sf-secondary", storefront.storeSecondaryColor || "#e639c0")
+    const layout = storefront.storeLayout
+    const columns = layout?.productColumns === 2 || layout?.productColumns === 4 ? layout.productColumns : 3
+    const heroHeight = layout?.bannerHeight === "short" ? "280px" : layout?.bannerHeight === "tall" ? "520px" : "380px"
+    root.style.setProperty("--sf-columns", String(columns))
+    root.style.setProperty("--sf-hero-height", heroHeight)
+    root.style.setProperty("--sf-banner-fit", layout?.bannerFit === "contain" ? "contain" : "cover")
+  }, [
+    storefront.storePrimaryColor,
+    storefront.storeSecondaryColor,
+    storefront.storeLayout,
+  ])
 
   const searching = searchQuery.trim().length > 0
   const visibility = storefront.storeLayout?.sectionVisibility ?? {}
@@ -1263,11 +1302,21 @@ export function StorefrontTemplate({
         onRemoveFromCart={onRemoveFromCart}
         onUpdateQuantity={onUpdateQuantity}
         onCheckout={onCheckout}
+        showSearch={storefront.storeLayout?.showSearch !== false}
       />
 
-      <CategoryNav items={cats} onSelect={selectCategory} />
+      <CategoryNav
+        items={cats}
+        onSelect={selectCategory}
+        visible={storefront.storeLayout?.showCategories !== false}
+      />
 
-      <HeroCarousel banners={heroBanners} />
+      <HeroCarousel
+        banners={heroBanners}
+        title={storefront.storeHeroTitle}
+        subtitle={storefront.storeHeroSubtitle}
+        buttonLabel={storefront.storePrimaryButtonLabel}
+      />
 
       {searching ? (
         <ProductSection

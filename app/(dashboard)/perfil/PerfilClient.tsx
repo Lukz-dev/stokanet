@@ -27,14 +27,29 @@ type CompanyData = {
   createdAt: string
 }
 
-type SubscriptionData = {
-  planType: 'MONTHLY' | 'ANNUAL'
+type SubscriptionDetails = {
+  planType: 'MONTHLY' | 'ANNUAL' | 'BASIC' | 'PRO'
   billingMode: 'ONE_TIME' | 'RECURRING'
   status: string
   nextBillingDate: string | null
   expiresAt: string | null
   autoRenew: boolean
-} | null
+}
+
+type SubscriptionData = SubscriptionDetails | null
+
+function formatPlanType(planType: SubscriptionDetails['planType']) {
+  switch (planType) {
+    case 'MONTHLY':
+      return 'Mensal'
+    case 'ANNUAL':
+      return 'Anual'
+    case 'BASIC':
+      return 'Básico'
+    case 'PRO':
+      return 'PRO'
+  }
+}
 
 interface Props {
   user: UserData
@@ -470,7 +485,7 @@ export function PerfilClient({ user, company, subscription }: Props) {
                 <div className="rounded-lg border border-border bg-muted/20 p-4">
                   <p className="text-xs uppercase tracking-wider text-muted-foreground">Plano</p>
                   <p className="mt-1 text-lg font-semibold">
-                    {subscription.planType === 'MONTHLY' ? 'Mensal' : 'Anual'}
+                    {formatPlanType(subscription.planType)}
                   </p>
                 </div>
                 <div className="grid grid-cols-1 gap-3 text-sm">

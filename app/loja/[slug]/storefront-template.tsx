@@ -78,6 +78,11 @@ export type StorefrontData = {
   storeLogoUrl: string | null
   products: StoreProduct[]
   storeLayout?: {
+    bannerHeight?: "short" | "medium" | "tall"
+    bannerFit?: "cover" | "contain"
+    productColumns?: 2 | 3 | 4
+    showCategories?: boolean
+    showSearch?: boolean
     categoryImages?: Record<string, string>
     aboutImage?: string | null
     instagramImage?: string | null

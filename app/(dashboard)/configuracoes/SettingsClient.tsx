@@ -242,12 +242,52 @@ export function SettingsClient({
     storeActive: Boolean(storeActive),
   })
 
+  const buildStorePreferences = (values: typeof form) => ({
+    defaultMinStock: Number.parseInt(values.defaultMinStock, 10),
+    notificationWebhookUrl: values.notificationWebhookUrl,
+    storeSlug: values.storeSlug,
+    storeName: values.storeName,
+    storeDescription: values.storeDescription,
+    storeHeroTitle: values.storeHeroTitle,
+    storeHeroSubtitle: values.storeHeroSubtitle,
+    storeBadgeText: values.storeBadgeText,
+    storePrimaryButtonLabel: values.storePrimaryButtonLabel,
+    storeSecondaryButtonLabel: values.storeSecondaryButtonLabel,
+    storeWhatsappNumber: values.storeWhatsappNumber,
+    storeInstagramUrl: values.storeInstagramUrl,
+    storeFacebookUrl: values.storeFacebookUrl,
+    storeTiktokUrl: values.storeTiktokUrl,
+    storeShippingFee: Number(values.storeShippingFee),
+    storeFreeShippingMin: Number(values.storeFreeShippingMin),
+    storeShippingNote: values.storeShippingNote,
+    storePrimaryColor: values.storePrimaryColor,
+    storeSecondaryColor: values.storeSecondaryColor,
+    storeShowSocialLinks: values.storeShowSocialLinks,
+    storeShowShippingInfo: values.storeShowShippingInfo,
+    storeBannerUrl: values.storeBannerUrl,
+    storeBannerUrls: values.storeBannerUrls,
+    storeLogoUrl: values.storeLogoUrl,
+    storeLayout: {
+      ...values.storeLayout,
+      bannerCarousel: values.storeLayout.bannerCarousel,
+      categoryImages: values.storeLayout.categoryImages,
+      aboutImage: values.storeLayout.aboutImage || null,
+      instagramImage: values.storeLayout.instagramImage || null,
+      testimonials: values.storeLayout.testimonials,
+      sectionVisibility: values.storeLayout.sectionVisibility,
+      sections: values.storeLayout.sections,
+      bannerCarousels: values.storeLayout.bannerCarousels,
+    },
+    storeTheme: values.storeTheme,
+    storeActive: values.storeActive,
+  }) as Parameters<typeof updateCompanyPreferences>[0]
+
   const restoreStoreDefaults = () => {
     if (!window.confirm('Restaurar o padrão visual da loja? Isso removerá logo, banners e imagens personalizadas, mas não alterará produtos, estoque ou dados de pagamento.')) {
       return
     }
 
-    setForm((current) => ({
+    const resetForm = (current: typeof form) => ({
       ...current,
       storeHeroTitle: 'Bem-vindo à nossa loja',
       storeHeroSubtitle: 'Produtos escolhidos para você.',
@@ -286,9 +326,21 @@ export function SettingsClient({
         sections: DEFAULT_STORE_SECTIONS,
         bannerCarousels: [],
       },
-    }))
+    })
+
+    setForm((current) => resetForm(current))
     setError('')
-    setSuccess('Padrão visual restaurado na prévia. Clique em “Salvar configurações” para publicar.')
+    setSuccess('Restaurando padrão visual e publicando na loja...')
+    startTransition(async () => {
+      try {
+        const nextForm = resetForm(form)
+        await updateCompanyPreferences(buildStorePreferences(nextForm))
+        setSuccess('Padrão visual restaurado e publicado na loja.')
+        router.refresh()
+      } catch (currentError) {
+        setError(currentError instanceof Error ? currentError.message : 'Não foi possível restaurar o padrão da loja.')
+      }
+    })
   }
   const storeThemePreset = THEME_COLOR_PRESETS[String(form.storeTheme ?? 'ocean').toUpperCase() as ThemePreference] ?? THEME_COLOR_PRESETS.OCEAN
   const previewLayout = form.storeLayout.categoryImages
@@ -337,59 +389,7 @@ export function SettingsClient({
 
     startTransition(async () => {
       try {
-        await updateCompanyPreferences({
-          defaultMinStock: Number.parseInt(form.defaultMinStock, 10),
-          notificationWebhookUrl: form.notificationWebhookUrl,
-          storeSlug: form.storeSlug,
-          storeName: form.storeName,
-          storeDescription: form.storeDescription,
-          storeHeroTitle: form.storeHeroTitle,
-          storeHeroSubtitle: form.storeHeroSubtitle,
-          storeBadgeText: form.storeBadgeText,
-          storePrimaryButtonLabel: form.storePrimaryButtonLabel,
-          storeSecondaryButtonLabel: form.storeSecondaryButtonLabel,
-          storeWhatsappNumber: form.storeWhatsappNumber,
-          storeInstagramUrl: form.storeInstagramUrl,
-          storeFacebookUrl: form.storeFacebookUrl,
-          storeTiktokUrl: form.storeTiktokUrl,
-          storeShippingFee: Number(form.storeShippingFee),
-          storeFreeShippingMin: Number(form.storeFreeShippingMin),
-          storeShippingNote: form.storeShippingNote,
-          storePrimaryColor: form.storePrimaryColor,
-          storeSecondaryColor: form.storeSecondaryColor,
-          storeShowSocialLinks: form.storeShowSocialLinks,
-          storeShowShippingInfo: form.storeShowShippingInfo,
-          storeBannerUrl: form.storeBannerUrl,
-          storeBannerUrls: form.storeBannerUrls,
-          storeLogoUrl: form.storeLogoUrl,
-          storeLayout: {
-            logoPosition: 'left',
-            bannerStyle: 'hero',
-            bannerCarousel: form.storeLayout.bannerCarousel,
-            bannerHeight: 'medium',
-            bannerFit: form.storeLayout.bannerFit,
-            showBannerArrows: form.storeLayout.showBannerArrows,
-            showBannerDots: form.storeLayout.showBannerDots,
-            cartPosition: 'right',
-            headerStyle: 'full',
-            contentWidth: 'wide',
-            productColumns: 4,
-            productCardStyle: 'standard',
-            productGap: 'normal',
-            showCategories: true,
-            showSearch: true,
-            showSort: true,
-            categoryImages: form.storeLayout.categoryImages,
-            aboutImage: form.storeLayout.aboutImage || null,
-            instagramImage: form.storeLayout.instagramImage || null,
-            testimonials: form.storeLayout.testimonials,
-            sectionVisibility: form.storeLayout.sectionVisibility,
-            sections: form.storeLayout.sections,
-            bannerCarousels: form.storeLayout.bannerCarousels,
-          },
-          storeTheme: form.storeTheme,
-          storeActive: form.storeActive,
-        } as Parameters<typeof updateCompanyPreferences>[0])
+        await updateCompanyPreferences(buildStorePreferences(form))
         setSuccess('Configurações salvas com sucesso.')
         router.refresh()
       } catch (currentError: any) {

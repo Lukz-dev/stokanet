@@ -78,9 +78,9 @@ export type StorefrontData = {
   storeLogoUrl: string | null
   products: StoreProduct[]
   storeLayout?: {
-    bannerHeight?: "short" | "medium" | "tall"
-    bannerFit?: "cover" | "contain"
-    productColumns?: 2 | 3 | 4
+    bannerHeight?: string
+    bannerFit?: string
+    productColumns?: number
     showCategories?: boolean
     showSearch?: boolean
     categoryImages?: Record<string, string>

@@ -58,6 +58,20 @@ const DEFAULT_TESTIMONIALS = [
   { name: 'Cliente D', text: 'O vendedor enviou super rápido. Chegou em poucos dias! É original. Estou super satisfeita.' },
 ]
 
+const DEFAULT_STORE_VISIBILITY = {
+  featured: true,
+  catalog: true,
+  categories: true,
+  brands: true,
+  testimonials: true,
+  about: true,
+  instagram: true,
+  benefits: true,
+  contact: true,
+}
+
+const DEFAULT_STORE_SECTIONS = ['featured', 'catalog', 'categories', 'brands', 'testimonials', 'about', 'instagram']
+
 interface Props {
   companyName: string
   defaultMinStock: number
@@ -227,6 +241,55 @@ export function SettingsClient({
     storeTheme,
     storeActive: Boolean(storeActive),
   })
+
+  const restoreStoreDefaults = () => {
+    if (!window.confirm('Restaurar o padrão visual da loja? Isso removerá logo, banners e imagens personalizadas, mas não alterará produtos, estoque ou dados de pagamento.')) {
+      return
+    }
+
+    setForm((current) => ({
+      ...current,
+      storeHeroTitle: 'Bem-vindo à nossa loja',
+      storeHeroSubtitle: 'Produtos escolhidos para você.',
+      storeBadgeText: 'Frete grátis para compras acima do valor mínimo | Parcelamento em até 6x sem juros',
+      storePrimaryButtonLabel: 'Comprar agora',
+      storeSecondaryButtonLabel: 'Ver catálogo',
+      storePrimaryColor: '#9d315d',
+      storeSecondaryColor: '#e98291',
+      storeTheme: 'ROSE',
+      storeBannerUrl: '',
+      storeBannerUrls: [],
+      storeLogoUrl: '',
+      storeLayout: {
+        ...current.storeLayout,
+        logoPosition: 'left',
+        bannerStyle: 'hero',
+        bannerCarousel: true,
+        bannerHeight: 'medium',
+        bannerFit: 'cover',
+        showBannerArrows: true,
+        showBannerDots: true,
+        cartPosition: 'right',
+        headerStyle: 'full',
+        contentWidth: 'wide',
+        productColumns: 4,
+        productCardStyle: 'standard',
+        productGap: 'normal',
+        showCategories: true,
+        showSearch: true,
+        showSort: true,
+        categoryImages: {},
+        aboutImage: '',
+        instagramImage: '',
+        testimonials: DEFAULT_TESTIMONIALS,
+        sectionVisibility: DEFAULT_STORE_VISIBILITY,
+        sections: DEFAULT_STORE_SECTIONS,
+        bannerCarousels: [],
+      },
+    }))
+    setError('')
+    setSuccess('Padrão visual restaurado na prévia. Clique em “Salvar configurações” para publicar.')
+  }
   const storeThemePreset = THEME_COLOR_PRESETS[String(form.storeTheme ?? 'ocean').toUpperCase() as ThemePreference] ?? THEME_COLOR_PRESETS.OCEAN
   const previewLayout = form.storeLayout.categoryImages
   const previewStorefront = {
@@ -660,12 +723,23 @@ export function SettingsClient({
           </section>
 
           <section className="bg-card border border-border rounded-2xl shadow-sm p-6">
-            <div className="flex items-center justify-between gap-4 mb-6">
+            <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
               <div>
                 <h2 className="text-lg font-semibold">Conteúdo da loja</h2>
                 <p className="text-sm text-muted-foreground">Edite textos, chamada principal e aparência do topo da vitrine.</p>
               </div>
-              <Store className="w-5 h-5 text-primary" />
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={restoreStoreDefaults}
+                  disabled={isPending}
+                  className="inline-flex items-center gap-2 rounded-lg border border-rose-300 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-800 transition-colors hover:bg-rose-100 disabled:opacity-60"
+                >
+                  <RotateCw className="h-4 w-4" />
+                  Restaurar padrão da loja
+                </button>
+                <Store className="w-5 h-5 text-primary" />
+              </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

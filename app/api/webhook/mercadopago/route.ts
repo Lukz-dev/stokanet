@@ -25,7 +25,7 @@ function normalizeMercadoPagoResourceId(value: unknown) {
   return trailingId || rawValue || null;
 }
 
-function getNextBillingDate(planType: "MONTHLY" | "ANNUAL") {
+function getNextBillingDate(planType: "MONTHLY" | "ANNUAL" | "BASIC" | "PRO") {
   const nextBillingDate = new Date();
   nextBillingDate.setMonth(nextBillingDate.getMonth() + (planType === "MONTHLY" ? 1 : 12));
   return nextBillingDate;

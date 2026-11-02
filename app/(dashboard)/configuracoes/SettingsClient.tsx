@@ -296,7 +296,7 @@ export function SettingsClient({
       storeSecondaryButtonLabel: 'Ver catálogo',
       storePrimaryColor: '#9d315d',
       storeSecondaryColor: '#e98291',
-      storeTheme: 'ROSE',
+      storeTheme: 'ROSE' as ThemePreference,
       storeBannerUrl: '',
       storeBannerUrls: [],
       storeLogoUrl: '',

@@ -1220,8 +1220,8 @@ export function StorefrontTemplate({
   useEffect(() => {
     const root = rootRef.current
     if (!root) return
-    root.style.setProperty("--sf-primary", storefront.storePrimaryColor || "#5b2a7a")
-    root.style.setProperty("--sf-secondary", storefront.storeSecondaryColor || "#e639c0")
+    root.style.setProperty("--sf-primary", storefront.storePrimaryColor || "#9d315d")
+    root.style.setProperty("--sf-secondary", storefront.storeSecondaryColor || "#e98291")
     const layout = storefront.storeLayout
     const columns = layout?.productColumns === 2 || layout?.productColumns === 4 ? layout.productColumns : 3
     const heroHeight = layout?.bannerHeight === "short" ? "280px" : layout?.bannerHeight === "tall" ? "520px" : "380px"

@@ -1455,6 +1455,9 @@ export async function updateCompanyPreferences(data: {
   revalidatePath('/perfil')
   revalidatePath('/configuracoes')
   revalidatePath('/estoque')
+  if (data.storeSlug?.trim()) {
+    revalidatePath(`/loja/${data.storeSlug.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')}`)
+  }
 
   await logAudit({
     action: 'UPDATE',
